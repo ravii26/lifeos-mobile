@@ -1,0 +1,47 @@
+name: lifeos_mobile
+description: "LifeOS — personal life operating system (mobile)."
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.12.2
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  cupertino_icons: ^1.0.8
+
+  # State management
+  flutter_bloc: ^9.0.0
+  equatable: ^2.0.7
+
+  # Networking
+  dio: ^5.7.0
+
+  # DI / service locator
+  get_it: ^8.0.3
+
+  # Routing
+  go_router: ^14.6.2
+
+  # Secure token storage
+  flutter_secure_storage: ^9.2.4
+
+  # Fonts (Hanken Grotesk + JetBrains Mono per design system)
+  google_fonts: ^6.2.1
+
+  # Local notifications (habit reminders)
+  flutter_local_notifications: ^18.0.1
+  timezone: ^0.9.4
+
+  # Utilities
+  intl: ^0.20.1
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+
+flutter:
+  uses-material-design: true
