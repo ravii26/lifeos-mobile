@@ -7,6 +7,7 @@ import '../../widgets/glass.dart';
 import '../../widgets/screen_header.dart';
 import '../shell/life_cubit.dart';
 import 'task_detail_screen.dart';
+import 'task_form.dart';
 import 'task_row.dart';
 
 class TasksScreen extends StatefulWidget {
@@ -126,6 +127,18 @@ class _TasksScreenState extends State<TasksScreen> {
                                   child: TaskDetailScreen(taskId: t.id),
                                 ),
                               ));
+                            },
+                            onLongPress: () {
+                              final cubit = context.read<LifeCubit>();
+                              showModalBottomSheet(
+                                context: context,
+                                isScrollControlled: true,
+                                backgroundColor: Colors.transparent,
+                                builder: (_) => BlocProvider.value(
+                                  value: cubit,
+                                  child: TaskForm(task: t, areas: s.areas),
+                                ),
+                              );
                             },
                             child: TaskRow(
                               task: t,

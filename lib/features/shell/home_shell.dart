@@ -47,16 +47,31 @@ class _HomeShellState extends State<HomeShell> {
         return Scaffold(
           backgroundColor: AppColors.bg,
           extendBody: true,
-          body: Container(
-            decoration: const BoxDecoration(
-              gradient: RadialGradient(
-                center: Alignment(0.85, -1),
-                radius: 1.1,
-                colors: [Color(0x22C5F23F), Colors.transparent],
-                stops: [0, 0.55],
+          body: BlocListener<LifeCubit, LifeState>(
+            listenWhen: (prev, curr) =>
+                curr.error != null && curr.error != prev.error,
+            listener: (context, state) {
+              ScaffoldMessenger.of(context)
+                ..hideCurrentSnackBar()
+                ..showSnackBar(SnackBar(
+                  content: Text(state.error!),
+                  backgroundColor: AppColors.surface2,
+                  behavior: SnackBarBehavior.floating,
+                  margin: const EdgeInsets.fromLTRB(14, 0, 14, 90),
+                ));
+              context.read<LifeCubit>().clearError();
+            },
+            child: Container(
+              decoration: const BoxDecoration(
+                gradient: RadialGradient(
+                  center: Alignment(0.85, -1),
+                  radius: 1.1,
+                  colors: [Color(0x22C5F23F), Colors.transparent],
+                  stops: [0, 0.55],
+                ),
               ),
+              child: IndexedStack(index: _index, children: screens),
             ),
-            child: IndexedStack(index: _index, children: screens),
           ),
           floatingActionButtonLocation:
               FloatingActionButtonLocation.centerDocked,

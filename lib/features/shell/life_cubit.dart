@@ -182,7 +182,12 @@ class LifeCubit extends Cubit<LifeState> {
   }
 
   // ---- Habits CRUD ----
-  Future<void> saveHabit({
+  /// Clears any surfaced error so the next failure re-triggers UI listeners.
+  void clearError() {
+    if (state.error != null) emit(state.copyWith(error: null));
+  }
+
+  Future<bool> saveHabit({
     String? id,
     required String title,
     required String areaId,
@@ -215,8 +220,10 @@ class LifeCubit extends Cubit<LifeState> {
       final habits = await _repo.habits();
       emit(state.copyWith(habits: habits));
       NotificationService.instance.syncHabitReminders(habits);
+      return true;
     } on ApiException catch (e) {
       emit(state.copyWith(error: e.message));
+      return false;
     }
   }
 
@@ -264,12 +271,61 @@ class LifeCubit extends Cubit<LifeState> {
     }
   }
 
-  Future<void> convertCapture(String id, {String? areaId}) async {
+  /// Converts a capture into its target entity. Returns the destination type
+  /// (TASK/HABIT/NOTE/RESOURCE/VAULT) on success, or null on failure (error is
+  /// surfaced in state so the caller can show it).
+  Future<String?> convertCapture(String id,
+      {String? areaId, String? topicId}) async {
     try {
-      await _repo.convertCapture(id, areaId: areaId);
+      await _repo.convertCapture(id, areaId: areaId, topicId: topicId);
+      final type =
+          state.captures.firstWhere((c) => c.id == id).type;
       await refresh();
+      return type;
+    } on StateError {
+      await refresh();
+      return null;
     } on ApiException catch (e) {
       emit(state.copyWith(error: e.message));
+      return null;
+    }
+  }
+
+  /// Override the AI classification, then reload the inbox.
+  Future<void> reclassifyCapture(String id, String type) async {
+    try {
+      await _repo.reclassifyCapture(id, type);
+      final captures = await _repo.captures(processed: false);
+      emit(state.copyWith(captures: captures));
+    } on ApiException catch (e) {
+      emit(state.copyWith(error: e.message));
+    }
+  }
+
+  /// Edits a task. The edit form always supplies the desired final state, so
+  /// areaId/dueDate are set explicitly (null clears them).
+  Future<bool> editTask(
+    String id, {
+    required String title,
+    required String priority,
+    String? status,
+    String? areaId,
+    DateTime? dueDate,
+  }) async {
+    try {
+      await _repo.updateTask(
+        id,
+        title: title,
+        priority: priority,
+        status: status,
+        areaId: areaId,
+        dueDate: dueDate,
+      );
+      emit(state.copyWith(tasks: await _repo.tasks()));
+      return true;
+    } on ApiException catch (e) {
+      emit(state.copyWith(error: e.message));
+      return false;
     }
   }
 }

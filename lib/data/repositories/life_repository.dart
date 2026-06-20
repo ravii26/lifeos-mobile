@@ -21,6 +21,10 @@ import '../models/vault_item.dart';
 
 /// Aggregates the domain endpoints the mobile screens use.
 /// Kept as one repository for now; can be split per-feature later.
+/// Sentinel for "argument omitted" so callers can distinguish leave-unchanged
+/// from explicitly clearing a nullable field (null).
+const Object _unset = Object();
+
 class LifeRepository {
   final ApiClient _api;
   LifeRepository(this._api);
@@ -84,6 +88,25 @@ class LifeRepository {
       if (areaId != null) 'areaId': areaId,
       'priority': priority,
       if (dueDate != null) 'dueDate': dueDate.toIso8601String(),
+    });
+    return Task.fromJson(data as Json);
+  }
+
+  Future<Task> updateTask(
+    String id, {
+    String? title,
+    String? priority,
+    String? status,
+    Object? areaId = _unset, // pass null to clear, omit to leave unchanged
+    Object? dueDate = _unset,
+  }) async {
+    final data = await _api.patch('/tasks/$id', body: {
+      if (title != null) 'title': title,
+      if (priority != null) 'priority': priority,
+      if (status != null) 'status': status,
+      if (!identical(areaId, _unset)) 'areaId': areaId,
+      if (!identical(dueDate, _unset))
+        'dueDate': dueDate == null ? null : (dueDate as DateTime).toIso8601String(),
     });
     return Task.fromJson(data as Json);
   }
@@ -399,6 +422,12 @@ class LifeRepository {
       if (topicId != null) 'topicId': topicId,
       if (priority != null) 'priority': priority,
     });
+  }
+
+  /// Override the AI's classification (PATCH /captures/:id) before converting.
+  Future<Capture> reclassifyCapture(String id, String type) async {
+    final data = await _api.patch('/captures/$id', body: {'type': type});
+    return Capture.fromJson(data as Json);
   }
 
   Future<void> dismissCapture(String id) => _api.delete('/captures/$id');

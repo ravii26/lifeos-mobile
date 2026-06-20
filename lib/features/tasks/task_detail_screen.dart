@@ -9,6 +9,7 @@ import '../../widgets/glass.dart';
 import '../../widgets/screen_header.dart';
 import '../focus/focus_screen.dart';
 import '../shell/life_cubit.dart';
+import 'task_form.dart';
 
 class TaskDetailScreen extends StatelessWidget {
   final String taskId;
@@ -83,6 +84,28 @@ class TaskDetailScreen extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(height: 14),
+                    SizedBox(
+                      width: double.infinity,
+                      child: OutlinedButton.icon(
+                        onPressed: () => showModalBottomSheet(
+                          context: context,
+                          isScrollControlled: true,
+                          backgroundColor: Colors.transparent,
+                          builder: (_) => BlocProvider.value(
+                            value: context.read<LifeCubit>(),
+                            child: TaskForm(task: task, areas: s.areas),
+                          ),
+                        ),
+                        icon: const Icon(Icons.edit_outlined, size: 16),
+                        label: const Text('Edit task'),
+                        style: OutlinedButton.styleFrom(
+                          minimumSize: const Size.fromHeight(46),
+                          foregroundColor: AppColors.tx,
+                          side: BorderSide(color: AppColors.line2),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 10),
                     if (!task.isDone) ...[
                       SizedBox(
                         width: double.infinity,

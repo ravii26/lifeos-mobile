@@ -63,10 +63,20 @@ class _HabitFormState extends State<HabitForm> {
 
   Future<void> _save() async {
     final title = _title.text.trim();
-    if (title.isEmpty || _areaId == null) return;
+    final messenger = ScaffoldMessenger.of(context);
+    if (title.isEmpty) {
+      messenger.showSnackBar(
+          const SnackBar(content: Text('Give the habit a title first.')));
+      return;
+    }
+    if (_areaId == null) {
+      messenger.showSnackBar(const SnackBar(
+          content: Text('Create an area first — habits live inside an area.')));
+      return;
+    }
     setState(() => _saving = true);
     final n = int.tryParse(_target.text.trim());
-    await context.read<LifeCubit>().saveHabit(
+    final ok = await context.read<LifeCubit>().saveHabit(
           id: widget.habit?.id,
           title: title,
           areaId: _areaId!,
@@ -76,7 +86,14 @@ class _HabitFormState extends State<HabitForm> {
           frequency: _frequency,
           reminderTime: _fmtReminder(),
         );
-    if (mounted) Navigator.of(context).pop();
+    if (!mounted) return;
+    if (ok) {
+      Navigator.of(context).pop();
+    } else {
+      // Save failed (error surfaced globally); keep the sheet open so the
+      // user doesn't lose their input.
+      setState(() => _saving = false);
+    }
   }
 
   @override

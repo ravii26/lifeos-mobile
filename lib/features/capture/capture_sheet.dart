@@ -4,7 +4,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import '../../core/di/service_locator.dart';
 import '../../core/theme/app_colors.dart';
+import '../../data/models/capture.dart';
+import '../../data/models/topic.dart';
+import '../../data/repositories/life_repository.dart';
 import '../../widgets/bits.dart';
 import '../shell/life_cubit.dart';
 
@@ -34,6 +38,108 @@ class _CaptureSheetState extends State<CaptureSheet> {
     await context.read<LifeCubit>().addCapture(t);
     _text.clear();
     if (mounted) setState(() => _sending = false);
+  }
+
+  static const _captureTypes = ['TASK', 'HABIT', 'NOTE', 'RESOURCE', 'VAULT'];
+
+  String _dest(String type) => switch (type) {
+        'TASK' => 'Tasks',
+        'HABIT' => 'Habits',
+        'NOTE' => 'a Notebook',
+        'RESOURCE' => 'Resources',
+        'VAULT' => 'the Vault',
+        _ => type,
+      };
+
+  void _snack(String msg, {bool error = false}) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text(msg),
+      backgroundColor: error ? AppColors.danger : AppColors.surface4,
+      behavior: SnackBarBehavior.floating,
+    ));
+  }
+
+  /// Converts a capture, prompting for the parent area/topic the backend
+  /// requires for HABIT (area) and NOTE/RESOURCE (topic) when the AI didn't
+  /// already suggest one.
+  Future<void> _convert(Capture c) async {
+    String? areaId;
+    String? topicId;
+
+    if (c.needsArea) {
+      areaId = await _pickArea();
+      if (areaId == null) return; // cancelled
+    }
+    if (c.needsTopic) {
+      topicId = await _pickTopic();
+      if (topicId == null) return; // cancelled
+    }
+    if (!mounted) return;
+
+    final cubit = context.read<LifeCubit>();
+    final type = await cubit.convertCapture(c.id, areaId: areaId, topicId: topicId);
+    if (type != null) {
+      _snack('Added to ${_dest(type)} ✓');
+    } else {
+      _snack(cubit.state.error ?? 'Could not convert', error: true);
+      cubit.clearError();
+    }
+  }
+
+  Future<String?> _pickArea() {
+    final areas = context.read<LifeCubit>().state.areas;
+    if (areas.isEmpty) {
+      _snack('Create an Area first to file this here', error: true);
+      return Future.value(null);
+    }
+    return showModalBottomSheet<String>(
+      context: context,
+      backgroundColor: AppColors.surface1,
+      builder: (ctx) => _PickerSheet(
+        title: 'File under which area?',
+        items: [for (final a in areas) (a.id, a.name)],
+      ),
+    );
+  }
+
+  Future<String?> _pickTopic() async {
+    List<Topic> topics;
+    try {
+      topics = await getIt<LifeRepository>().topics();
+    } catch (_) {
+      _snack('Could not load topics', error: true);
+      return null;
+    }
+    if (!mounted) return null;
+    if (topics.isEmpty) {
+      _snack('Create a Topic first to file this here', error: true);
+      return null;
+    }
+    return showModalBottomSheet<String>(
+      context: context,
+      backgroundColor: AppColors.surface1,
+      builder: (ctx) => _PickerSheet(
+        title: 'File under which topic?',
+        items: [for (final t in topics) (t.id, t.title)],
+      ),
+    );
+  }
+
+  /// Long-press / tap the type chip to fix a wrong AI classification.
+  Future<void> _reclassify(Capture c) async {
+    final picked = await showModalBottomSheet<String>(
+      context: context,
+      backgroundColor: AppColors.surface1,
+      builder: (ctx) => _PickerSheet(
+        title: 'Reclassify as…',
+        items: [for (final t in _captureTypes) (t, _dest(t))],
+        selected: c.type,
+      ),
+    );
+    if (picked != null && picked != c.type && mounted) {
+      await context.read<LifeCubit>().reclassifyCapture(c.id, picked);
+    }
   }
 
   @override
@@ -173,15 +279,16 @@ class _CaptureSheetState extends State<CaptureSheet> {
                                               style: const TextStyle(
                                                   fontSize: 13.5)),
                                           const SizedBox(height: 5),
-                                          Chip3(
-                                              '${c.type} · ${c.confidencePct}%'),
+                                          GestureDetector(
+                                            onTap: () => _reclassify(c),
+                                            child: Chip3(
+                                                '${c.type} · ${c.confidencePct}% ▾'),
+                                          ),
                                         ],
                                       ),
                                     ),
                                     IconButton(
-                                      onPressed: () => context
-                                          .read<LifeCubit>()
-                                          .convertCapture(c.id),
+                                      onPressed: () => _convert(c),
                                       icon: Icon(Icons.check_circle,
                                           color: AppColors.accent, size: 22),
                                       tooltip: 'Convert',
@@ -207,6 +314,55 @@ class _CaptureSheetState extends State<CaptureSheet> {
             ),
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// Simple single-select list sheet — returns the picked id via Navigator.pop.
+class _PickerSheet extends StatelessWidget {
+  final String title;
+  final List<(String, String)> items; // (id, label)
+  final String? selected;
+  const _PickerSheet({
+    required this.title,
+    required this.items,
+    this.selected,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 18, 20, 8),
+            child: Text(title,
+                style: GoogleFonts.hankenGrotesk(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.tx)),
+          ),
+          Flexible(
+            child: ListView(
+              shrinkWrap: true,
+              children: [
+                for (final (id, label) in items)
+                  ListTile(
+                    title: Text(label,
+                        style: TextStyle(color: AppColors.tx, fontSize: 15)),
+                    trailing: id == selected
+                        ? Icon(Icons.check, color: AppColors.accent, size: 20)
+                        : null,
+                    onTap: () => Navigator.of(context).pop(id),
+                  ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 8),
+        ],
       ),
     );
   }

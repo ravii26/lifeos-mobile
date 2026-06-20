@@ -20,8 +20,11 @@ class ApiClient {
       : _dio = dio ??
             Dio(BaseOptions(
               baseUrl: AppConfig.apiBaseUrl,
-              connectTimeout: const Duration(seconds: 15),
-              receiveTimeout: const Duration(seconds: 20),
+              // Render free-tier instances sleep when idle and take
+              // ~30-50s to wake, so the first request after inactivity is
+              // slow. Generous timeouts avoid a spurious "took too long".
+              connectTimeout: const Duration(seconds: 30),
+              receiveTimeout: const Duration(seconds: 60),
               headers: {'Content-Type': 'application/json'},
             )) {
     _dio.interceptors.add(InterceptorsWrapper(
