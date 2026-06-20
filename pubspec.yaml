@@ -44,6 +44,7 @@ dev_dependencies:
     sdk: flutter
   flutter_lints: ^6.0.0
   flutter_launcher_icons: ^0.14.4
+  flutter_native_splash: ^2.4.3
 
 flutter:
   uses-material-design: true
@@ -63,3 +64,17 @@ flutter_launcher_icons:
 
   macos:
     generate: true
+
+# Native cold-start splash (shown by the OS before Flutter boots).
+# Regenerate after changes with: dart run flutter_native_splash:create
+flutter_native_splash:
+  color: "#0A0B0D"
+  image: assets/logo/app_icon.png
+  android_12:
+    color: "#0A0B0D"
+    image: assets/logo/app_icon.png
+  color_dark: "#0A0B0D"
+  image_dark: assets/logo/app_icon.png
+  android: true
+  ios: true
+  web: true

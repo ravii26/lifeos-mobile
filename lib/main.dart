@@ -5,7 +5,6 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'core/api/api_client.dart';
 import 'core/di/service_locator.dart';
 import 'core/notifications/notification_service.dart';
-import 'core/theme/app_colors.dart';
 import 'core/theme/app_theme.dart';
 import 'data/repositories/auth_repository.dart';
 import 'data/repositories/life_repository.dart';
@@ -13,6 +12,7 @@ import 'features/appearance/appearance_cubit.dart';
 import 'features/auth/bloc/auth_bloc.dart';
 import 'features/auth/login_screen.dart';
 import 'features/shell/home_shell.dart';
+import 'features/splash/splash_screen.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -86,19 +86,9 @@ class _Root extends StatelessWidget {
           AuthStatus.unauthenticated ||
           AuthStatus.authenticating =>
             const LoginScreen(),
-          AuthStatus.unknown => const _Splash(),
+          AuthStatus.unknown => const SplashScreen(),
         };
       },
     );
   }
-}
-
-class _Splash extends StatelessWidget {
-  const _Splash();
-  @override
-  Widget build(BuildContext context) => Scaffold(
-        backgroundColor: AppColors.bg,
-        body: Center(
-            child: CircularProgressIndicator(color: AppColors.accent)),
-      );
 }

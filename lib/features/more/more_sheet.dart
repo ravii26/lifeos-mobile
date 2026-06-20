@@ -43,16 +43,19 @@ class MoreSheet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final maxHeight = MediaQuery.of(context).size.height * 0.85;
+    final bottomInset = MediaQuery.of(context).padding.bottom;
     return ClipRRect(
       borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
       child: BackdropFilter(
         filter: ImageFilter.blur(sigmaX: 28, sigmaY: 28),
         child: Container(
+          constraints: BoxConstraints(maxHeight: maxHeight),
           decoration: BoxDecoration(
             color: AppColors.glassBg2,
             border: Border(top: BorderSide(color: AppColors.glassBorder)),
           ),
-          padding: const EdgeInsets.fromLTRB(16, 10, 16, 34),
+          padding: EdgeInsets.fromLTRB(16, 10, 16, 34 + bottomInset),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -102,21 +105,34 @@ class MoreSheet extends StatelessWidget {
                 ],
               ),
               const SizedBox(height: 14),
-              for (final item in _items)
-                _row(context, item.$1, item.$2, item.$3,
-                    badge: item.$1 == 'Weekly Review' ? 0 : 0),
-              const SizedBox(height: 6),
-              const Divider(height: 24),
-              ListTile(
-                contentPadding: EdgeInsets.zero,
-                leading: const Icon(Icons.logout, color: AppColors.danger),
-                title: const Text('Sign out',
-                    style: TextStyle(
-                        color: AppColors.danger, fontWeight: FontWeight.w600)),
-                onTap: () {
-                  Navigator.of(context).pop();
-                  context.read<AuthBloc>().add(const AuthLogoutRequested());
-                },
+              Flexible(
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      for (final item in _items)
+                        _row(context, item.$1, item.$2, item.$3,
+                            badge: item.$1 == 'Weekly Review' ? 0 : 0),
+                      const SizedBox(height: 6),
+                      const Divider(height: 24),
+                      ListTile(
+                        contentPadding: EdgeInsets.zero,
+                        leading:
+                            const Icon(Icons.logout, color: AppColors.danger),
+                        title: const Text('Sign out',
+                            style: TextStyle(
+                                color: AppColors.danger,
+                                fontWeight: FontWeight.w600)),
+                        onTap: () {
+                          Navigator.of(context).pop();
+                          context
+                              .read<AuthBloc>()
+                              .add(const AuthLogoutRequested());
+                        },
+                      ),
+                    ],
+                  ),
+                ),
               ),
             ],
           ),
