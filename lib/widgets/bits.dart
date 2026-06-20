@@ -5,6 +5,40 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../core/theme/app_colors.dart';
 
+/// Dashed "add new" tile used at the foot of list sections.
+class AddTile extends StatelessWidget {
+  final String label;
+  final VoidCallback onTap;
+  const AddTile({super.key, required this.label, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 14),
+        decoration: BoxDecoration(
+          color: AppColors.surface2,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: AppColors.line2),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.add, size: 18, color: AppColors.accent),
+            const SizedBox(width: 8),
+            Text(label,
+                style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.accent)),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 /// Uppercase mono eyebrow label — `.m-eyebrow`.
 class Eyebrow extends StatelessWidget {
   final String text;

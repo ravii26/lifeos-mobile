@@ -1,10 +1,19 @@
 import '../../core/api/api_client.dart';
 import '../models/area.dart';
+import '../models/behavior_log.dart';
 import '../models/calendar_block.dart';
 import '../models/capture.dart';
+import '../models/decision.dart';
+import '../models/goal.dart';
+import '../models/graph_data.dart';
 import '../models/habit.dart';
+import '../models/identity.dart';
 import '../models/json.dart';
+import '../models/note.dart';
+import '../models/notebook.dart';
+import '../models/project.dart';
 import '../models/resource.dart';
+import '../models/topic.dart';
 import '../models/review.dart';
 import '../models/task.dart';
 import '../models/user_settings.dart';
@@ -21,6 +30,41 @@ class LifeRepository {
     final data = await _api.get('/areas');
     return (data as List).map((e) => Area.fromJson(e as Json)).toList();
   }
+
+  Future<Area> createArea({
+    required String name,
+    String type = 'PRIMARY',
+    required String color,
+    String icon = 'target',
+  }) async {
+    final data = await _api.post('/areas', body: {
+      'name': name,
+      'type': type,
+      'color': color,
+      'icon': icon,
+    });
+    return Area.fromJson(data as Json);
+  }
+
+  Future<Area> updateArea(
+    String id, {
+    String? name,
+    String? type,
+    String? color,
+    String? icon,
+    bool? isActive,
+  }) async {
+    final data = await _api.patch('/areas/$id', body: {
+      if (name != null) 'name': name,
+      if (type != null) 'type': type,
+      if (color != null) 'color': color,
+      if (icon != null) 'icon': icon,
+      if (isActive != null) 'isActive': isActive,
+    });
+    return Area.fromJson(data as Json);
+  }
+
+  Future<void> deleteArea(String id) => _api.delete('/areas/$id');
 
   // ---- Tasks ----
   Future<List<Task>> tasks({String? areaId, String? status}) async {
@@ -67,6 +111,276 @@ class LifeRepository {
     });
   }
 
+  Future<Habit> createHabit({
+    required String title,
+    required String areaId,
+    String habitType = 'BOOLEAN',
+    int? targetCount,
+    int? targetMinutes,
+    String frequency = 'DAILY',
+    String? reminderTime,
+    String? description,
+  }) async {
+    final data = await _api.post('/habits', body: {
+      'title': title,
+      'areaId': areaId,
+      'habitType': habitType,
+      if (targetCount != null) 'targetCount': targetCount,
+      if (targetMinutes != null) 'targetMinutes': targetMinutes,
+      'frequency': frequency,
+      if (reminderTime != null && reminderTime.isNotEmpty)
+        'reminderTime': reminderTime,
+      if (description != null && description.isNotEmpty)
+        'description': description,
+    });
+    return Habit.fromJson(data as Json);
+  }
+
+  Future<Habit> updateHabit(
+    String id, {
+    String? title,
+    String? areaId,
+    String? habitType,
+    int? targetCount,
+    int? targetMinutes,
+    String? frequency,
+    String? reminderTime,
+    bool? isActive,
+  }) async {
+    final data = await _api.patch('/habits/$id', body: {
+      if (title != null) 'title': title,
+      if (areaId != null) 'areaId': areaId,
+      if (habitType != null) 'habitType': habitType,
+      if (targetCount != null) 'targetCount': targetCount,
+      if (targetMinutes != null) 'targetMinutes': targetMinutes,
+      if (frequency != null) 'frequency': frequency,
+      // reminderTime is nullable on the backend: '' clears it.
+      if (reminderTime != null)
+        'reminderTime': reminderTime.isEmpty ? null : reminderTime,
+      if (isActive != null) 'isActive': isActive,
+    });
+    return Habit.fromJson(data as Json);
+  }
+
+  Future<void> deleteHabit(String id) => _api.delete('/habits/$id');
+
+  // ---- Goals ----
+  Future<List<Goal>> goals(
+      {String? areaId, String? status, bool withConfidence = true}) async {
+    final data = await _api.get('/goals', query: {
+      'areaId': areaId,
+      'status': status,
+      'withConfidence': withConfidence ? 'true' : null,
+    });
+    return (data as List).map((e) => Goal.fromJson(e as Json)).toList();
+  }
+
+  Future<Goal> createGoal({
+    required String title,
+    required String areaId,
+    String? description,
+    String priority = 'MEDIUM',
+    DateTime? deadline,
+  }) async {
+    final data = await _api.post('/goals', body: {
+      'title': title,
+      'areaId': areaId,
+      if (description != null && description.isNotEmpty)
+        'description': description,
+      'priority': priority,
+      if (deadline != null) 'deadline': deadline.toIso8601String(),
+    });
+    return Goal.fromJson(data as Json);
+  }
+
+  Future<Goal> updateGoal(
+    String id, {
+    String? title,
+    String? description,
+    String? areaId,
+    String? priority,
+    String? status,
+    DateTime? deadline,
+  }) async {
+    final data = await _api.patch('/goals/$id', body: {
+      if (title != null) 'title': title,
+      if (description != null) 'description': description,
+      if (areaId != null) 'areaId': areaId,
+      if (priority != null) 'priority': priority,
+      if (status != null) 'status': status,
+      if (deadline != null) 'deadline': deadline.toIso8601String(),
+    });
+    return Goal.fromJson(data as Json);
+  }
+
+  Future<void> deleteGoal(String id) => _api.delete('/goals/$id');
+
+  /// Promote a goal into an active focus slot. When all slots are full the
+  /// backend requires [parkGoalId] naming which active goal to park in its place.
+  Future<void> activateGoal(String id, {String? parkGoalId}) =>
+      _api.post('/goals/$id/activate',
+          body: {if (parkGoalId != null) 'parkGoalId': parkGoalId});
+
+  Future<void> parkGoal(String id) => _api.post('/goals/$id/park');
+
+  // ---- Projects ----
+  Future<List<Project>> projects(
+      {String? areaId, String? goalId, String? status}) async {
+    final data = await _api.get('/projects',
+        query: {'areaId': areaId, 'goalId': goalId, 'status': status});
+    return (data as List).map((e) => Project.fromJson(e as Json)).toList();
+  }
+
+  Future<Project> createProject({
+    required String title,
+    required String areaId,
+    String? description,
+    String? goalId,
+    DateTime? deadline,
+  }) async {
+    final data = await _api.post('/projects', body: {
+      'title': title,
+      'areaId': areaId,
+      if (description != null && description.isNotEmpty)
+        'description': description,
+      if (goalId != null) 'goalId': goalId,
+      if (deadline != null) 'deadline': deadline.toIso8601String(),
+    });
+    return Project.fromJson(data as Json);
+  }
+
+  Future<Project> updateProject(
+    String id, {
+    String? title,
+    String? description,
+    String? areaId,
+    String? goalId,
+    String? status,
+    DateTime? deadline,
+  }) async {
+    final data = await _api.patch('/projects/$id', body: {
+      if (title != null) 'title': title,
+      if (description != null) 'description': description,
+      if (areaId != null) 'areaId': areaId,
+      if (goalId != null) 'goalId': goalId,
+      if (status != null) 'status': status,
+      if (deadline != null) 'deadline': deadline.toIso8601String(),
+    });
+    return Project.fromJson(data as Json);
+  }
+
+  Future<void> deleteProject(String id) => _api.delete('/projects/$id');
+
+  // ---- Topics ----
+  Future<List<Topic>> topics({String? areaId}) async {
+    final data = await _api.get('/topics', query: {'areaId': areaId});
+    return (data as List).map((e) => Topic.fromJson(e as Json)).toList();
+  }
+
+  Future<Topic> createTopic({
+    required String title,
+    required String areaId,
+    String? description,
+    String masteryLevel = 'BEGINNER',
+  }) async {
+    final data = await _api.post('/topics', body: {
+      'title': title,
+      'areaId': areaId,
+      if (description != null && description.isNotEmpty)
+        'description': description,
+      'masteryLevel': masteryLevel,
+    });
+    return Topic.fromJson(data as Json);
+  }
+
+  // ---- Notebooks ----
+  Future<List<Notebook>> notebooks({String? topicId}) async {
+    final data = await _api.get('/notebooks', query: {'topicId': topicId});
+    return (data as List).map((e) => Notebook.fromJson(e as Json)).toList();
+  }
+
+  Future<Notebook> createNotebook({
+    required String title,
+    required String topicId,
+    String? description,
+    List<String>? tags,
+  }) async {
+    final data = await _api.post('/notebooks', body: {
+      'title': title,
+      'topicId': topicId,
+      if (description != null && description.isNotEmpty)
+        'description': description,
+      if (tags != null && tags.isNotEmpty) 'tags': tags,
+    });
+    return Notebook.fromJson(data as Json);
+  }
+
+  Future<Notebook> updateNotebook(
+    String id, {
+    String? title,
+    String? description,
+    List<String>? tags,
+  }) async {
+    final data = await _api.patch('/notebooks/$id', body: {
+      if (title != null) 'title': title,
+      if (description != null) 'description': description,
+      if (tags != null) 'tags': tags,
+    });
+    return Notebook.fromJson(data as Json);
+  }
+
+  Future<void> deleteNotebook(String id) => _api.delete('/notebooks/$id');
+
+  // ---- Notes ----
+  Future<List<Note>> notes(
+      {String? topicId, String? notebookId, String? noteType}) async {
+    final data = await _api.get('/notes', query: {
+      'topicId': topicId,
+      'notebookId': notebookId,
+      'noteType': noteType,
+    });
+    return (data as List).map((e) => Note.fromJson(e as Json)).toList();
+  }
+
+  Future<Note> createNote({
+    required String title,
+    required String content,
+    required String topicId,
+    String? notebookId,
+    String noteType = 'CONCEPT',
+    List<String>? tags,
+  }) async {
+    final data = await _api.post('/notes', body: {
+      'title': title,
+      'content': content,
+      'topicId': topicId,
+      if (notebookId != null) 'notebookId': notebookId,
+      'noteType': noteType,
+      if (tags != null && tags.isNotEmpty) 'tags': tags,
+    });
+    return Note.fromJson(data as Json);
+  }
+
+  Future<Note> updateNote(
+    String id, {
+    String? title,
+    String? content,
+    String? notebookId,
+    String? noteType,
+    List<String>? tags,
+  }) async {
+    final data = await _api.patch('/notes/$id', body: {
+      if (title != null) 'title': title,
+      if (content != null) 'content': content,
+      if (notebookId != null) 'notebookId': notebookId,
+      if (noteType != null) 'noteType': noteType,
+      if (tags != null) 'tags': tags,
+    });
+    return Note.fromJson(data as Json);
+  }
+
+  Future<void> deleteNote(String id) => _api.delete('/notes/$id');
+
   // ---- Captures (brain dump) ----
   Future<List<Capture>> captures({bool? processed}) async {
     final data = await _api.get('/captures', query: {'processed': processed});
@@ -100,6 +414,114 @@ class LifeRepository {
         .toList();
   }
 
+  Future<CalendarBlock> createBlock({
+    required String title,
+    required DateTime startTime,
+    required DateTime endTime,
+    String? blockType,
+    String? areaId,
+    String? notes,
+    String? recurrenceRule,
+  }) async {
+    final data = await _api.post('/calendar', body: {
+      'title': title,
+      'startTime': startTime.toIso8601String(),
+      'endTime': endTime.toIso8601String(),
+      if (blockType != null) 'blockType': blockType,
+      if (areaId != null) 'areaId': areaId,
+      if (notes != null && notes.isNotEmpty) 'notes': notes,
+      if (recurrenceRule != null && recurrenceRule.isNotEmpty)
+        'recurrenceRule': recurrenceRule,
+    });
+    return CalendarBlock.fromJson(data as Json);
+  }
+
+  Future<CalendarBlock> updateBlock(
+    String id, {
+    String? title,
+    DateTime? startTime,
+    DateTime? endTime,
+    String? blockType,
+    String? areaId,
+    // Pass '' to turn a recurring series back into a one-off (sends null).
+    String? recurrenceRule,
+  }) async {
+    final data = await _api.patch('/calendar/$id', body: {
+      if (title != null) 'title': title,
+      if (startTime != null) 'startTime': startTime.toIso8601String(),
+      if (endTime != null) 'endTime': endTime.toIso8601String(),
+      if (blockType != null) 'blockType': blockType,
+      if (areaId != null) 'areaId': areaId,
+      if (recurrenceRule != null)
+        'recurrenceRule': recurrenceRule.isEmpty ? null : recurrenceRule,
+    });
+    return CalendarBlock.fromJson(data as Json);
+  }
+
+  Future<void> deleteBlock(String id) => _api.delete('/calendar/$id');
+
+  /// Create or update a single per-occurrence override on a recurring series.
+  /// [occurrenceDate] must be the occurrence's original start instant.
+  Future<void> upsertException(
+    String seriesId, {
+    required DateTime occurrenceDate,
+    bool? isCancelled,
+    String? title,
+    DateTime? startTime,
+    DateTime? endTime,
+    String? blockType,
+    String? notes,
+  }) {
+    return _api.put('/calendar/$seriesId/exceptions', body: {
+      'occurrenceDate': occurrenceDate.toIso8601String(),
+      if (isCancelled != null) 'isCancelled': isCancelled,
+      if (title != null) 'title': title,
+      if (startTime != null) 'startTime': startTime.toIso8601String(),
+      if (endTime != null) 'endTime': endTime.toIso8601String(),
+      if (blockType != null) 'blockType': blockType,
+      if (notes != null) 'notes': notes,
+    });
+  }
+
+  /// Remove an override so the occurrence reverts to the series default.
+  Future<void> deleteException(String seriesId, DateTime occurrenceDate) {
+    return _api.delete('/calendar/$seriesId/exceptions',
+        body: {'occurrenceDate': occurrenceDate.toIso8601String()});
+  }
+
+  /// "This and following": split the series at [fromOccurrenceDate]; occurrences
+  /// from there onward become a new series carrying the provided overrides.
+  Future<void> splitSeries(
+    String seriesId, {
+    required DateTime fromOccurrenceDate,
+    String? title,
+    DateTime? startTime,
+    DateTime? endTime,
+    String? blockType,
+    String? areaId,
+    String? recurrenceRule,
+  }) {
+    return _api.post('/calendar/$seriesId/split', body: {
+      'fromOccurrenceDate': fromOccurrenceDate.toIso8601String(),
+      if (title != null) 'title': title,
+      if (startTime != null) 'startTime': startTime.toIso8601String(),
+      if (endTime != null) 'endTime': endTime.toIso8601String(),
+      if (blockType != null) 'blockType': blockType,
+      if (areaId != null) 'areaId': areaId,
+      if (recurrenceRule != null && recurrenceRule.isNotEmpty)
+        'recurrenceRule': recurrenceRule,
+    });
+  }
+
+  /// Overlapping occurrence pairs within a window. Returns raw pair maps.
+  Future<List<dynamic>> calendarConflicts({DateTime? from, DateTime? to}) async {
+    final data = await _api.get('/calendar/conflicts', query: {
+      'from': from?.toIso8601String(),
+      'to': to?.toIso8601String(),
+    });
+    return (data as List?) ?? const [];
+  }
+
   // ---- Reviews ----
   Future<List<Review>> reviews() async {
     final data = await _api.get('/reviews');
@@ -129,10 +551,103 @@ class LifeRepository {
 
   Future<void> markVaultUsed(String id) => _api.post('/vault/$id/used');
 
+  Future<VaultItem> createVaultItem({
+    required String title,
+    required String content,
+    required String vaultType,
+    String? url,
+    List<String>? triggerTags,
+  }) async {
+    final data = await _api.post('/vault', body: {
+      'title': title,
+      'content': content,
+      'vaultType': vaultType,
+      if (url != null && url.isNotEmpty) 'url': url,
+      if (triggerTags != null && triggerTags.isNotEmpty)
+        'triggerTags': triggerTags,
+    });
+    return VaultItem.fromJson(data as Json);
+  }
+
+  Future<VaultItem> updateVaultItem(
+    String id, {
+    String? title,
+    String? content,
+    String? vaultType,
+    String? url,
+    List<String>? triggerTags,
+  }) async {
+    final data = await _api.patch('/vault/$id', body: {
+      if (title != null) 'title': title,
+      if (content != null) 'content': content,
+      if (vaultType != null) 'vaultType': vaultType,
+      if (url != null) 'url': url.isEmpty ? null : url,
+      if (triggerTags != null) 'triggerTags': triggerTags,
+    });
+    return VaultItem.fromJson(data as Json);
+  }
+
+  Future<void> deleteVaultItem(String id) => _api.delete('/vault/$id');
+
   // ---- Learn (resources) ----
   Future<List<Resource>> resources({String? status}) async {
     final data = await _api.get('/resources', query: {'status': status});
     return (data as List).map((e) => Resource.fromJson(e as Json)).toList();
+  }
+
+  // ---- Decisions ("what now") ----
+  Future<DecisionResult> decisionsNow() async {
+    final data = await _api.get('/decisions/now');
+    return DecisionResult.fromJson(data as Json);
+  }
+
+  // ---- Identity ----
+  Future<Identity> identity() async {
+    final data = await _api.get('/identity');
+    return Identity.fromJson(data is Json ? data : null);
+  }
+
+  Future<Identity> saveIdentity({
+    String? personality,
+    List<String>? values,
+    List<String>? strengths,
+    List<String>? weaknesses,
+    String? purpose,
+    String? thisYearGoal,
+    String? bigPicture,
+    String? lifeVision,
+  }) async {
+    final data = await _api.put('/identity', body: {
+      'personality': personality,
+      if (values != null) 'values': values,
+      if (strengths != null) 'strengths': strengths,
+      if (weaknesses != null) 'weaknesses': weaknesses,
+      'purpose': purpose,
+      'thisYearGoal': thisYearGoal,
+      'bigPicture': bigPicture,
+      'lifeVision': lifeVision,
+    });
+    return Identity.fromJson(data is Json ? data : null);
+  }
+
+  // ---- Behavior ----
+  Future<List<BehaviorLog>> behaviorLogs({String? eventType}) async {
+    final data = await _api.get('/behavior', query: {'eventType': eventType});
+    return (data as List).map((e) => BehaviorLog.fromJson(e as Json)).toList();
+  }
+
+  Future<void> recordBehavior(String eventType,
+      {Map<String, dynamic>? metadata}) {
+    return _api.post('/behavior', body: {
+      'eventType': eventType,
+      if (metadata != null) 'metadata': metadata,
+    });
+  }
+
+  // ---- Knowledge graph ----
+  Future<GraphData> graph() async {
+    final data = await _api.get('/graph');
+    return GraphData.fromJson(data as Json);
   }
 
   // ---- Settings ----

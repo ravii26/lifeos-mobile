@@ -150,6 +150,87 @@ class LifeCubit extends Cubit<LifeState> {
     }
   }
 
+  // ---- Areas CRUD ----
+  Future<void> saveArea({
+    String? id,
+    required String name,
+    required String type,
+    required String color,
+    required String icon,
+  }) async {
+    try {
+      if (id == null) {
+        await _repo.createArea(name: name, type: type, color: color, icon: icon);
+      } else {
+        await _repo.updateArea(id,
+            name: name, type: type, color: color, icon: icon);
+      }
+      emit(state.copyWith(areas: await _repo.areas()));
+    } on ApiException catch (e) {
+      emit(state.copyWith(error: e.message));
+    }
+  }
+
+  Future<void> deleteArea(String id) async {
+    emit(state.copyWith(
+        areas: state.areas.where((a) => a.id != id).toList()));
+    try {
+      await _repo.deleteArea(id);
+    } on ApiException catch (_) {
+      await refresh();
+    }
+  }
+
+  // ---- Habits CRUD ----
+  Future<void> saveHabit({
+    String? id,
+    required String title,
+    required String areaId,
+    required String habitType,
+    int? targetCount,
+    int? targetMinutes,
+    String frequency = 'DAILY',
+    String? reminderTime,
+  }) async {
+    try {
+      if (id == null) {
+        await _repo.createHabit(
+            title: title,
+            areaId: areaId,
+            habitType: habitType,
+            targetCount: targetCount,
+            targetMinutes: targetMinutes,
+            frequency: frequency,
+            reminderTime: reminderTime);
+      } else {
+        await _repo.updateHabit(id,
+            title: title,
+            areaId: areaId,
+            habitType: habitType,
+            targetCount: targetCount,
+            targetMinutes: targetMinutes,
+            frequency: frequency,
+            reminderTime: reminderTime ?? '');
+      }
+      final habits = await _repo.habits();
+      emit(state.copyWith(habits: habits));
+      NotificationService.instance.syncHabitReminders(habits);
+    } on ApiException catch (e) {
+      emit(state.copyWith(error: e.message));
+    }
+  }
+
+  Future<void> deleteHabit(String id) async {
+    emit(state.copyWith(
+        habits: state.habits.where((h) => h.id != id).toList()));
+    try {
+      await _repo.deleteHabit(id);
+      NotificationService.instance.syncHabitReminders(state.habits);
+    } on ApiException catch (_) {
+      await refresh();
+    }
+  }
+
   Future<void> logHabit(Habit h) async {
     try {
       await _repo.logHabit(h.id,

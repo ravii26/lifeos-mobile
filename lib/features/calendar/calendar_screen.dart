@@ -6,9 +6,11 @@ import '../../core/di/service_locator.dart';
 import '../../core/theme/app_colors.dart';
 import '../../data/models/calendar_block.dart';
 import '../../data/repositories/life_repository.dart';
+import '../../widgets/form_kit.dart';
 import '../../widgets/glass.dart';
 import '../../widgets/screen_header.dart';
 import '../shell/life_cubit.dart';
+import 'block_form.dart';
 
 class CalendarScreen extends StatefulWidget {
   const CalendarScreen({super.key});
@@ -22,14 +24,115 @@ class _CalendarScreenState extends State<CalendarScreen> {
   static const _rowH = 56.0;
   final _hours = List.generate(15, (i) => i + 7); // 7am–9pm
 
+  DateTime get _dayStart {
+    final now = DateTime.now();
+    return DateTime(now.year, now.month, now.day);
+  }
+
   @override
   void initState() {
     super.initState();
-    final now = DateTime.now();
-    final start = DateTime(now.year, now.month, now.day);
-    _future = getIt<LifeRepository>()
-        .calendar(from: start, to: start.add(const Duration(days: 1)));
+    _load();
   }
+
+  Set<String> _conflictIds = {};
+
+  void _load() {
+    final start = _dayStart;
+    final end = start.add(const Duration(days: 1));
+    final repo = getIt<LifeRepository>();
+    _future = repo.calendar(from: start, to: end);
+    // Best-effort conflict highlighting; failures just leave nothing flagged.
+    repo.calendarConflicts(from: start, to: end).then((pairs) {
+      if (!mounted) return;
+      final ids = <String>{};
+      for (final p in pairs) {
+        if (p is Map) {
+          final a = p['a'], b = p['b'];
+          if (a is Map && a['occurrenceId'] != null) {
+            ids.add('${a['occurrenceId']}');
+          }
+          if (b is Map && b['occurrenceId'] != null) {
+            ids.add('${b['occurrenceId']}');
+          }
+        }
+      }
+      setState(() => _conflictIds = ids);
+    }).catchError((_) {});
+  }
+
+  void _reload() => setState(_load);
+
+  Future<void> _openForm(
+      {CalendarBlock? block, EditScope scope = EditScope.single}) async {
+    final areas = context.read<LifeCubit>().state.areas;
+    final changed = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) =>
+          BlockForm(block: block, areas: areas, day: _dayStart, scope: scope),
+    );
+    if (changed == true) _reload();
+  }
+
+  /// Recurring occurrences need a scope choice; one-offs open straight to edit.
+  Future<void> _onBlockTap(CalendarBlock b) async {
+    if (!b.isOccurrence) {
+      _openForm(block: b);
+      return;
+    }
+    final choice = await showModalBottomSheet<String>(
+      context: context,
+      backgroundColor: AppColors.surface1,
+      shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+      builder: (_) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const SizedBox(height: 8),
+            _sheetRow(Icons.event, 'Edit this occurrence', 'occurrence'),
+            _sheetRow(Icons.fast_forward, 'Edit this & following', 'following'),
+            _sheetRow(Icons.repeat, 'Edit whole series', 'series'),
+            _sheetRow(Icons.block, 'Skip this occurrence', 'skip',
+                color: AppColors.warn),
+            _sheetRow(Icons.delete_outline, 'Delete series', 'deleteSeries',
+                color: AppColors.danger),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
+    if (!mounted || choice == null) return;
+    switch (choice) {
+      case 'occurrence':
+        _openForm(block: b, scope: EditScope.occurrence);
+      case 'following':
+        _openForm(block: b, scope: EditScope.following);
+      case 'series':
+        _openForm(block: b, scope: EditScope.series);
+      case 'skip':
+        await getIt<LifeRepository>().upsertException(b.seriesId,
+            occurrenceDate: b.occurrenceDate!, isCancelled: true);
+        _reload();
+      case 'deleteSeries':
+        if (await confirmDelete(
+            context, 'The entire “${b.title}” series will be removed.')) {
+          await getIt<LifeRepository>().deleteBlock(b.seriesId);
+          _reload();
+        }
+    }
+  }
+
+  Widget _sheetRow(IconData icon, String label, String value, {Color? color}) =>
+      ListTile(
+        leading: Icon(icon, color: color ?? AppColors.tx, size: 21),
+        title: Text(label,
+            style: TextStyle(
+                color: color ?? AppColors.tx, fontWeight: FontWeight.w600)),
+        onTap: () => Navigator.of(context).pop(value),
+      );
 
   @override
   Widget build(BuildContext context) {
@@ -37,6 +140,13 @@ class _CalendarScreenState extends State<CalendarScreen> {
     final nowH = now.hour + now.minute / 60;
     return Scaffold(
       backgroundColor: AppColors.bg,
+      floatingActionButton: FloatingActionButton.extended(
+        backgroundColor: AppColors.accent,
+        foregroundColor: AppColors.accentInk,
+        onPressed: () => _openForm(),
+        icon: const Icon(Icons.add, size: 20),
+        label: const Text('Block'),
+      ),
       body: Column(
         children: [
           BackHeader(eyebrow: _dateLabel(now), title: 'Today'),
@@ -117,7 +227,9 @@ class _CalendarScreenState extends State<CalendarScreen> {
       left: 52,
       right: 4,
       height: height,
-      child: Container(
+      child: GestureDetector(
+        onTap: () => _onBlockTap(b),
+        child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 8),
         decoration: BoxDecoration(
           color: color.withOpacity(0.16),
@@ -127,16 +239,32 @@ class _CalendarScreenState extends State<CalendarScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(b.title,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                    fontSize: 13, fontWeight: FontWeight.w600)),
+            Row(
+              children: [
+                Expanded(
+                  child: Text(b.title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                          fontSize: 13, fontWeight: FontWeight.w600)),
+                ),
+                if (_conflictIds.contains(b.id))
+                  Icon(Icons.warning_amber_rounded,
+                      size: 13, color: AppColors.warn),
+                if (b.isRecurring)
+                  Padding(
+                    padding: const EdgeInsets.only(left: 3),
+                    child:
+                        Icon(Icons.repeat, size: 12, color: AppColors.tx3),
+                  ),
+              ],
+            ),
             Text('${_hr(b.startHour)}–${_hr(b.endHour)}',
                 style: GoogleFonts.jetBrainsMono(
                     fontSize: 10, color: AppColors.tx3)),
           ],
         ),
+      ),
       ),
     );
   }

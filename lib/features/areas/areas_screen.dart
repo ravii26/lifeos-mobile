@@ -9,6 +9,20 @@ import '../../widgets/glass.dart';
 import '../../widgets/screen_header.dart';
 import '../shell/life_cubit.dart';
 import 'area_detail_screen.dart';
+import 'area_form.dart';
+
+void _openAreaForm(BuildContext context, {Area? area}) {
+  final cubit = context.read<LifeCubit>();
+  showModalBottomSheet(
+    context: context,
+    isScrollControlled: true,
+    backgroundColor: Colors.transparent,
+    builder: (_) => BlocProvider.value(
+      value: cubit,
+      child: AreaForm(area: area),
+    ),
+  );
+}
 
 class AreasScreen extends StatelessWidget {
   final VoidCallback onOpenMore;
@@ -58,9 +72,15 @@ class AreasScreen extends StatelessWidget {
                                 ),
                               ));
                             },
+                            onLongPress: () =>
+                                _openAreaForm(context, area: a),
                             child: _AreaCard(area: a),
                           ),
                         ),
+                    const SizedBox(height: 4),
+                    AddTile(
+                        label: 'New area',
+                        onTap: () => _openAreaForm(context)),
                   ],
                 ),
               ),

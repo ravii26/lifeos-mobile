@@ -8,8 +8,15 @@ import '../../core/theme/app_colors.dart';
 import '../../data/models/user.dart';
 import '../../widgets/bits.dart';
 import '../auth/bloc/auth_bloc.dart';
+import '../behavior/behavior_screen.dart';
 import '../calendar/calendar_screen.dart';
+import '../goals/goals_screen.dart';
+import '../graph/graph_screen.dart';
+import '../identity/identity_screen.dart';
 import '../learn/learn_screen.dart';
+import '../notebooks/notebooks_screen.dart';
+import '../now/now_screen.dart';
+import '../projects/projects_screen.dart';
 import '../review/review_screen.dart';
 import '../shell/life_cubit.dart';
 import '../vault/vault_screen.dart';
@@ -20,6 +27,13 @@ class MoreSheet extends StatelessWidget {
   const MoreSheet({super.key, required this.user});
 
   static const _items = [
+    ('What now', 'Your next best move', Icons.bolt_outlined),
+    ('Goals', 'What you\'re aiming at', Icons.flag_outlined),
+    ('Projects', 'Bodies of work in motion', Icons.account_tree_outlined),
+    ('Notebooks', 'Topics, notebooks & notes', Icons.menu_book_outlined),
+    ('Identity', 'Purpose, values & vision', Icons.self_improvement),
+    ('Graph', 'How everything connects', Icons.hub_outlined),
+    ('Behaviour', 'Your activity signals', Icons.insights_outlined),
     ('Calendar', 'Time-blocked day', Icons.calendar_today_outlined),
     ('Weekly Review', 'Reflect & integrate insights', Icons.refresh),
     ('Learn', 'Courses, notes & resources', Icons.school_outlined),
@@ -162,6 +176,13 @@ class MoreSheet extends StatelessWidget {
 
   Widget _destination(String name) => switch (name) {
         'Settings' => SettingsScreen(user: user),
+        'What now' => const NowScreen(),
+        'Goals' => const GoalsScreen(),
+        'Projects' => const ProjectsScreen(),
+        'Notebooks' => const KnowledgeScreen(),
+        'Identity' => const IdentityScreen(),
+        'Graph' => const GraphScreen(),
+        'Behaviour' => const BehaviorScreen(),
         'Calendar' => const CalendarScreen(),
         'Weekly Review' => const ReviewScreen(),
         'Learn' => const LearnScreen(),

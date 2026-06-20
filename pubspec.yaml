@@ -37,6 +37,7 @@ dependencies:
 
   # Utilities
   intl: ^0.20.1
+  rename: ^3.1.0
 
 dev_dependencies:
   flutter_test:

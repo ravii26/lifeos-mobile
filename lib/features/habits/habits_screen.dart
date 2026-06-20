@@ -9,6 +9,20 @@ import '../../widgets/glass.dart';
 import '../../widgets/screen_header.dart';
 import '../shell/life_cubit.dart';
 import 'habit_detail_screen.dart';
+import 'habit_form.dart';
+
+void _openHabitForm(BuildContext context, {Habit? habit}) {
+  final cubit = context.read<LifeCubit>();
+  showModalBottomSheet(
+    context: context,
+    isScrollControlled: true,
+    backgroundColor: Colors.transparent,
+    builder: (_) => BlocProvider.value(
+      value: cubit,
+      child: HabitForm(habit: habit, areas: cubit.state.areas),
+    ),
+  );
+}
 
 class HabitsScreen extends StatelessWidget {
   final VoidCallback onOpenMore;
@@ -65,8 +79,18 @@ class HabitsScreen extends StatelessWidget {
                       for (final h in s.habits)
                         Padding(
                           padding: const EdgeInsets.only(bottom: 11),
-                          child: _HabitCard(habit: h, areaColor: s.areaById(h.areaId)?.color),
+                          child: GestureDetector(
+                            onLongPress: () =>
+                                _openHabitForm(context, habit: h),
+                            child: _HabitCard(
+                                habit: h,
+                                areaColor: s.areaById(h.areaId)?.color),
+                          ),
                         ),
+                    const SizedBox(height: 4),
+                    AddTile(
+                        label: 'New habit',
+                        onTap: () => _openHabitForm(context)),
                   ],
                 ),
               ),

@@ -8,6 +8,7 @@ import '../../data/repositories/life_repository.dart';
 import '../../widgets/bits.dart';
 import '../../widgets/glass.dart';
 import '../../widgets/screen_header.dart';
+import 'vault_form.dart';
 
 class VaultScreen extends StatefulWidget {
   const VaultScreen({super.key});
@@ -33,10 +34,29 @@ class _VaultScreenState extends State<VaultScreen> {
     _future = getIt<LifeRepository>().vault();
   }
 
+  void _reload() => setState(() => _future = getIt<LifeRepository>().vault());
+
+  Future<void> _openForm({VaultItem? item}) async {
+    final changed = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => VaultForm(item: item),
+    );
+    if (changed == true) _reload();
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.bg,
+      floatingActionButton: FloatingActionButton.extended(
+        backgroundColor: AppColors.accent,
+        foregroundColor: AppColors.accentInk,
+        onPressed: () => _openForm(),
+        icon: const Icon(Icons.add, size: 20),
+        label: const Text('Add'),
+      ),
       body: FutureBuilder<List<VaultItem>>(
         future: _future,
         builder: (context, snap) {
@@ -45,7 +65,7 @@ class _VaultScreenState extends State<VaultScreen> {
               ? all
               : all.where((v) => v.vaultType.toUpperCase() == _filter).toList();
           return ListView(
-            padding: const EdgeInsets.only(bottom: 40),
+            padding: const EdgeInsets.only(bottom: 100),
             children: [
               const BackHeader(eyebrow: 'Support', title: 'Vault'),
               Padding(
@@ -113,7 +133,10 @@ class _VaultScreenState extends State<VaultScreen> {
                       for (final v in list)
                         Padding(
                           padding: const EdgeInsets.only(bottom: 11),
-                          child: _card(v),
+                          child: GestureDetector(
+                            onTap: () => _openForm(item: v),
+                            child: _card(v),
+                          ),
                         ),
                   ],
                 ),
