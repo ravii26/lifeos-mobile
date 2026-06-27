@@ -17,8 +17,10 @@ class ApiClient {
   void Function()? onUnauthorized;
 
   ApiClient(this._tokens, {Dio? dio})
-      : _dio = dio ??
-            Dio(BaseOptions(
+    : _dio =
+          dio ??
+          Dio(
+            BaseOptions(
               baseUrl: AppConfig.apiBaseUrl,
               // Render free-tier instances sleep when idle and take
               // ~30-50s to wake, so the first request after inactivity is
@@ -26,16 +28,19 @@ class ApiClient {
               connectTimeout: const Duration(seconds: 30),
               receiveTimeout: const Duration(seconds: 60),
               headers: {'Content-Type': 'application/json'},
-            )) {
-    _dio.interceptors.add(InterceptorsWrapper(
-      onRequest: (options, handler) {
-        final token = _tokens.current;
-        if (token != null && token.isNotEmpty) {
-          options.headers['Authorization'] = 'Bearer $token';
-        }
-        handler.next(options);
-      },
-    ));
+            ),
+          ) {
+    _dio.interceptors.add(
+      InterceptorsWrapper(
+        onRequest: (options, handler) {
+          final token = _tokens.current;
+          if (token != null && token.isNotEmpty) {
+            options.headers['Authorization'] = 'Bearer $token';
+          }
+          handler.next(options);
+        },
+      ),
+    );
   }
 
   /// GET → returns the `data` field (decoded JSON).
@@ -73,9 +78,8 @@ class ApiClient {
     final data = e.response?.data;
     if (data is Map) {
       final msg = (data['message'] as String?) ?? 'Request failed';
-      final errs = (data['errors'] as List?)
-              ?.map((x) => x.toString())
-              .toList() ??
+      final errs =
+          (data['errors'] as List?)?.map((x) => x.toString()).toList() ??
           const <String>[];
       return ApiException(msg, statusCode: status, errors: errs);
     }
@@ -83,8 +87,7 @@ class ApiClient {
     final fallback = switch (e.type) {
       DioExceptionType.connectionTimeout ||
       DioExceptionType.receiveTimeout ||
-      DioExceptionType.sendTimeout =>
-        'The server took too long to respond.',
+      DioExceptionType.sendTimeout => 'The server took too long to respond.',
       DioExceptionType.connectionError =>
         'Cannot reach the server. Is the backend running?',
       _ => e.message ?? 'Network error',

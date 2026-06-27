@@ -8,6 +8,7 @@ class VaultItem {
   final String? url;
   final List<String> triggerTags;
   final int usedCount;
+  final int helpfulCount;
 
   const VaultItem({
     required this.id,
@@ -17,6 +18,7 @@ class VaultItem {
     this.url,
     this.triggerTags = const [],
     required this.usedCount,
+    this.helpfulCount = 0,
   });
 
   factory VaultItem.fromJson(Json j) => VaultItem(
@@ -27,5 +29,6 @@ class VaultItem {
         url: asStringOrNull(j['url']),
         triggerTags: asStringList(j['triggerTags']),
         usedCount: asInt(j['usedCount']),
+        helpfulCount: asInt(j['helpfulCount']),
       );
 }

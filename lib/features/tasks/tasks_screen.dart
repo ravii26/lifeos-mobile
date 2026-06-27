@@ -24,6 +24,8 @@ class _TasksScreenState extends State<TasksScreen> {
   final _title = TextEditingController();
   String _priority = 'P2';
   String? _areaId;
+  String? _goalId;
+  String? _projectId;
 
   @override
   void dispose() {
@@ -203,6 +205,17 @@ class _TasksScreenState extends State<TasksScreen> {
   }
 
   Widget _addTaskCard(BuildContext context, LifeState s) {
+    final linkableGoals =
+        s.goals.where((g) => _areaId == null || g.areaId == _areaId).toList();
+    final linkableProjects = s.projects.where((p) {
+      if (_areaId == null) return false;
+      if (_goalId != null) {
+        return p.goalId == _goalId;
+      } else {
+        return p.areaId == _areaId;
+      }
+    }).toList();
+
     return Padding(
       padding: const EdgeInsets.only(top: 12),
       child: GlassCard(
@@ -221,16 +234,54 @@ class _TasksScreenState extends State<TasksScreen> {
                 height: 34,
                 child: ListView.separated(
                   scrollDirection: Axis.horizontal,
-                  itemCount: s.areas.length,
+                  itemCount: s.areas.length + 1,
                   separatorBuilder: (_, __) => const SizedBox(width: 8),
                   itemBuilder: (_, i) {
-                    final a = s.areas[i];
+                    if (i == 0) {
+                      final on = _areaId == null;
+                      return GestureDetector(
+                        onTap: () => setState(() {
+                          _areaId = null;
+                          _goalId = null;
+                          _projectId = null;
+                        }),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 13, vertical: 7),
+                          decoration: BoxDecoration(
+                            color: on ? AppColors.accent : AppColors.surface2,
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(
+                                color:
+                                    on ? Colors.transparent : AppColors.line),
+                          ),
+                          child: Text('No Area',
+                              style: TextStyle(
+                                  fontSize: 12.5,
+                                  fontWeight: FontWeight.w600,
+                                  color: on
+                                      ? AppColors.accentInk
+                                      : AppColors.tx2)),
+                        ),
+                      );
+                    }
+                    final a = s.areas[i - 1];
                     final on = _areaId == a.id;
                     return GestureDetector(
-                      onTap: () => setState(() => _areaId = a.id),
+                      onTap: () => setState(() {
+                        _areaId = a.id;
+                        if (_goalId != null) {
+                          final hasGoal = s.goals.any(
+                              (g) => g.id == _goalId && g.areaId == a.id);
+                          if (!hasGoal) {
+                            _goalId = null;
+                            _projectId = null;
+                          }
+                        }
+                      }),
                       child: Container(
-                        padding:
-                            const EdgeInsets.symmetric(horizontal: 13, vertical: 7),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 13, vertical: 7),
                         decoration: BoxDecoration(
                           color: on ? AppColors.accent : AppColors.surface2,
                           borderRadius: BorderRadius.circular(20),
@@ -241,13 +292,142 @@ class _TasksScreenState extends State<TasksScreen> {
                             style: TextStyle(
                                 fontSize: 12.5,
                                 fontWeight: FontWeight.w600,
-                                color:
-                                    on ? AppColors.accentInk : AppColors.tx2)),
+                                color: on
+                                    ? AppColors.accentInk
+                                    : AppColors.tx2)),
                       ),
                     );
                   },
                 ),
               ),
+            if (_areaId != null && linkableGoals.isNotEmpty) ...[
+              const SizedBox(height: 11),
+              SizedBox(
+                height: 34,
+                child: ListView.separated(
+                  scrollDirection: Axis.horizontal,
+                  itemCount: linkableGoals.length + 1,
+                  separatorBuilder: (_, __) => const SizedBox(width: 8),
+                  itemBuilder: (_, i) {
+                    if (i == 0) {
+                      final on = _goalId == null;
+                      return GestureDetector(
+                        onTap: () => setState(() {
+                          _goalId = null;
+                          _projectId = null;
+                        }),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 13, vertical: 7),
+                          decoration: BoxDecoration(
+                            color: on ? AppColors.accent : AppColors.surface2,
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(
+                                color:
+                                    on ? Colors.transparent : AppColors.line),
+                          ),
+                          child: Text('No Goal',
+                              style: TextStyle(
+                                  fontSize: 12.5,
+                                  fontWeight: FontWeight.w600,
+                                  color: on
+                                      ? AppColors.accentInk
+                                      : AppColors.tx2)),
+                        ),
+                      );
+                    }
+                    final g = linkableGoals[i - 1];
+                    final on = _goalId == g.id;
+                    return GestureDetector(
+                      onTap: () => setState(() {
+                        _goalId = g.id;
+                        if (_projectId != null) {
+                          final hasProj = s.projects.any(
+                              (p) => p.id == _projectId && p.goalId == g.id);
+                          if (!hasProj) _projectId = null;
+                        }
+                      }),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 13, vertical: 7),
+                        decoration: BoxDecoration(
+                          color: on ? AppColors.accent : AppColors.surface2,
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(
+                              color: on ? Colors.transparent : AppColors.line),
+                        ),
+                        child: Text(g.title,
+                            style: TextStyle(
+                                fontSize: 12.5,
+                                fontWeight: FontWeight.w600,
+                                color: on
+                                    ? AppColors.accentInk
+                                    : AppColors.tx2)),
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ],
+            if (_areaId != null && linkableProjects.isNotEmpty) ...[
+              const SizedBox(height: 11),
+              SizedBox(
+                height: 34,
+                child: ListView.separated(
+                  scrollDirection: Axis.horizontal,
+                  itemCount: linkableProjects.length + 1,
+                  separatorBuilder: (_, __) => const SizedBox(width: 8),
+                  itemBuilder: (_, i) {
+                    if (i == 0) {
+                      final on = _projectId == null;
+                      return GestureDetector(
+                        onTap: () => setState(() => _projectId = null),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 13, vertical: 7),
+                          decoration: BoxDecoration(
+                            color: on ? AppColors.accent : AppColors.surface2,
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(
+                                color:
+                                    on ? Colors.transparent : AppColors.line),
+                          ),
+                          child: Text('No Project',
+                              style: TextStyle(
+                                  fontSize: 12.5,
+                                  fontWeight: FontWeight.w600,
+                                  color: on
+                                      ? AppColors.accentInk
+                                      : AppColors.tx2)),
+                        ),
+                      );
+                    }
+                    final p = linkableProjects[i - 1];
+                    final on = _projectId == p.id;
+                    return GestureDetector(
+                      onTap: () => setState(() => _projectId = p.id),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 13, vertical: 7),
+                        decoration: BoxDecoration(
+                          color: on ? AppColors.accent : AppColors.surface2,
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(
+                              color: on ? Colors.transparent : AppColors.line),
+                        ),
+                        child: Text(p.title,
+                            style: TextStyle(
+                                fontSize: 12.5,
+                                fontWeight: FontWeight.w600,
+                                color: on
+                                    ? AppColors.accentInk
+                                    : AppColors.tx2)),
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ],
             const SizedBox(height: 11),
             Row(
               children: [
@@ -281,6 +461,9 @@ class _TasksScreenState extends State<TasksScreen> {
                     onPressed: () => setState(() {
                           _adding = false;
                           _title.clear();
+                          _areaId = null;
+                          _goalId = null;
+                          _projectId = null;
                         }),
                     child: Text('Cancel',
                         style: TextStyle(color: AppColors.tx3))),
@@ -310,11 +493,16 @@ class _TasksScreenState extends State<TasksScreen> {
     context.read<LifeCubit>().addTask(
           title: title,
           areaId: _areaId,
+          goalId: _goalId,
+          projectId: _projectId,
           priority: Priority.fromLabel(_priority),
         );
     setState(() {
       _adding = false;
       _title.clear();
+      _areaId = null;
+      _goalId = null;
+      _projectId = null;
     });
   }
 }

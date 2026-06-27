@@ -118,6 +118,145 @@ class HabitDetailScreen extends StatelessWidget {
     final pct = h.target == 0
         ? (h.todayDone ? 1.0 : 0.0)
         : (h.todayVal / h.target).clamp(0, 1).toDouble();
+
+    if (h.kind == 'boolean') {
+      return GlassCard(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Eyebrow('Today'),
+                Text(
+                    h.todayDone ? 'Done' : 'Not yet',
+                    style: GoogleFonts.jetBrainsMono(
+                        fontSize: 13, 
+                        fontWeight: FontWeight.w600,
+                        color: h.todayDone ? AppColors.ok : AppColors.tx3)),
+              ],
+            ),
+            const SizedBox(height: 14),
+            SizedBox(
+              width: double.infinity,
+              height: 48,
+              child: FilledButton.icon(
+                onPressed: () => context.read<LifeCubit>().logHabit(h),
+                icon: Icon(h.todayDone ? Icons.check : Icons.add, size: 18),
+                label: Text(h.todayDone ? 'Logged (Tap to uncheck)' : 'Mark done'),
+                style: FilledButton.styleFrom(
+                  backgroundColor: h.todayDone ? AppColors.ok.withValues(alpha: 0.15) : color,
+                  foregroundColor: h.todayDone ? AppColors.ok : AppColors.accentInk,
+                  side: h.todayDone ? BorderSide(color: AppColors.ok.withValues(alpha: 0.3)) : null,
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(13)),
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    if (h.kind == 'count') {
+      return GlassCard(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Eyebrow('Today\'s Count'),
+                Text(
+                    '${h.todayCount}/${h.targetCount}',
+                    style: GoogleFonts.jetBrainsMono(
+                        fontSize: 14, 
+                        fontWeight: FontWeight.bold,
+                        color: h.todayDone ? AppColors.ok : AppColors.tx)),
+              ],
+            ),
+            const SizedBox(height: 12),
+            ProgressBar(pct, color: h.todayDone ? AppColors.ok : color),
+            const SizedBox(height: 20),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                IconButton(
+                  onPressed: h.todayCount > 0
+                      ? () {
+                          final nextCount = h.todayCount - 1;
+                          context.read<LifeCubit>().updateHabitLog(
+                            h,
+                            count: nextCount,
+                            minutes: h.todayMinutes,
+                            completed: nextCount >= h.targetCount,
+                          );
+                        }
+                      : null,
+                  icon: const Icon(Icons.remove, size: 20),
+                  style: IconButton.styleFrom(
+                    backgroundColor: AppColors.surface3,
+                    foregroundColor: AppColors.tx,
+                    padding: const EdgeInsets.all(12),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12)),
+                  ),
+                ),
+                const SizedBox(width: 24),
+                Text(
+                  '${h.todayCount}',
+                  style: GoogleFonts.jetBrainsMono(
+                    fontSize: 32,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.tx,
+                  ),
+                ),
+                const SizedBox(width: 24),
+                IconButton(
+                  onPressed: () {
+                    final nextCount = h.todayCount + 1;
+                    context.read<LifeCubit>().updateHabitLog(
+                      h,
+                      count: nextCount,
+                      minutes: h.todayMinutes,
+                      completed: nextCount >= h.targetCount,
+                    );
+                  },
+                  icon: const Icon(Icons.add, size: 20),
+                  style: IconButton.styleFrom(
+                    backgroundColor: color,
+                    foregroundColor: AppColors.accentInk,
+                    padding: const EdgeInsets.all(12),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12)),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 14),
+            if (h.todayCount > 0)
+              Center(
+                child: TextButton(
+                  onPressed: () {
+                    context.read<LifeCubit>().updateHabitLog(
+                      h,
+                      count: 0,
+                      minutes: h.todayMinutes,
+                      completed: false,
+                    );
+                  },
+                  child: Text(
+                    'Reset Count',
+                    style: TextStyle(color: AppColors.danger, fontSize: 13),
+                  ),
+                ),
+              ),
+          ],
+        ),
+      );
+    }
+
+    // Timer kind
     return GlassCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -125,42 +264,125 @@ class HabitDetailScreen extends StatelessWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Eyebrow('Today'),
+              Eyebrow('Today\'s Timer'),
               Text(
-                  h.kind == 'boolean'
-                      ? (h.todayDone ? 'Done' : 'Not yet')
-                      : '${h.todayVal}/${h.target}',
+                  '${h.todayMinutes}/${h.targetMinutes} min',
                   style: GoogleFonts.jetBrainsMono(
-                      fontSize: 13, color: AppColors.tx2)),
+                      fontSize: 14, 
+                      fontWeight: FontWeight.bold,
+                      color: h.todayDone ? AppColors.ok : AppColors.tx)),
             ],
           ),
-          if (h.kind != 'boolean') ...[
-            const SizedBox(height: 12),
-            ProgressBar(pct, color: color),
-          ],
+          const SizedBox(height: 12),
+          ProgressBar(pct, color: h.todayDone ? AppColors.ok : color),
+          const SizedBox(height: 20),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+            children: [
+              OutlinedButton(
+                onPressed: h.todayMinutes >= 5
+                    ? () {
+                        final nextMin = h.todayMinutes - 5;
+                        context.read<LifeCubit>().updateHabitLog(
+                          h,
+                          count: h.todayCount,
+                          minutes: nextMin,
+                          completed: nextMin >= h.targetMinutes,
+                        );
+                      }
+                    : null,
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: AppColors.tx2,
+                  side: BorderSide(color: AppColors.line2),
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                  minimumSize: Size.zero,
+                ),
+                child: const Text('-5m'),
+              ),
+              OutlinedButton(
+                onPressed: h.todayMinutes >= 15
+                    ? () {
+                        final nextMin = h.todayMinutes - 15;
+                        context.read<LifeCubit>().updateHabitLog(
+                          h,
+                          count: h.todayCount,
+                          minutes: nextMin,
+                          completed: nextMin >= h.targetMinutes,
+                        );
+                      }
+                    : null,
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: AppColors.tx2,
+                  side: BorderSide(color: AppColors.line2),
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                  minimumSize: Size.zero,
+                ),
+                child: const Text('-15m'),
+              ),
+              Text(
+                '${h.todayMinutes}m',
+                style: GoogleFonts.jetBrainsMono(
+                  fontSize: 26,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.tx,
+                ),
+              ),
+              FilledButton(
+                onPressed: () {
+                  final nextMin = h.todayMinutes + 5;
+                  context.read<LifeCubit>().updateHabitLog(
+                    h,
+                    count: h.todayCount,
+                    minutes: nextMin,
+                    completed: nextMin >= h.targetMinutes,
+                  );
+                },
+                style: FilledButton.styleFrom(
+                  backgroundColor: AppColors.surface3,
+                  foregroundColor: AppColors.tx,
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                  minimumSize: Size.zero,
+                ),
+                child: const Text('+5m'),
+              ),
+              FilledButton(
+                onPressed: () {
+                  final nextMin = h.todayMinutes + 15;
+                  context.read<LifeCubit>().updateHabitLog(
+                    h,
+                    count: h.todayCount,
+                    minutes: nextMin,
+                    completed: nextMin >= h.targetMinutes,
+                  );
+                },
+                style: FilledButton.styleFrom(
+                  backgroundColor: color,
+                  foregroundColor: AppColors.accentInk,
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                  minimumSize: Size.zero,
+                ),
+                child: const Text('+15m'),
+              ),
+            ],
+          ),
           const SizedBox(height: 14),
-          SizedBox(
-            width: double.infinity,
-            height: 48,
-            child: FilledButton.icon(
-              onPressed: () => context.read<LifeCubit>().logHabit(h),
-              icon: Icon(h.todayDone ? Icons.check : Icons.add, size: 18),
-              label: Text(h.kind == 'count'
-                  ? 'Log +1'
-                  : h.kind == 'timer'
-                      ? 'Log session'
-                      : h.todayDone
-                          ? 'Logged'
-                          : 'Mark done'),
-              style: FilledButton.styleFrom(
-                backgroundColor: h.todayDone ? AppColors.surface3 : color,
-                foregroundColor:
-                    h.todayDone ? AppColors.tx : AppColors.accentInk,
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(13)),
+          if (h.todayMinutes > 0)
+            Center(
+              child: TextButton(
+                onPressed: () {
+                  context.read<LifeCubit>().updateHabitLog(
+                    h,
+                    count: h.todayCount,
+                    minutes: 0,
+                    completed: false,
+                  );
+                },
+                child: Text(
+                  'Reset Timer',
+                  style: TextStyle(color: AppColors.danger, fontSize: 13),
+                ),
               ),
             ),
-          ),
         ],
       ),
     );

@@ -236,7 +236,13 @@ class _CaptureSheetState extends State<CaptureSheet> {
                 const SizedBox(height: 18),
                 BlocBuilder<LifeCubit, LifeState>(
                   builder: (context, s) {
-                    final pending = s.pendingCaptures;
+                    // Worth-now items float to the top of the inbox.
+                    final pending = [...s.pendingCaptures]..sort((a, b) {
+                        if (a.isWorthNow != b.isWorthNow) {
+                          return a.isWorthNow ? -1 : 1;
+                        }
+                        return 0;
+                      });
                     if (pending.isEmpty) {
                       return Padding(
                         padding: EdgeInsets.symmetric(vertical: 8),
@@ -279,19 +285,59 @@ class _CaptureSheetState extends State<CaptureSheet> {
                                               style: const TextStyle(
                                                   fontSize: 13.5)),
                                           const SizedBox(height: 5),
-                                          GestureDetector(
-                                            onTap: () => _reclassify(c),
-                                            child: Chip3(
-                                                '${c.type} · ${c.confidencePct}% ▾'),
-                                          ),
+                                          if (!c.isClassified)
+                                            Row(
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: [
+                                                SizedBox(
+                                                  width: 11,
+                                                  height: 11,
+                                                  child:
+                                                      CircularProgressIndicator(
+                                                          strokeWidth: 1.8,
+                                                          color:
+                                                              AppColors.tx4),
+                                                ),
+                                                const SizedBox(width: 7),
+                                                Text('Sorting…',
+                                                    style: TextStyle(
+                                                        fontSize: 11.5,
+                                                        color: AppColors.tx4)),
+                                              ],
+                                            )
+                                          else
+                                            Wrap(
+                                              spacing: 6,
+                                              runSpacing: 4,
+                                              crossAxisAlignment:
+                                                  WrapCrossAlignment.center,
+                                              children: [
+                                                GestureDetector(
+                                                  onTap: () => _reclassify(c),
+                                                  child: Chip3(
+                                                      '${c.type} · ${c.confidencePct}% ▾'),
+                                                ),
+                                                if (c.isWorthNow)
+                                                  Chip3('Worth now',
+                                                      icon: Icons.bolt,
+                                                      color: AppColors.accent,
+                                                      bg: AppColors.accentSoft),
+                                              ],
+                                            ),
                                         ],
                                       ),
                                     ),
                                     IconButton(
-                                      onPressed: () => _convert(c),
+                                      onPressed:
+                                          c.isClassified ? () => _convert(c) : null,
                                       icon: Icon(Icons.check_circle,
-                                          color: AppColors.accent, size: 22),
-                                      tooltip: 'Convert',
+                                          color: c.isClassified
+                                              ? AppColors.accent
+                                              : AppColors.tx4,
+                                          size: 22),
+                                      tooltip: c.isClassified
+                                          ? 'Convert'
+                                          : 'Sorting…',
                                     ),
                                     IconButton(
                                       onPressed: () => context

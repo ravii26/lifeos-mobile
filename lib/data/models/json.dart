@@ -20,6 +20,15 @@ double asDouble(dynamic v, [double fallback = 0]) {
   return fallback;
 }
 
+/// Like [asDouble] but preserves null — used where null is meaningful
+/// (e.g. an unclassified capture has `confidence: null`, not 0).
+double? asDoubleOrNull(dynamic v) {
+  if (v == null) return null;
+  if (v is num) return v.toDouble();
+  if (v is String) return double.tryParse(v);
+  return null;
+}
+
 bool asBool(dynamic v, [bool fallback = false]) {
   if (v is bool) return v;
   if (v is String) return v.toLowerCase() == 'true';

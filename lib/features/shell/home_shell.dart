@@ -1,13 +1,16 @@
+import 'dart:async';
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../core/di/service_locator.dart';
+import '../../core/modules/module_registry.dart';
 import '../../core/notifications/notification_service.dart';
 import '../../core/theme/app_colors.dart';
 import '../../data/models/user.dart';
 import '../../data/repositories/life_repository.dart';
+import '../appearance/appearance_cubit.dart';
 import '../areas/areas_screen.dart';
 import '../capture/capture_sheet.dart';
 import '../habits/habits_screen.dart';
@@ -15,6 +18,16 @@ import '../home/home_screen.dart';
 import '../more/more_sheet.dart';
 import '../tasks/tasks_screen.dart';
 import 'life_cubit.dart';
+
+/// A bottom-nav destination. Built dynamically so optional modules (Habits)
+/// drop out when the user disables them.
+class _TabDef {
+  final String label;
+  final IconData icon;
+  final IconData iconActive;
+  final Widget screen;
+  const _TabDef(this.label, this.icon, this.iconActive, this.screen);
+}
 
 class HomeShell extends StatefulWidget {
   final AppUser user;
@@ -31,6 +44,8 @@ class _HomeShellState extends State<HomeShell> {
   void initState() {
     super.initState();
     NotificationService.instance.requestPermission();
+    // Behaviour signal: the app was opened (once per session, on shell mount).
+    getIt<LifeRepository>().recordBehavior('APP_OPEN').ignore();
   }
 
   @override
@@ -38,51 +53,72 @@ class _HomeShellState extends State<HomeShell> {
     return BlocProvider(
       create: (_) => LifeCubit(getIt<LifeRepository>())..load(),
       child: Builder(builder: (context) {
-        final screens = [
-          HomeScreen(user: widget.user, onOpenMore: () => _openMore(context)),
-          TasksScreen(onOpenMore: () => _openMore(context)),
-          HabitsScreen(onOpenMore: () => _openMore(context)),
-          AreasScreen(onOpenMore: () => _openMore(context)),
-        ];
-        return Scaffold(
-          backgroundColor: AppColors.bg,
-          extendBody: true,
-          body: BlocListener<LifeCubit, LifeState>(
-            listenWhen: (prev, curr) =>
-                curr.error != null && curr.error != prev.error,
-            listener: (context, state) {
-              ScaffoldMessenger.of(context)
-                ..hideCurrentSnackBar()
-                ..showSnackBar(SnackBar(
-                  content: Text(state.error!),
-                  backgroundColor: AppColors.surface2,
-                  behavior: SnackBarBehavior.floating,
-                  margin: const EdgeInsets.fromLTRB(14, 0, 14, 90),
-                ));
-              context.read<LifeCubit>().clearError();
-            },
-            child: Container(
-              decoration: const BoxDecoration(
-                gradient: RadialGradient(
-                  center: Alignment(0.85, -1),
-                  radius: 1.1,
-                  colors: [Color(0x22C5F23F), Colors.transparent],
-                  stops: [0, 0.55],
+        return BlocBuilder<AppearanceCubit, AppearanceState>(
+          buildWhen: (a, b) => a.rawModules != b.rawModules,
+          builder: (context, appearance) {
+            final tabs = _buildTabs(context, appearance);
+            final index = _index.clamp(0, tabs.length - 1);
+            return Scaffold(
+              backgroundColor: AppColors.bg,
+              extendBody: true,
+              body: BlocListener<LifeCubit, LifeState>(
+                listenWhen: (prev, curr) =>
+                    curr.error != null && curr.error != prev.error,
+                listener: (context, state) {
+                  ScaffoldMessenger.of(context)
+                    ..hideCurrentSnackBar()
+                    ..showSnackBar(SnackBar(
+                      content: Text(state.error!),
+                      backgroundColor: AppColors.surface2,
+                      behavior: SnackBarBehavior.floating,
+                      margin: const EdgeInsets.fromLTRB(14, 0, 14, 90),
+                    ));
+                  context.read<LifeCubit>().clearError();
+                },
+                child: Container(
+                  decoration: const BoxDecoration(
+                    gradient: RadialGradient(
+                      center: Alignment(0.85, -1),
+                      radius: 1.1,
+                      colors: [Color(0x22C5F23F), Colors.transparent],
+                      stops: [0, 0.55],
+                    ),
+                  ),
+                  child: IndexedStack(
+                      index: index,
+                      children: [for (final t in tabs) t.screen]),
                 ),
               ),
-              child: IndexedStack(index: _index, children: screens),
-            ),
-          ),
-          floatingActionButtonLocation:
-              FloatingActionButtonLocation.centerDocked,
-          floatingActionButton: _CaptureFab(onTap: () => _openCapture(context)),
-          bottomNavigationBar: _BottomNav(
-            index: _index,
-            onTap: (i) => setState(() => _index = i),
-          ),
+              floatingActionButtonLocation:
+                  FloatingActionButtonLocation.centerDocked,
+              floatingActionButton:
+                  _CaptureFab(onTap: () => _openCapture(context)),
+              bottomNavigationBar: _BottomNav(
+                tabs: tabs,
+                index: index,
+                onTap: (i) => setState(() => _index = i),
+              ),
+            );
+          },
         );
       }),
     );
+  }
+
+  /// Bottom-nav tabs: Home + Tasks (core) + Habits (optional) + Areas (core).
+  List<_TabDef> _buildTabs(BuildContext context, AppearanceState appearance) {
+    void openMore() => _openMore(context);
+    return [
+      _TabDef('Home', Icons.dashboard_outlined, Icons.dashboard,
+          HomeScreen(user: widget.user, onOpenMore: openMore)),
+      _TabDef('Tasks', Icons.check_circle_outline, Icons.check_circle,
+          TasksScreen(onOpenMore: openMore)),
+      if (appearance.isEnabled(ModuleId.habits))
+        _TabDef('Habits', Icons.repeat_rounded, Icons.repeat_rounded,
+            HabitsScreen(onOpenMore: openMore)),
+      _TabDef('Areas', Icons.grid_view_outlined, Icons.grid_view_rounded,
+          AreasScreen(onOpenMore: openMore)),
+    ];
   }
 
   void _openCapture(BuildContext context) {
@@ -145,20 +181,17 @@ class _CaptureFab extends StatelessWidget {
 }
 
 class _BottomNav extends StatelessWidget {
+  final List<_TabDef> tabs;
   final int index;
   final ValueChanged<int> onTap;
-  const _BottomNav({required this.index, required this.onTap});
-
-  static const _tabs = [
-    (0, 'Home', Icons.dashboard_outlined, Icons.dashboard),
-    (1, 'Tasks', Icons.check_circle_outline, Icons.check_circle),
-    (2, 'Habits', Icons.repeat_rounded, Icons.repeat_rounded),
-    (3, 'Areas', Icons.grid_view_outlined, Icons.grid_view_rounded),
-  ];
+  const _BottomNav(
+      {required this.tabs, required this.index, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
     final todo = context.select<LifeCubit, int>((c) => c.state.todayTasks.length);
+    // Split tabs evenly around the center FAB slot.
+    final split = (tabs.length / 2).ceil();
     return Padding(
       padding: const EdgeInsets.fromLTRB(14, 0, 14, 18),
       child: ClipRRect(
@@ -177,11 +210,9 @@ class _BottomNav extends StatelessWidget {
             ),
             child: Row(
               children: [
-                _tab(_tabs[0], todo),
-                _tab(_tabs[1], todo),
+                for (int i = 0; i < split; i++) _tab(i, todo),
                 const SizedBox(width: 64), // FAB slot
-                _tab(_tabs[2], todo),
-                _tab(_tabs[3], todo),
+                for (int i = split; i < tabs.length; i++) _tab(i, todo),
               ],
             ),
           ),
@@ -190,12 +221,13 @@ class _BottomNav extends StatelessWidget {
     );
   }
 
-  Widget _tab((int, String, IconData, IconData) t, int todo) {
-    final active = index == t.$1;
-    final badge = t.$1 == 1 ? todo : 0;
+  Widget _tab(int i, int todo) {
+    final t = tabs[i];
+    final active = index == i;
+    final badge = t.label == 'Tasks' ? todo : 0;
     return Expanded(
       child: InkWell(
-        onTap: () => onTap(t.$1),
+        onTap: () => onTap(i),
         borderRadius: BorderRadius.circular(16),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -203,7 +235,7 @@ class _BottomNav extends StatelessWidget {
             Stack(
               clipBehavior: Clip.none,
               children: [
-                Icon(active ? t.$4 : t.$3,
+                Icon(active ? t.iconActive : t.icon,
                     size: 22,
                     color: active ? AppColors.accent : AppColors.tx4),
                 if (badge > 0)
@@ -231,7 +263,7 @@ class _BottomNav extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 3),
-            Text(t.$2,
+            Text(t.label,
                 style: TextStyle(
                     fontSize: 9.5,
                     fontWeight: FontWeight.w600,

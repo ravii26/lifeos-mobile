@@ -2,6 +2,7 @@ import 'package:equatable/equatable.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
+import '../../core/modules/module_registry.dart';
 import '../../core/theme/app_colors.dart';
 import '../../data/repositories/life_repository.dart';
 
@@ -12,13 +13,22 @@ class AppearanceState extends Equatable {
   final bool light; // theme mode
   final String density; // compact | cozy | comfy
 
+  /// Raw optional-module keys enabled by the user. Empty == all optional on.
+  final List<String> rawModules;
+
   const AppearanceState({
     this.accent = AppAccent.chartreuse,
     this.font = 'inter',
     this.vibe = 'focused',
     this.light = false,
     this.density = 'comfy',
+    this.rawModules = const [],
   });
+
+  /// Effective set of enabled module keys (core modules always included).
+  Set<String> get enabled => resolveEnabled(rawModules);
+
+  bool isEnabled(ModuleId id) => enabled.contains(id.name);
 
   /// Text scale multiplier applied app-wide for the density setting.
   double get textScale => switch (density) {
@@ -33,6 +43,7 @@ class AppearanceState extends Equatable {
     String? vibe,
     bool? light,
     String? density,
+    List<String>? rawModules,
   }) =>
       AppearanceState(
         accent: accent ?? this.accent,
@@ -40,10 +51,12 @@ class AppearanceState extends Equatable {
         vibe: vibe ?? this.vibe,
         light: light ?? this.light,
         density: density ?? this.density,
+        rawModules: rawModules ?? this.rawModules,
       );
 
   @override
-  List<Object?> get props => [accent, font, vibe, light, density];
+  List<Object?> get props =>
+      [accent, font, vibe, light, density, rawModules];
 }
 
 /// Holds appearance prefs. Accent/font/vibe persist to the backend /settings;
@@ -76,9 +89,29 @@ class AppearanceCubit extends Cubit<AppearanceState> {
         accent: AppAccent.fromHex(s.accent),
         font: s.font,
         vibe: s.vibe,
+        rawModules: s.enabledModules,
       );
     } catch (_) {}
     _emit(next);
+  }
+
+  /// Toggle an optional module on/off and persist the new set to the backend.
+  /// Core modules are never toggled.
+  Future<void> toggleModule(String key, bool on) async {
+    if (Modules.coreKeys.contains(key)) return;
+    // Materialize the current effective optional set, then add/remove.
+    final current = {
+      ...state.enabled.where(Modules.optionalKeys.contains),
+    };
+    if (on) {
+      current.add(key);
+    } else {
+      current.remove(key);
+    }
+    // Persist in registry order for stable, readable payloads.
+    final next = Modules.optionalKeys.where(current.contains).toList();
+    emit(state.copyWith(rawModules: next));
+    _save(() => _repo.updateSettings(enabledModules: next));
   }
 
   Future<void> setAccent(AppAccent accent) async {

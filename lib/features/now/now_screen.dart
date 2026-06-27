@@ -9,7 +9,15 @@ import '../../data/repositories/life_repository.dart';
 import '../../widgets/bits.dart';
 import '../../widgets/glass.dart';
 import '../../widgets/screen_header.dart';
+import '../areas/area_detail_screen.dart';
+import '../capture/capture_sheet.dart';
+import '../goals/goals_screen.dart';
+import '../learn/learn_screen.dart';
+import '../notebooks/notebooks_screen.dart';
+import '../projects/projects_screen.dart';
+import '../review/review_screen.dart';
 import '../shell/life_cubit.dart';
+import '../vault/vault_screen.dart';
 
 class NowScreen extends StatefulWidget {
   const NowScreen({super.key});
@@ -30,20 +38,83 @@ class _NowScreenState extends State<NowScreen> {
   void _reload() =>
       setState(() => _future = getIt<LifeRepository>().decisionsNow());
 
-  /// Light-touch actions: complete a task or log a habit, then refresh.
-  Future<void> _act(String type, String? refId) async {
-    if (refId == null) return;
+  /// Acts on a coach suggestion. TASK/HABIT are completed/logged inline; every
+  /// other type navigates to the relevant screen (the project, the inbox, a
+  /// resource, the vault, a note, a goal, an area, the review).
+  Future<void> _handle(String type, String? refId) async {
     final life = context.read<LifeCubit>();
     if (type == 'TASK') {
+      if (refId == null) return;
       await life.completeTask(refId);
-    } else if (type == 'HABIT') {
-      final h = life.state.habits.where((x) => x.id == refId);
-      if (h.isNotEmpty) await life.logHabit(h.first);
-    } else {
+      _reload();
       return;
     }
-    _reload();
+    if (type == 'HABIT') {
+      if (refId == null) return;
+      final h = life.state.habits.where((x) => x.id == refId);
+      if (h.isNotEmpty) await life.logHabit(h.first);
+      _reload();
+      return;
+    }
+    _navigate(type, refId, life);
   }
+
+  /// Whether the card should render a CTA. TASK/HABIT need a refId to act
+  /// inline; navigation targets are always reachable (refId just deep-links).
+  bool _canAct(String type, String? refId) {
+    if (type == 'TASK' || type == 'HABIT') return refId != null;
+    return _hasDestination(type, refId);
+  }
+
+  bool _hasDestination(String type, String? refId) => switch (type) {
+        'PROJECT' || 'GOAL' || 'RESOURCE' || 'NOTE' || 'VAULT' || 'REVIEW' ||
+        'CAPTURE' =>
+          true,
+        'AREA_FOCUS' => refId != null,
+        _ => false,
+      };
+
+  void _navigate(String type, String? refId, LifeCubit cubit) {
+    if (type == 'CAPTURE') {
+      showModalBottomSheet(
+        context: context,
+        isScrollControlled: true,
+        backgroundColor: Colors.transparent,
+        builder: (_) =>
+            BlocProvider.value(value: cubit, child: const CaptureSheet()),
+      );
+      return;
+    }
+    final Widget? dest = switch (type) {
+      'PROJECT' => const ProjectsScreen(),
+      'GOAL' => const GoalsScreen(),
+      'RESOURCE' => const LearnScreen(),
+      'NOTE' => const KnowledgeScreen(),
+      'VAULT' => const VaultScreen(),
+      'REVIEW' => const ReviewScreen(),
+      'AREA_FOCUS' => refId != null ? AreaDetailScreen(areaId: refId) : null,
+      _ => null,
+    };
+    if (dest == null) return;
+    Navigator.of(context).push(MaterialPageRoute(
+      builder: (_) => BlocProvider.value(value: cubit, child: dest),
+    ));
+  }
+
+  /// CTA icon + label per suggestion type.
+  (IconData, String) _cta(String type) => switch (type) {
+        'TASK' => (Icons.check, 'Mark done'),
+        'HABIT' => (Icons.add, 'Log it'),
+        'CAPTURE' => (Icons.inbox_outlined, 'Open inbox'),
+        'REVIEW' => (Icons.rate_review_outlined, 'Open review'),
+        'GOAL' => (Icons.flag_outlined, 'View goal'),
+        'PROJECT' => (Icons.folder_open_outlined, 'View project'),
+        'RESOURCE' => (Icons.menu_book_outlined, 'Open resource'),
+        'NOTE' => (Icons.sticky_note_2_outlined, 'Open note'),
+        'VAULT' => (Icons.shield_outlined, 'Open vault'),
+        'AREA_FOCUS' => (Icons.grid_view_outlined, 'View area'),
+        _ => (Icons.open_in_new, 'Open'),
+      };
 
   @override
   Widget build(BuildContext context) {
@@ -184,7 +255,8 @@ class _NowScreenState extends State<NowScreen> {
   }
 
   Widget _primaryCard(PrimaryAction a, Color tone) {
-    final actionable = a.refId != null && (a.type == 'TASK' || a.type == 'HABIT');
+    final actionable = _canAct(a.type, a.refId);
+    final (ctaIcon, ctaLabel) = _cta(a.type);
     return GlassCard(
       padding: const EdgeInsets.all(18),
       gradient: LinearGradient(
@@ -219,9 +291,9 @@ class _NowScreenState extends State<NowScreen> {
             SizedBox(
               width: double.infinity,
               child: FilledButton.icon(
-                onPressed: () => _act(a.type, a.refId),
-                icon: Icon(a.type == 'TASK' ? Icons.check : Icons.add, size: 18),
-                label: Text(a.type == 'TASK' ? 'Mark done' : 'Log it'),
+                onPressed: () => _handle(a.type, a.refId),
+                icon: Icon(ctaIcon, size: 18),
+                label: Text(ctaLabel),
                 style: FilledButton.styleFrom(
                   backgroundColor: AppColors.accent,
                   foregroundColor: AppColors.accentInk,
@@ -300,7 +372,8 @@ class _NowScreenState extends State<NowScreen> {
       );
 
   Widget _suggestionCard(Suggestion s) {
-    final actionable = s.refId != null && (s.type == 'TASK' || s.type == 'HABIT');
+    final actionable = _canAct(s.type, s.refId);
+    final (ctaIcon, ctaLabel) = _cta(s.type);
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
       padding: const EdgeInsets.all(15),
@@ -362,14 +435,14 @@ class _NowScreenState extends State<NowScreen> {
             Align(
               alignment: Alignment.centerLeft,
               child: TextButton.icon(
-                onPressed: () => _act(s.type, s.refId),
+                onPressed: () => _handle(s.type, s.refId),
                 style: TextButton.styleFrom(
                     padding: EdgeInsets.zero,
                     foregroundColor: AppColors.accent,
                     minimumSize: const Size(0, 0),
                     tapTargetSize: MaterialTapTargetSize.shrinkWrap),
-                icon: Icon(s.type == 'TASK' ? Icons.check : Icons.add, size: 16),
-                label: Text(s.type == 'TASK' ? 'Mark done' : 'Log it',
+                icon: Icon(ctaIcon, size: 16),
+                label: Text(ctaLabel,
                     style: const TextStyle(
                         fontSize: 12.5, fontWeight: FontWeight.w600)),
               ),

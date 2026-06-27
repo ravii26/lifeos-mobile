@@ -46,6 +46,35 @@ class _VaultScreenState extends State<VaultScreen> {
     if (changed == true) _reload();
   }
 
+  void _snack(String msg) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text(msg),
+      backgroundColor: AppColors.surface4,
+      behavior: SnackBarBehavior.floating,
+    ));
+  }
+
+  Future<void> _markUsed(VaultItem v) async {
+    try {
+      await getIt<LifeRepository>().markVaultUsed(v.id);
+      _snack('Pulled from the vault ✓');
+      _reload();
+    } catch (_) {
+      _snack('Could not record that');
+    }
+  }
+
+  Future<void> _markHelpful(VaultItem v) async {
+    try {
+      await getIt<LifeRepository>().markVaultHelpful(v.id);
+      _snack('Glad it helped 💚');
+      _reload();
+    } catch (_) {
+      _snack('Could not record that');
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -161,7 +190,9 @@ class _VaultScreenState extends State<VaultScreen> {
                         Icons.sticky_note_2_outlined,
                     color: AppColors.accent,
                     bg: AppColors.accentSoft),
-                Text('used ${v.usedCount}×',
+                Text(
+                    'used ${v.usedCount}×'
+                    '${v.helpfulCount > 0 ? ' · helped ${v.helpfulCount}×' : ''}',
                     style: GoogleFonts.jetBrainsMono(
                         fontSize: 10, color: AppColors.tx4)),
               ],
@@ -184,9 +215,39 @@ class _VaultScreenState extends State<VaultScreen> {
                 children: [for (final t in v.triggerTags) Chip3('#$t')],
               ),
             ],
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                _vaultAction(
+                    Icons.bolt_outlined, 'Used it', () => _markUsed(v)),
+                const SizedBox(width: 8),
+                _vaultAction(Icons.favorite_outline, 'This helped',
+                    () => _markHelpful(v),
+                    accent: true),
+              ],
+            ),
           ],
         ),
       );
+
+  Widget _vaultAction(IconData icon, String label, VoidCallback onTap,
+      {bool accent = false}) {
+    final fg = accent ? AppColors.accent : AppColors.tx2;
+    return OutlinedButton.icon(
+      onPressed: onTap,
+      icon: Icon(icon, size: 15, color: fg),
+      label: Text(label,
+          style: TextStyle(
+              fontSize: 12, fontWeight: FontWeight.w600, color: fg)),
+      style: OutlinedButton.styleFrom(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        minimumSize: const Size(0, 34),
+        side: BorderSide(
+            color: accent ? AppColors.accentSoft : AppColors.line2),
+        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+      ),
+    );
+  }
 
   static String _label(String k) =>
       k == 'All' ? 'All' : k[0] + k.substring(1).toLowerCase();

@@ -21,6 +21,7 @@ Color _typeColor(String type) => switch (type) {
       'TOPIC' => const Color(0xFFA78BFA),
       'NOTEBOOK' => AppColors.relationships,
       'NOTE' => AppColors.tx4,
+      'RESOURCE' => const Color(0xFF34D399),
       _ => AppColors.tx3,
     };
 
@@ -46,12 +47,14 @@ double _radiusFor(String type) => switch (type) {
       'PROJECT' => 8,
       'HABIT' => 8,
       'NOTEBOOK' => 7,
+      'RESOURCE' => 6,
       _ => 5,
     };
 
 double _depthFor(String type) => switch (type) {
       'GOAL' || 'HABIT' || 'TOPIC' => 0.30,
       'PROJECT' || 'NOTEBOOK' => 0.40,
+      'RESOURCE' => 0.46,
       _ => 0.50,
     };
 
@@ -140,7 +143,8 @@ class _GraphScreenState extends State<GraphScreen> {
       'HABIT',
       'TOPIC',
       'NOTEBOOK',
-      'NOTE'
+      'NOTE',
+      'RESOURCE'
     ];
     return Container(
       width: double.infinity,

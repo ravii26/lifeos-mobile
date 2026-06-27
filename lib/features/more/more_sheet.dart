@@ -4,9 +4,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import '../../core/modules/module_registry.dart';
 import '../../core/theme/app_colors.dart';
 import '../../data/models/user.dart';
-import '../../widgets/bits.dart';
+import '../appearance/appearance_cubit.dart';
 import '../auth/bloc/auth_bloc.dart';
 import '../behavior/behavior_screen.dart';
 import '../calendar/calendar_screen.dart';
@@ -20,25 +21,27 @@ import '../projects/projects_screen.dart';
 import '../review/review_screen.dart';
 import '../shell/life_cubit.dart';
 import '../vault/vault_screen.dart';
+import 'modules_screen.dart';
 import 'settings_screen.dart';
 
 class MoreSheet extends StatelessWidget {
   final AppUser user;
   const MoreSheet({super.key, required this.user});
 
-  static const _items = [
-    ('What now', 'Your next best move', Icons.bolt_outlined),
-    ('Goals', 'What you\'re aiming at', Icons.flag_outlined),
-    ('Projects', 'Bodies of work in motion', Icons.account_tree_outlined),
-    ('Notebooks', 'Topics, notebooks & notes', Icons.menu_book_outlined),
-    ('Identity', 'Purpose, values & vision', Icons.self_improvement),
-    ('Graph', 'How everything connects', Icons.hub_outlined),
-    ('Behaviour', 'Your activity signals', Icons.insights_outlined),
-    ('Calendar', 'Time-blocked day', Icons.calendar_today_outlined),
-    ('Weekly Review', 'Reflect & integrate insights', Icons.refresh),
-    ('Learn', 'Courses, notes & resources', Icons.school_outlined),
-    ('Vault', 'Wins, quotes & protocols', Icons.lock_outline),
-    ('Settings', 'Profile, vibe & preferences', Icons.settings_outlined),
+  /// Modules surfaced in the More sheet, in display order. (Tasks/Habits/Areas
+  /// live in the bottom nav and Capture is the FAB, so they're not listed here.)
+  static const _moreModules = [
+    ModuleId.decisions,
+    ModuleId.goals,
+    ModuleId.projects,
+    ModuleId.knowledge,
+    ModuleId.identity,
+    ModuleId.graph,
+    ModuleId.behaviour,
+    ModuleId.calendar,
+    ModuleId.review,
+    ModuleId.learn,
+    ModuleId.vault,
   ];
 
   @override
@@ -107,12 +110,20 @@ class MoreSheet extends StatelessWidget {
               const SizedBox(height: 14),
               Flexible(
                 child: SingleChildScrollView(
-                  child: Column(
+                  child: BlocBuilder<AppearanceCubit, AppearanceState>(
+                    builder: (context, appearance) => Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      for (final item in _items)
-                        _row(context, item.$1, item.$2, item.$3,
-                            badge: item.$1 == 'Weekly Review' ? 0 : 0),
+                      for (final id in _moreModules)
+                        if (appearance.enabled.contains(id.name))
+                          _moduleRow(context, Modules.byKey(id.name)!),
+                      const SizedBox(height: 6),
+                      const Divider(height: 24),
+                      _row(context, 'Modules', 'Choose what you see',
+                          Icons.tune, () => const ModulesScreen()),
+                      _row(context, 'Settings', 'Profile, vibe & preferences',
+                          Icons.settings_outlined,
+                          () => SettingsScreen(user: user)),
                       const SizedBox(height: 6),
                       const Divider(height: 24),
                       ListTile(
@@ -132,6 +143,7 @@ class MoreSheet extends StatelessWidget {
                       ),
                     ],
                   ),
+                  ),
                 ),
               ),
             ],
@@ -141,8 +153,12 @@ class MoreSheet extends StatelessWidget {
     );
   }
 
+  /// A row for a module screen — pushes the module's destination.
+  Widget _moduleRow(BuildContext context, ModuleDef m) =>
+      _row(context, m.label, m.desc, m.icon, () => _destination(m.id));
+
   Widget _row(BuildContext context, String name, String desc, IconData icon,
-      {int badge = 0}) {
+      Widget Function() destination) {
     return InkWell(
       borderRadius: BorderRadius.circular(15),
       onTap: () {
@@ -151,7 +167,7 @@ class MoreSheet extends StatelessWidget {
         Navigator.of(context).push(MaterialPageRoute(
           builder: (_) => BlocProvider.value(
             value: cubit,
-            child: _destination(name),
+            child: destination(),
           ),
         ));
       },
@@ -182,7 +198,6 @@ class MoreSheet extends StatelessWidget {
                 ],
               ),
             ),
-            if (badge > 0) Chip3('$badge', color: AppColors.accent, bg: AppColors.accentSoft),
             Icon(Icons.chevron_right, color: AppColors.tx4),
           ],
         ),
@@ -190,19 +205,18 @@ class MoreSheet extends StatelessWidget {
     );
   }
 
-  Widget _destination(String name) => switch (name) {
-        'Settings' => SettingsScreen(user: user),
-        'What now' => const NowScreen(),
-        'Goals' => const GoalsScreen(),
-        'Projects' => const ProjectsScreen(),
-        'Notebooks' => const KnowledgeScreen(),
-        'Identity' => const IdentityScreen(),
-        'Graph' => const GraphScreen(),
-        'Behaviour' => const BehaviorScreen(),
-        'Calendar' => const CalendarScreen(),
-        'Weekly Review' => const ReviewScreen(),
-        'Learn' => const LearnScreen(),
-        'Vault' => const VaultScreen(),
+  Widget _destination(ModuleId id) => switch (id) {
+        ModuleId.decisions => const NowScreen(),
+        ModuleId.goals => const GoalsScreen(),
+        ModuleId.projects => const ProjectsScreen(),
+        ModuleId.knowledge => const KnowledgeScreen(),
+        ModuleId.identity => const IdentityScreen(),
+        ModuleId.graph => const GraphScreen(),
+        ModuleId.behaviour => const BehaviorScreen(),
+        ModuleId.calendar => const CalendarScreen(),
+        ModuleId.review => const ReviewScreen(),
+        ModuleId.learn => const LearnScreen(),
+        ModuleId.vault => const VaultScreen(),
         _ => SettingsScreen(user: user),
       };
 }

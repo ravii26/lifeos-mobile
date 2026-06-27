@@ -5,6 +5,8 @@ import '../../core/api/api_exception.dart';
 import '../../core/notifications/notification_service.dart';
 import '../../data/models/area.dart';
 import '../../data/models/capture.dart';
+import '../../data/models/goal.dart';
+import '../../data/models/project.dart';
 import '../../data/models/habit.dart';
 import '../../data/models/task.dart';
 import '../../data/repositories/life_repository.dart';
@@ -17,6 +19,8 @@ class LifeState extends Equatable {
   final List<Task> tasks;
   final List<Habit> habits;
   final List<Capture> captures;
+  final List<Goal> goals;
+  final List<Project> projects;
   final String? error;
 
   const LifeState({
@@ -25,6 +29,8 @@ class LifeState extends Equatable {
     this.tasks = const [],
     this.habits = const [],
     this.captures = const [],
+    this.goals = const [],
+    this.projects = const [],
     this.error,
   });
 
@@ -64,12 +70,30 @@ class LifeState extends Equatable {
     return null;
   }
 
+  Goal? goalById(String? id) {
+    if (id == null) return null;
+    for (final g in goals) {
+      if (g.id == id) return g;
+    }
+    return null;
+  }
+
+  Project? projectById(String? id) {
+    if (id == null) return null;
+    for (final p in projects) {
+      if (p.id == id) return p;
+    }
+    return null;
+  }
+
   LifeState copyWith({
     LoadStatus? status,
     List<Area>? areas,
     List<Task>? tasks,
     List<Habit>? habits,
     List<Capture>? captures,
+    List<Goal>? goals,
+    List<Project>? projects,
     String? error,
   }) =>
       LifeState(
@@ -78,11 +102,14 @@ class LifeState extends Equatable {
         tasks: tasks ?? this.tasks,
         habits: habits ?? this.habits,
         captures: captures ?? this.captures,
+        goals: goals ?? this.goals,
+        projects: projects ?? this.projects,
         error: error,
       );
 
   @override
-  List<Object?> get props => [status, areas, tasks, habits, captures, error];
+  List<Object?> get props =>
+      [status, areas, tasks, habits, captures, goals, projects, error];
 }
 
 class LifeCubit extends Cubit<LifeState> {
@@ -97,6 +124,8 @@ class LifeCubit extends Cubit<LifeState> {
         _repo.tasks(),
         _repo.habits(),
         _repo.captures(processed: false),
+        _repo.goals(withConfidence: false),
+        _repo.projects(),
       ]);
       final habits = results[2] as List<Habit>;
       emit(state.copyWith(
@@ -105,6 +134,8 @@ class LifeCubit extends Cubit<LifeState> {
         tasks: results[1] as List<Task>,
         habits: habits,
         captures: results[3] as List<Capture>,
+        goals: results[4] as List<Goal>,
+        projects: results[5] as List<Project>,
       ));
       // Best-effort: keep local habit reminders in sync with the backend.
       NotificationService.instance.syncHabitReminders(habits);
@@ -117,7 +148,12 @@ class LifeCubit extends Cubit<LifeState> {
 
   Future<void> completeTask(String id) async {
     try {
-      await _repo.completeTask(id);
+      final task = state.tasks.firstWhere((t) => t.id == id);
+      if (task.isDone) {
+        await _repo.updateTask(id, status: 'PENDING');
+      } else {
+        await _repo.completeTask(id);
+      }
       final tasks = await _repo.tasks();
       emit(state.copyWith(tasks: tasks));
     } on ApiException catch (e) {
@@ -135,14 +171,22 @@ class LifeCubit extends Cubit<LifeState> {
     }
   }
 
-  Future<void> addTask(
-      {required String title, String? areaId, String priority = 'MEDIUM'}) async {
+  Future<void> addTask({
+    required String title,
+    String? areaId,
+    String? goalId,
+    String? projectId,
+    String priority = 'MEDIUM',
+    DateTime? dueDate,
+  }) async {
     try {
       await _repo.createTask(
           title: title,
           areaId: areaId,
+          goalId: goalId,
+          projectId: projectId,
           priority: priority,
-          dueDate: DateTime.now());
+          dueDate: dueDate ?? DateTime.now());
       final tasks = await _repo.tasks();
       emit(state.copyWith(tasks: tasks));
     } on ApiException catch (e) {
@@ -240,10 +284,34 @@ class LifeCubit extends Cubit<LifeState> {
 
   Future<void> logHabit(Habit h) async {
     try {
-      await _repo.logHabit(h.id,
-          completed: true,
-          count: h.kind == 'count' ? h.todayCount + 1 : null,
-          minutes: h.kind == 'timer' ? h.todayMinutes : null);
+      final wasDone = h.todayDone;
+      if (h.kind == 'boolean') {
+        await _repo.logHabit(h.id, completed: !wasDone);
+      } else if (h.kind == 'count') {
+        final nextCount = h.todayCount + 1;
+        await _repo.logHabit(
+          h.id,
+          completed: nextCount >= h.targetCount,
+          count: nextCount,
+        );
+      } else if (h.kind == 'timer') {
+        final nextMinutes = h.todayMinutes + 15;
+        await _repo.logHabit(
+          h.id,
+          completed: nextMinutes >= h.targetMinutes,
+          minutes: nextMinutes,
+        );
+      }
+      final habits = await _repo.habits();
+      emit(state.copyWith(habits: habits));
+    } on ApiException catch (e) {
+      emit(state.copyWith(error: e.message));
+    }
+  }
+
+  Future<void> updateHabitLog(Habit h, {required int count, required int minutes, required bool completed}) async {
+    try {
+      await _repo.logHabit(h.id, completed: completed, count: count, minutes: minutes);
       final habits = await _repo.habits();
       emit(state.copyWith(habits: habits));
     } on ApiException catch (e) {
@@ -254,10 +322,40 @@ class LifeCubit extends Cubit<LifeState> {
   Future<void> addCapture(String text) async {
     try {
       await _repo.createCapture(text);
-      final captures = await _repo.captures(processed: false);
-      emit(state.copyWith(captures: captures));
+      await _refreshCaptures();
+      // Capture classification runs in the background on the server (~1-2s).
+      // Poll a couple of times so the type + worth rating appear without the
+      // user pulling to refresh. Best-effort: ignore failures, stop if any
+      // pending capture is still unclassified after the last attempt.
+      _pollCaptureClassification();
     } on ApiException catch (e) {
       emit(state.copyWith(error: e.message));
+    }
+  }
+
+  Future<void> _refreshCaptures() async {
+    final captures = await _repo.captures(processed: false);
+    if (!isClosed) emit(state.copyWith(captures: captures));
+  }
+
+  /// Refetch the inbox a few times to pick up async AI classification.
+  Future<void> _pollCaptureClassification() async {
+    const delays = [
+      Duration(milliseconds: 1500),
+      Duration(milliseconds: 2500),
+      Duration(milliseconds: 4000),
+    ];
+    for (final d in delays) {
+      await Future<void>.delayed(d);
+      if (isClosed) return;
+      try {
+        await _refreshCaptures();
+      } catch (_) {
+        return; // network blip — pull-to-refresh remains the fallback
+      }
+      final allClassified =
+          state.pendingCaptures.every((c) => c.isClassified);
+      if (allClassified) return;
     }
   }
 
@@ -310,6 +408,8 @@ class LifeCubit extends Cubit<LifeState> {
     required String priority,
     String? status,
     String? areaId,
+    String? goalId,
+    String? projectId,
     DateTime? dueDate,
   }) async {
     try {
@@ -319,6 +419,8 @@ class LifeCubit extends Cubit<LifeState> {
         priority: priority,
         status: status,
         areaId: areaId,
+        goalId: goalId,
+        projectId: projectId,
         dueDate: dueDate,
       );
       emit(state.copyWith(tasks: await _repo.tasks()));

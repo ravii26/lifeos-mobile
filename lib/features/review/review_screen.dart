@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
@@ -8,6 +10,7 @@ import '../../data/repositories/life_repository.dart';
 import '../../widgets/bits.dart';
 import '../../widgets/glass.dart';
 import '../../widgets/screen_header.dart';
+import 'review_compose_screen.dart';
 
 class ReviewScreen extends StatefulWidget {
   const ReviewScreen({super.key});
@@ -24,14 +27,30 @@ class _ReviewScreenState extends State<ReviewScreen> {
   void initState() {
     super.initState();
     _future = _repo.reviews();
+    // Behaviour signal — lets the coach nudge stale reviews.
+    _repo.recordBehavior('REVIEW_OPENED').ignore();
   }
 
   void _reload() => setState(() => _future = _repo.reviews());
+
+  Future<void> _compose() async {
+    final saved = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(builder: (_) => const ReviewComposeScreen()),
+    );
+    if (saved == true) _reload();
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.bg,
+      floatingActionButton: FloatingActionButton.extended(
+        backgroundColor: AppColors.accent,
+        foregroundColor: AppColors.accentInk,
+        onPressed: _compose,
+        icon: const Icon(Icons.add, size: 20),
+        label: const Text('New review'),
+      ),
       body: FutureBuilder<List<Review>>(
         future: _future,
         builder: (context, snap) {

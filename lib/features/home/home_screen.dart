@@ -2,11 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import '../../core/modules/module_registry.dart';
 import '../../core/theme/app_colors.dart';
 import '../../data/models/user.dart';
 import '../../widgets/bits.dart';
 import '../../widgets/glass.dart';
 import '../../widgets/screen_header.dart';
+import '../appearance/appearance_cubit.dart';
 import '../focus/focus_screen.dart';
 import '../shell/life_cubit.dart';
 import '../tasks/task_row.dart';
@@ -93,10 +95,13 @@ class HomeScreen extends StatelessWidget {
                     SectionHeader('Today · $doneToday/${today.length}'),
                     const SizedBox(height: 10),
                     ..._taskList(context, s, today),
-                    const SizedBox(height: 14),
-                    SectionHeader('Quick log'),
-                    const SizedBox(height: 10),
-                    _habitsCard(context, s),
+                    if (context.select<AppearanceCubit, bool>(
+                        (c) => c.state.isEnabled(ModuleId.habits))) ...[
+                      const SizedBox(height: 14),
+                      SectionHeader('Quick log'),
+                      const SizedBox(height: 10),
+                      _habitsCard(context, s),
+                    ],
                     const SizedBox(height: 14),
                     SectionHeader('Inbox'),
                     const SizedBox(height: 10),

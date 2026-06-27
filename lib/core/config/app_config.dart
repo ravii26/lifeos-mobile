@@ -9,8 +9,10 @@ import 'package:flutter/foundation.dart';
 class AppConfig {
   AppConfig._();
 
-  static const String _override =
-      String.fromEnvironment('API_BASE_URL', defaultValue: '');
+  static const String _override = String.fromEnvironment(
+    'API_BASE_URL',
+    defaultValue: '',
+  );
 
   static const int _port = 3000;
   static const String _basePath = '/api/v1';

@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:flutter_timezone/flutter_timezone.dart';
 import 'package:timezone/data/latest_all.dart' as tz;
 import 'package:timezone/timezone.dart' as tz;
 
@@ -24,6 +25,14 @@ class NotificationService {
   Future<void> init() async {
     if (_ready || kIsWeb) return;
     tz.initializeTimeZones();
+    // Anchor tz.local to the device zone so daily reminders fire at the user's
+    // local wall-clock time (without this tz.local defaults to UTC).
+    try {
+      final name = await FlutterTimezone.getLocalTimezone();
+      if (name.isNotEmpty) tz.setLocalLocation(tz.getLocation(name));
+    } catch (_) {
+      // Leave tz.local at its default if the lookup fails.
+    }
     const android = AndroidInitializationSettings('@mipmap/ic_launcher');
     const ios = DarwinInitializationSettings();
     await _plugin.initialize(

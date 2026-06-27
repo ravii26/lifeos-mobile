@@ -21,7 +21,8 @@ class GraphData {
 
 class GraphNode {
   final String id;
-  final String type; // AREA | GOAL | PROJECT | TASK | HABIT | TOPIC | NOTEBOOK | NOTE
+  // AREA | GOAL | PROJECT | TASK | HABIT | TOPIC | NOTEBOOK | NOTE | RESOURCE
+  final String type;
   final String label;
   final Map<String, dynamic> data;
 
@@ -45,17 +46,22 @@ class GraphNode {
 class GraphEdge {
   final String source;
   final String target;
-  final String type;
+  // AREA_GOAL | AREA_HABIT | AREA_TOPIC | GOAL_PROJECT | PROJECT_TASK |
+  // AREA_TASK | TOPIC_TASK | TOPIC_NOTEBOOK | TOPIC_NOTE | TOPIC_RESOURCE |
+  // RESOURCE_NOTE
+  final String relation;
 
   const GraphEdge({
     required this.source,
     required this.target,
-    required this.type,
+    required this.relation,
   });
 
   factory GraphEdge.fromJson(Json j) => GraphEdge(
         source: asString(j['source']),
         target: asString(j['target']),
-        type: asString(j['type']),
+        // Server serializes the edge kind as `relation`; fall back to `type`
+        // for older payloads.
+        relation: asString(j['relation'], asString(j['type'])),
       );
 }

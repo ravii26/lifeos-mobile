@@ -31,6 +31,8 @@ class TaskDetailScreen extends StatelessWidget {
         }
         final task = t;
         final area = s.areaById(task.areaId);
+        final goal = s.goalById(task.goalId);
+        final project = s.projectById(task.projectId);
         final color = area?.color ?? AppColors.accent;
 
         return Scaffold(
@@ -63,6 +65,23 @@ class TaskDetailScreen extends StatelessWidget {
                                       : AppColors.tx2),
                             ],
                           ),
+                          if (goal != null || project != null) ...[
+                            const SizedBox(height: 10),
+                            Wrap(
+                              spacing: 8,
+                              runSpacing: 6,
+                              children: [
+                                if (goal != null)
+                                  Chip3(goal.title,
+                                      color: color,
+                                      icon: Icons.flag_outlined),
+                                if (project != null)
+                                  Chip3(project.title,
+                                      color: color,
+                                      icon: Icons.assignment_outlined),
+                              ],
+                            ),
+                          ],
                           const SizedBox(height: 14),
                           Text(task.title,
                               style: GoogleFonts.hankenGrotesk(
@@ -165,6 +184,44 @@ class TaskDetailScreen extends StatelessWidget {
                             ),
                           ),
                         ],
+                      ),
+                    ] else ...[
+                      SizedBox(
+                        width: double.infinity,
+                        height: 50,
+                        child: OutlinedButton.icon(
+                          onPressed: () {
+                            context.read<LifeCubit>().completeTask(task.id);
+                            Navigator.of(context).pop();
+                          },
+                          icon: const Icon(Icons.undo_rounded, size: 18),
+                          label: const Text('Reopen task'),
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: AppColors.tx,
+                            side: BorderSide(color: AppColors.line2),
+                            shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(14)),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      SizedBox(
+                        width: double.infinity,
+                        height: 50,
+                        child: OutlinedButton.icon(
+                          onPressed: () {
+                            context.read<LifeCubit>().deleteTask(task.id);
+                            Navigator.of(context).pop();
+                          },
+                          icon: const Icon(Icons.delete_outline, size: 18),
+                          label: const Text('Delete task'),
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: AppColors.danger,
+                            side: const BorderSide(color: Color(0x4DFF5D62)),
+                            shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(14)),
+                          ),
+                        ),
                       ),
                     ],
                   ],

@@ -35,6 +35,13 @@ dependencies:
   flutter_local_notifications: ^18.0.1
   timezone: ^0.9.4
 
+  # Device IANA timezone, sent on register so the backend computes
+  # "today"/streaks/scores in the user's local zone.
+  flutter_timezone: ^3.0.1
+
+  # On-device text-to-speech for the floating coach companion
+  flutter_tts: ^4.2.0
+
   # Utilities
   intl: ^0.20.1
   rename: ^3.1.0

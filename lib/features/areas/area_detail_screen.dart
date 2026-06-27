@@ -1,9 +1,13 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import '../../core/di/service_locator.dart';
 import '../../core/theme/app_colors.dart';
 import '../../data/models/area.dart';
+import '../../data/repositories/life_repository.dart';
 import '../../widgets/bits.dart';
 import '../../widgets/glass.dart';
 import '../../widgets/screen_header.dart';
@@ -11,9 +15,22 @@ import '../shell/life_cubit.dart';
 import '../tasks/task_detail_screen.dart';
 import '../tasks/task_row.dart';
 
-class AreaDetailScreen extends StatelessWidget {
+class AreaDetailScreen extends StatefulWidget {
   final String areaId;
   const AreaDetailScreen({super.key, required this.areaId});
+
+  @override
+  State<AreaDetailScreen> createState() => _AreaDetailScreenState();
+}
+
+class _AreaDetailScreenState extends State<AreaDetailScreen> {
+  @override
+  void initState() {
+    super.initState();
+    // Fire-and-forget behaviour signal — powers the coach's neglect detection.
+    getIt<LifeRepository>().recordBehavior('AREA_VIEWED',
+        metadata: {'areaId': widget.areaId}).ignore();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -21,7 +38,7 @@ class AreaDetailScreen extends StatelessWidget {
       builder: (context, s) {
         Area? a;
         for (final x in s.areas) {
-          if (x.id == areaId) a = x;
+          if (x.id == widget.areaId) a = x;
         }
         if (a == null) {
           return Scaffold(

@@ -21,6 +21,8 @@ class TaskForm extends StatefulWidget {
 class _TaskFormState extends State<TaskForm> {
   late final TextEditingController _title;
   String? _areaId;
+  String? _goalId;
+  String? _projectId;
   late String _priority; // P1/P2/P3 label
   late String _status; // TODO | IN_PROGRESS | COMPLETED | CANCELLED
   DateTime? _due;
@@ -32,6 +34,8 @@ class _TaskFormState extends State<TaskForm> {
     final t = widget.task;
     _title = TextEditingController(text: t.title);
     _areaId = t.areaId;
+    _goalId = t.goalId;
+    _projectId = t.projectId;
     _priority = t.priorityLabel;
     _status = t.status.toUpperCase();
     _due = t.dueDate;
@@ -58,6 +62,8 @@ class _TaskFormState extends State<TaskForm> {
           priority: Priority.fromLabel(_priority),
           status: _status,
           areaId: _areaId,
+          goalId: _goalId,
+          projectId: _projectId,
           dueDate: _due,
         );
     if (!mounted) return;
@@ -70,6 +76,19 @@ class _TaskFormState extends State<TaskForm> {
 
   @override
   Widget build(BuildContext context) {
+    final state = context.watch<LifeCubit>().state;
+    final linkableGoals = state.goals
+        .where((g) => _areaId == null || g.areaId == _areaId)
+        .toList();
+    final linkableProjects = state.projects.where((p) {
+      if (_areaId == null) return false;
+      if (_goalId != null) {
+        return p.goalId == _goalId;
+      } else {
+        return p.areaId == _areaId;
+      }
+    }).toList();
+
     return FormSheet(
       title: 'Edit task',
       children: [
@@ -91,12 +110,69 @@ class _TaskFormState extends State<TaskForm> {
           const SizedBox(height: 16),
           formLabel('Area'),
           chipWrap([
-            selChip('None', _areaId == null,
-                () => setState(() => _areaId = null)),
+            selChip('None', _areaId == null, () {
+              setState(() {
+                _areaId = null;
+                _goalId = null;
+                _projectId = null;
+              });
+            }),
             for (final a in widget.areas)
-              selChip(a.name, _areaId == a.id,
-                  () => setState(() => _areaId = a.id),
-                  color: a.color),
+              selChip(a.name, _areaId == a.id, () {
+                setState(() {
+                  _areaId = a.id;
+                  if (_goalId != null) {
+                    final hasGoalInArea =
+                        state.goals.any((g) => g.id == _goalId && g.areaId == a.id);
+                    if (!hasGoalInArea) {
+                      _goalId = null;
+                      _projectId = null;
+                    }
+                  }
+                });
+              }, color: a.color),
+          ]),
+        ],
+        if (linkableGoals.isNotEmpty) ...[
+          const SizedBox(height: 16),
+          formLabel('Goal (optional)'),
+          chipWrap([
+            selChip('None', _goalId == null, () {
+              setState(() {
+                _goalId = null;
+                _projectId = null;
+              });
+            }),
+            for (final g in linkableGoals)
+              selChip(g.title, _goalId == g.id, () {
+                setState(() {
+                  _goalId = g.id;
+                  if (_projectId != null) {
+                    final hasProjectInGoal = state.projects
+                        .any((p) => p.id == _projectId && p.goalId == g.id);
+                    if (!hasProjectInGoal) {
+                      _projectId = null;
+                    }
+                  }
+                });
+              }),
+          ]),
+        ],
+        if (linkableProjects.isNotEmpty) ...[
+          const SizedBox(height: 16),
+          formLabel('Project (optional)'),
+          chipWrap([
+            selChip('None', _projectId == null, () {
+              setState(() {
+                _projectId = null;
+              });
+            }),
+            for (final p in linkableProjects)
+              selChip(p.title, _projectId == p.id, () {
+                setState(() {
+                  _projectId = p.id;
+                });
+              }),
           ]),
         ],
         const SizedBox(height: 16),

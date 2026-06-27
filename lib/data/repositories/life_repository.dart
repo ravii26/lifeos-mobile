@@ -80,12 +80,16 @@ class LifeRepository {
   Future<Task> createTask({
     required String title,
     String? areaId,
+    String? goalId,
+    String? projectId,
     String priority = 'MEDIUM',
     DateTime? dueDate,
   }) async {
     final data = await _api.post('/tasks', body: {
       'title': title,
       if (areaId != null) 'areaId': areaId,
+      if (goalId != null) 'goalId': goalId,
+      if (projectId != null) 'projectId': projectId,
       'priority': priority,
       if (dueDate != null) 'dueDate': dueDate.toIso8601String(),
     });
@@ -98,6 +102,8 @@ class LifeRepository {
     String? priority,
     String? status,
     Object? areaId = _unset, // pass null to clear, omit to leave unchanged
+    Object? goalId = _unset,
+    Object? projectId = _unset,
     Object? dueDate = _unset,
   }) async {
     final data = await _api.patch('/tasks/$id', body: {
@@ -105,6 +111,8 @@ class LifeRepository {
       if (priority != null) 'priority': priority,
       if (status != null) 'status': status,
       if (!identical(areaId, _unset)) 'areaId': areaId,
+      if (!identical(goalId, _unset)) 'goalId': goalId,
+      if (!identical(projectId, _unset)) 'projectId': projectId,
       if (!identical(dueDate, _unset))
         'dueDate': dueDate == null ? null : (dueDate as DateTime).toIso8601String(),
     });
@@ -557,6 +565,40 @@ class LifeRepository {
     return (data as List).map((e) => Review.fromJson(e as Json)).toList();
   }
 
+  /// Auto-drafted review pre-filled from the period's real data + an AI
+  /// narrative (GET /reviews/draft?reviewType=).
+  Future<ReviewDraft> reviewDraft(String reviewType) async {
+    final data =
+        await _api.get('/reviews/draft', query: {'reviewType': reviewType});
+    return ReviewDraft.fromJson(data as Json);
+  }
+
+  /// Persist a review (POST /reviews). [aiInsights] carries the draft's AI
+  /// narrative through so it's stored alongside the user's edits.
+  Future<Review> createReview({
+    required String reviewType,
+    required DateTime periodStart,
+    required DateTime periodEnd,
+    String? summary,
+    String? highlights,
+    String? improvements,
+    String? userNote,
+    Json? aiInsights,
+  }) async {
+    final data = await _api.post('/reviews', body: {
+      'reviewType': reviewType,
+      'periodStart': periodStart.toIso8601String(),
+      'periodEnd': periodEnd.toIso8601String(),
+      if (summary != null && summary.isNotEmpty) 'summary': summary,
+      if (highlights != null && highlights.isNotEmpty) 'highlights': highlights,
+      if (improvements != null && improvements.isNotEmpty)
+        'improvements': improvements,
+      if (userNote != null && userNote.isNotEmpty) 'userNote': userNote,
+      if (aiInsights != null && aiInsights.isNotEmpty) 'aiInsights': aiInsights,
+    });
+    return Review.fromJson(data as Json);
+  }
+
   Future<List<ReviewInsight>> reviewInsights(String reviewId) async {
     final data = await _api.get('/reviews/$reviewId/insights');
     return (data as List)
@@ -579,6 +621,10 @@ class LifeRepository {
   }
 
   Future<void> markVaultUsed(String id) => _api.post('/vault/$id/used');
+
+  /// Records that a vault item actually helped (POST /vault/:id/helpful).
+  /// Feeds the coach's "resurface what helps" ranking.
+  Future<void> markVaultHelpful(String id) => _api.post('/vault/$id/helpful');
 
   Future<VaultItem> createVaultItem({
     required String title,
@@ -686,12 +732,17 @@ class LifeRepository {
   }
 
   Future<UserSettings> updateSettings(
-      {String? vibe, String? accent, String? font, String? startTab}) async {
+      {String? vibe,
+      String? accent,
+      String? font,
+      String? startTab,
+      List<String>? enabledModules}) async {
     final data = await _api.patch('/settings', body: {
       if (vibe != null) 'vibe': vibe,
       if (accent != null) 'accent': accent,
       if (font != null) 'font': font,
       if (startTab != null) 'startTab': startTab,
+      if (enabledModules != null) 'enabledModules': enabledModules,
     });
     return UserSettings.fromJson(data as Json);
   }

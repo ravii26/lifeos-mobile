@@ -32,6 +32,8 @@ class Task {
   final int targetMinutes;
   final DateTime? dueDate;
   final String? areaId;
+  final String? projectId;
+  final String? goalId;
   final String? source; // MANUAL | DUMP | LEARN
 
   const Task({
@@ -45,6 +47,8 @@ class Task {
     required this.targetMinutes,
     this.dueDate,
     this.areaId,
+    this.projectId,
+    this.goalId,
     this.source,
   });
 
@@ -69,6 +73,8 @@ class Task {
         targetMinutes: asInt(j['targetMinutes']),
         dueDate: asDate(j['dueDate']),
         areaId: asStringOrNull(j['areaId']),
+        projectId: asStringOrNull(j['projectId']),
+        goalId: asStringOrNull(j['goalId']),
         source: asStringOrNull(j['source']),
       );
 }
