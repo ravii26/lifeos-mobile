@@ -1,3 +1,5 @@
+import 'package:dio/dio.dart';
+
 import '../../core/api/api_client.dart';
 import '../models/area.dart';
 import '../models/behavior_log.dart';
@@ -133,12 +135,15 @@ class LifeRepository {
     return (data as List).map((e) => Habit.fromJson(e as Json)).toList();
   }
 
+  /// [date] backfills a specific past day (upsert on habitId+date server-side);
+  /// omit it to log today.
   Future<void> logHabit(String id,
-      {bool completed = true, int? count, int? minutes}) {
+      {bool completed = true, int? count, int? minutes, DateTime? date}) {
     return _api.post('/habits/$id/log', body: {
       'completed': completed,
       if (count != null) 'count': count,
       if (minutes != null) 'minutes': minutes,
+      if (date != null) 'date': date.toIso8601String(),
     });
   }
 
@@ -324,6 +329,24 @@ class LifeRepository {
     return Topic.fromJson(data as Json);
   }
 
+  Future<Topic> updateTopic(
+    String id, {
+    String? title,
+    String? description,
+    String? areaId,
+    String? masteryLevel,
+  }) async {
+    final data = await _api.patch('/topics/$id', body: {
+      if (title != null) 'title': title,
+      if (description != null) 'description': description,
+      if (areaId != null) 'areaId': areaId,
+      if (masteryLevel != null) 'masteryLevel': masteryLevel,
+    });
+    return Topic.fromJson(data as Json);
+  }
+
+  Future<void> deleteTopic(String id) => _api.delete('/topics/$id');
+
   // ---- Notebooks ----
   Future<List<Notebook>> notebooks({String? topicId}) async {
     final data = await _api.get('/notebooks', query: {'topicId': topicId});
@@ -420,6 +443,31 @@ class LifeRepository {
 
   Future<Capture> createCapture(String text) async {
     final data = await _api.post('/captures', body: {'text': text});
+    return Capture.fromJson(data as Json);
+  }
+
+  /// Uploads an image or voice recording as a capture (multipart). The server
+  /// transcribes/describes it with the multimodal AI and classifies it just
+  /// like a text dump. [mimeType] e.g. 'image/jpeg' or 'audio/wav'.
+  Future<Capture> createMediaCapture(
+    String filePath, {
+    required String filename,
+    required String mimeType,
+    String? caption,
+  }) async {
+    final parts = mimeType.split('/');
+    final form = FormData.fromMap({
+      if (caption != null && caption.isNotEmpty) 'text': caption,
+      'file': await MultipartFile.fromFile(
+        filePath,
+        filename: filename,
+        contentType: DioMediaType(
+          parts.first,
+          parts.length > 1 ? parts[1] : 'octet-stream',
+        ),
+      ),
+    });
+    final data = await _api.post('/captures', body: form);
     return Capture.fromJson(data as Json);
   }
 
@@ -523,7 +571,7 @@ class LifeRepository {
   /// Remove an override so the occurrence reverts to the series default.
   Future<void> deleteException(String seriesId, DateTime occurrenceDate) {
     return _api.delete('/calendar/$seriesId/exceptions',
-        body: {'occurrenceDate': occurrenceDate.toIso8601String()});
+        query: {'occurrenceDate': occurrenceDate.toIso8601String()});
   }
 
   /// "This and following": split the series at [fromOccurrenceDate]; occurrences
@@ -614,6 +662,29 @@ class LifeRepository {
     });
   }
 
+  /// Edits a saved review's text fields (PATCH /reviews/:id). An empty
+  /// string clears the field server-side (matches [updateVaultItem]'s
+  /// `url` handling).
+  Future<Review> updateReview(
+    String id, {
+    String? summary,
+    String? highlights,
+    String? improvements,
+    String? userNote,
+  }) async {
+    final data = await _api.patch('/reviews/$id', body: {
+      if (summary != null) 'summary': summary.isEmpty ? null : summary,
+      if (highlights != null)
+        'highlights': highlights.isEmpty ? null : highlights,
+      if (improvements != null)
+        'improvements': improvements.isEmpty ? null : improvements,
+      if (userNote != null) 'userNote': userNote.isEmpty ? null : userNote,
+    });
+    return Review.fromJson(data as Json);
+  }
+
+  Future<void> deleteReview(String id) => _api.delete('/reviews/$id');
+
   // ---- Vault ----
   Future<List<VaultItem>> vault({String? vaultType}) async {
     final data = await _api.get('/vault', query: {'vaultType': vaultType});
@@ -630,6 +701,7 @@ class LifeRepository {
     required String title,
     required String content,
     required String vaultType,
+    String mediaType = 'TEXT',
     String? url,
     List<String>? triggerTags,
   }) async {
@@ -637,6 +709,7 @@ class LifeRepository {
       'title': title,
       'content': content,
       'vaultType': vaultType,
+      'mediaType': mediaType,
       if (url != null && url.isNotEmpty) 'url': url,
       if (triggerTags != null && triggerTags.isNotEmpty)
         'triggerTags': triggerTags,
@@ -649,6 +722,7 @@ class LifeRepository {
     String? title,
     String? content,
     String? vaultType,
+    String? mediaType,
     String? url,
     List<String>? triggerTags,
   }) async {
@@ -656,6 +730,7 @@ class LifeRepository {
       if (title != null) 'title': title,
       if (content != null) 'content': content,
       if (vaultType != null) 'vaultType': vaultType,
+      if (mediaType != null) 'mediaType': mediaType,
       if (url != null) 'url': url.isEmpty ? null : url,
       if (triggerTags != null) 'triggerTags': triggerTags,
     });
@@ -668,6 +743,67 @@ class LifeRepository {
   Future<List<Resource>> resources({String? status}) async {
     final data = await _api.get('/resources', query: {'status': status});
     return (data as List).map((e) => Resource.fromJson(e as Json)).toList();
+  }
+
+  Future<Resource> createResource({
+    required String title,
+    required String topicId,
+    required String resourceType,
+    String? platform,
+    String? url,
+    String? notes,
+    String status = 'NOT_STARTED',
+  }) async {
+    final data = await _api.post('/resources', body: {
+      'title': title,
+      'topicId': topicId,
+      'resourceType': resourceType,
+      if (platform != null && platform.isNotEmpty) 'platform': platform,
+      if (url != null && url.isNotEmpty) 'url': url,
+      if (notes != null && notes.isNotEmpty) 'notes': notes,
+      'status': status,
+    });
+    return Resource.fromJson(data as Json);
+  }
+
+  Future<Resource> updateResource(
+    String id, {
+    String? title,
+    String? resourceType,
+    String? platform,
+    String? url,
+    String? notes,
+    String? status,
+  }) async {
+    final data = await _api.patch('/resources/$id', body: {
+      if (title != null) 'title': title,
+      if (resourceType != null) 'resourceType': resourceType,
+      if (platform != null) 'platform': platform.isEmpty ? null : platform,
+      if (url != null) 'url': url.isEmpty ? null : url,
+      if (notes != null) 'notes': notes.isEmpty ? null : notes,
+      if (status != null) 'status': status,
+    });
+    return Resource.fromJson(data as Json);
+  }
+
+  Future<void> deleteResource(String id) => _api.delete('/resources/$id');
+
+  /// Logs lesson/minute progress on a resource (B8). [minutesConsumed] is
+  /// added to the running total server-side, not set absolutely.
+  Future<Resource> updateResourceProgress(
+    String id, {
+    int? lessonsCompleted,
+    int? totalLessons,
+    int? minutesConsumed,
+    bool autoComplete = true,
+  }) async {
+    final data = await _api.patch('/resources/$id/progress', body: {
+      if (lessonsCompleted != null) 'lessonsCompleted': lessonsCompleted,
+      if (totalLessons != null) 'totalLessons': totalLessons,
+      if (minutesConsumed != null) 'minutesConsumed': minutesConsumed,
+      'autoComplete': autoComplete,
+    });
+    return Resource.fromJson(data as Json);
   }
 
   // ---- Decisions ("what now") ----
@@ -757,7 +893,7 @@ class LifeRepository {
     return asString((data as Json)['id']);
   }
 
-  Future<void> stopFocus(String id, {int? durationMinutes}) {
+  Future<void> stopFocus(String id) {
     return _api.patch('/focus/$id/stop', body: {
       'endedAt': DateTime.now().toIso8601String(),
     });

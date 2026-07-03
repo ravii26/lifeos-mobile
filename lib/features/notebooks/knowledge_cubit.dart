@@ -119,6 +119,36 @@ class KnowledgeCubit extends Cubit<KnowledgeState> {
     }
   }
 
+  Future<void> updateTopic(
+    String id, {
+    String? title,
+    String? description,
+    String? areaId,
+    String? masteryLevel,
+  }) async {
+    try {
+      await _repo.updateTopic(id,
+          title: title,
+          description: description,
+          areaId: areaId,
+          masteryLevel: masteryLevel);
+      await load();
+    } on ApiException catch (e) {
+      emit(state.copyWith(error: e.message));
+    }
+  }
+
+  Future<void> deleteTopic(String id) async {
+    emit(state.copyWith(
+        topics: state.topics.where((t) => t.id != id).toList()));
+    try {
+      await _repo.deleteTopic(id);
+      await load();
+    } on ApiException catch (_) {
+      await load();
+    }
+  }
+
   Future<void> createNotebook({
     required String title,
     required String topicId,

@@ -1,12 +1,12 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_tts/flutter_tts.dart';
 
-import '../../core/di/service_locator.dart';
 import '../../core/theme/app_colors.dart';
 import '../../data/models/decision.dart';
-import '../../data/repositories/life_repository.dart';
+import '../now/decisions_cubit.dart';
 
 /// A persistent, draggable "coach" companion that floats above every screen.
 ///
@@ -107,9 +107,11 @@ class _CompanionState extends State<CompanionOverlay>
       _friendlySpeech = '';
     });
     try {
-      final r = await getIt<LifeRepository>().decisionsNow();
+      await context.read<DecisionsCubit>().refresh();
       if (!mounted) return;
-      
+      final r = context.read<DecisionsCubit>().state.result;
+      if (r == null) throw StateError('No decision result');
+
       final formatted = _formatKidFriendly(r);
       setState(() {
         _result = r;

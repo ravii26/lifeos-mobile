@@ -2,6 +2,14 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 	<dict>
+		<key>NSMicrophoneUsageDescription</key>
+		<string>LifeOS uses the microphone for voice dictation so you can speak your thoughts instead of typing.</string>
+		<key>NSSpeechRecognitionUsageDescription</key>
+		<string>LifeOS converts your speech to text on-device so you can dictate captures.</string>
+		<key>NSCameraUsageDescription</key>
+		<string>LifeOS uses the camera to capture photos (whiteboards, book covers, notes) that the AI reads and sorts for you.</string>
+		<key>NSPhotoLibraryUsageDescription</key>
+		<string>LifeOS lets you attach photos from your library to capture and organize them.</string>
 		<key>CADisableMinimumFrameDurationOnPhone</key>
 		<true/>
 		<key>CFBundleDevelopmentRegion</key>

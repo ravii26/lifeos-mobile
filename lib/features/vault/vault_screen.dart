@@ -20,12 +20,18 @@ class VaultScreen extends StatefulWidget {
 class _VaultScreenState extends State<VaultScreen> {
   late Future<List<VaultItem>> _future;
   String _filter = 'All';
-  static const _kinds = ['All', 'QUOTE', 'WIN', 'PROTOCOL', 'NOTE'];
+  static const _kinds = ['All', 'REFLECTION', 'MEMORY', 'MOTIVATION', 'RECOVERY'];
   static const _icons = {
+    'REFLECTION': Icons.format_quote,
+    'MEMORY': Icons.trending_up,
+    'MOTIVATION': Icons.gps_fixed,
+    'RECOVERY': Icons.sticky_note_2_outlined,
+  };
+  static const _mediaIcons = {
     'QUOTE': Icons.format_quote,
-    'WIN': Icons.trending_up,
-    'PROTOCOL': Icons.gps_fixed,
-    'NOTE': Icons.sticky_note_2_outlined,
+    'VIDEO': Icons.videocam_outlined,
+    'AUDIO': Icons.mic_outlined,
+    'IMAGE': Icons.image_outlined,
   };
 
   @override
@@ -185,11 +191,20 @@ class _VaultScreenState extends State<VaultScreen> {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Chip3(_label(v.vaultType),
-                    icon: _icons[v.vaultType.toUpperCase()] ??
-                        Icons.sticky_note_2_outlined,
-                    color: AppColors.accent,
-                    bg: AppColors.accentSoft),
+                Row(
+                  children: [
+                    Chip3(_label(v.vaultType),
+                        icon: _icons[v.vaultType.toUpperCase()] ??
+                            Icons.sticky_note_2_outlined,
+                        color: AppColors.accent,
+                        bg: AppColors.accentSoft),
+                    if (_mediaIcons.containsKey(v.mediaType.toUpperCase())) ...[
+                      const SizedBox(width: 6),
+                      Icon(_mediaIcons[v.mediaType.toUpperCase()],
+                          size: 14, color: AppColors.tx4),
+                    ],
+                  ],
+                ),
                 Text(
                     'used ${v.usedCount}×'
                     '${v.helpfulCount > 0 ? ' · helped ${v.helpfulCount}×' : ''}',

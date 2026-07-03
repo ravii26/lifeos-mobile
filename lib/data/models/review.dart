@@ -6,8 +6,9 @@ class Review {
   final DateTime? periodStart;
   final DateTime? periodEnd;
   final String? summary;
-  final List<String> highlights;
-  final List<String> improvements;
+  final String? highlights;
+  final String? improvements;
+  final String? userNote;
   final List<ReviewInsight> insights;
   final Json? aiInsights;
 
@@ -17,8 +18,9 @@ class Review {
     this.periodStart,
     this.periodEnd,
     this.summary,
-    this.highlights = const [],
-    this.improvements = const [],
+    this.highlights,
+    this.improvements,
+    this.userNote,
     this.insights = const [],
     this.aiInsights,
   });
@@ -29,8 +31,9 @@ class Review {
         periodStart: asDate(j['periodStart']),
         periodEnd: asDate(j['periodEnd']),
         summary: asStringOrNull(j['summary']),
-        highlights: asStringList(j['highlights']),
-        improvements: asStringList(j['improvements']),
+        highlights: asStringOrNull(j['highlights']),
+        improvements: asStringOrNull(j['improvements']),
+        userNote: asStringOrNull(j['userNote']),
         insights: (j['insights'] as List?)
                 ?.map((e) => ReviewInsight.fromJson(e as Json))
                 .toList() ??

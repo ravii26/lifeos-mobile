@@ -12,6 +12,7 @@ import 'features/appearance/appearance_cubit.dart';
 import 'features/auth/bloc/auth_bloc.dart';
 import 'features/auth/login_screen.dart';
 import 'features/companion/companion_overlay.dart';
+import 'features/now/decisions_cubit.dart';
 import 'features/shell/home_shell.dart';
 import 'features/splash/splash_screen.dart';
 
@@ -38,48 +39,67 @@ class LifeOSApp extends StatelessWidget {
                 AuthBloc(getIt<AuthRepository>())..add(const AuthStarted())),
         BlocProvider(
             create: (_) => AppearanceCubit(getIt<LifeRepository>())..load()),
+        BlocProvider(
+            create: (_) => DecisionsCubit(getIt<LifeRepository>())),
       ],
       child: Builder(builder: (context) {
         // Sign the user out when any API call returns 401.
         getIt<ApiClient>().onUnauthorized =
             () => context.read<AuthBloc>().add(const AuthLogoutRequested());
 
-        return BlocBuilder<AppearanceCubit, AppearanceState>(
-          builder: (context, appearance) => MaterialApp(
-            title: 'LifeOS',
-            debugShowCheckedModeBanner: false,
-            theme: AppTheme.build(
-                accent: appearance.accent,
-                font: appearance.font,
-                light: appearance.light),
-            builder: (context, child) {
-              // Status bar icons follow the theme; density scales text app-wide.
-              SystemChrome.setSystemUIOverlayStyle(SystemUiOverlayStyle(
-                statusBarColor: Colors.transparent,
-                statusBarIconBrightness: appearance.light
-                    ? Brightness.dark
-                    : Brightness.light,
-              ));
-              final mq = MediaQuery.of(context);
-              return MediaQuery(
-                data: mq.copyWith(
-                    textScaler: TextScaler.linear(appearance.textScale)),
-                // Float the coach companion above every route, but only once
-                // the user is signed in.
-                child: Stack(
-                  children: [
-                    child!,
-                    BlocBuilder<AuthBloc, AuthState>(
-                      builder: (context, auth) =>
-                          auth.status == AuthStatus.authenticated
-                              ? const CompanionOverlay()
-                              : const SizedBox.shrink(),
-                    ),
-                  ],
-                ),
-              );
-            },
-            home: const _Root(),
+        return BlocListener<AuthBloc, AuthState>(
+          listenWhen: (prev, curr) => prev.status != curr.status,
+          listener: (context, auth) {
+            // Reset cached appearance/module prefs on sign-out, and reload
+            // for whichever user just signed in, so a shared device never
+            // shows one user's settings while another is briefly active.
+            final appearance = context.read<AppearanceCubit>();
+            final decisions = context.read<DecisionsCubit>();
+            if (auth.status == AuthStatus.authenticated) {
+              appearance.load();
+              decisions.refresh();
+            } else if (auth.status == AuthStatus.unauthenticated) {
+              appearance.reset();
+              decisions.reset();
+            }
+          },
+          child: BlocBuilder<AppearanceCubit, AppearanceState>(
+            builder: (context, appearance) => MaterialApp(
+              title: 'LifeOS',
+              debugShowCheckedModeBanner: false,
+              theme: AppTheme.build(
+                  accent: appearance.accent,
+                  font: appearance.font,
+                  light: appearance.light),
+              builder: (context, child) {
+                // Status bar icons follow the theme; density scales text app-wide.
+                SystemChrome.setSystemUIOverlayStyle(SystemUiOverlayStyle(
+                  statusBarColor: Colors.transparent,
+                  statusBarIconBrightness: appearance.light
+                      ? Brightness.dark
+                      : Brightness.light,
+                ));
+                final mq = MediaQuery.of(context);
+                return MediaQuery(
+                  data: mq.copyWith(
+                      textScaler: TextScaler.linear(appearance.textScale)),
+                  // Float the coach companion above every route, but only once
+                  // the user is signed in.
+                  child: Stack(
+                    children: [
+                      child!,
+                      BlocBuilder<AuthBloc, AuthState>(
+                        builder: (context, auth) =>
+                            auth.status == AuthStatus.authenticated
+                                ? const CompanionOverlay()
+                                : const SizedBox.shrink(),
+                      ),
+                    ],
+                  ),
+                );
+              },
+              home: const _Root(),
+            ),
           ),
         );
       }),

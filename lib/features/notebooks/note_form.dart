@@ -5,12 +5,10 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../core/theme/app_colors.dart';
 import '../../data/models/note.dart';
 import '../../data/models/topic.dart';
+import '../../widgets/form_kit.dart' show titleCaseWord;
 import 'knowledge_cubit.dart';
 
 const kNoteTypes = ['CONCEPT', 'INSIGHT', 'SUMMARY', 'QUOTE', 'OTHER'];
-
-String titleCase(String s) =>
-    s.isEmpty ? s : s[0] + s.substring(1).toLowerCase();
 
 /// Bottom-sheet form to create or edit a Note. When opened from inside a
 /// notebook, [fixedNotebookId] and [fixedTopicId] are supplied so the note
@@ -141,7 +139,7 @@ class _NoteFormState extends State<NoteForm> {
               _label('Type'),
               _chipWrap([
                 for (final nt in kNoteTypes)
-                  _selChip(titleCase(nt), _noteType == nt,
+                  _selChip(titleCaseWord(nt), _noteType == nt,
                       () => setState(() => _noteType = nt)),
               ]),
               const SizedBox(height: 14),

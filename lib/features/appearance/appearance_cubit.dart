@@ -71,6 +71,10 @@ class AppearanceCubit extends Cubit<AppearanceState> {
   static const _kMode = 'pref_theme_mode';
   static const _kDensity = 'pref_density';
 
+  /// Drops back to defaults so a different user signing in on the same
+  /// device never briefly renders with the previous user's cached prefs.
+  void reset() => _emit(const AppearanceState());
+
   Future<void> load() async {
     var next = const AppearanceState();
     // device-local prefs first (so the UI is correct even if offline)

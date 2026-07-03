@@ -3,6 +3,8 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:speech_to_text/speech_to_text.dart';
 
 import '../../core/di/service_locator.dart';
 import '../../core/theme/app_colors.dart';
@@ -23,12 +25,24 @@ class CaptureSheet extends StatefulWidget {
 
 class _CaptureSheetState extends State<CaptureSheet> {
   final _text = TextEditingController();
+  final _speech = SpeechToText();
+  final _picker = ImagePicker();
   bool _sending = false;
+  bool _listening = false;
+  // The text already in the field when dictation began; recognised words are
+  // appended to it so typing + speaking compose naturally.
+  String _dictBase = '';
 
   @override
   void dispose() {
+    _speech.cancel();
     _text.dispose();
     super.dispose();
+  }
+
+  String? get _caption {
+    final t = _text.text.trim();
+    return t.isEmpty ? null : t;
   }
 
   Future<void> _send() async {
@@ -38,6 +52,89 @@ class _CaptureSheetState extends State<CaptureSheet> {
     await context.read<LifeCubit>().addCapture(t);
     _text.clear();
     if (mounted) setState(() => _sending = false);
+  }
+
+  // ── Voice: on-device dictation (no upload, no API key) ───────────────────
+  Future<void> _toggleDictation() async {
+    if (_listening) {
+      await _speech.stop();
+      if (mounted) setState(() => _listening = false);
+      return;
+    }
+    final available = await _speech.initialize(
+      onStatus: (s) {
+        if ((s == 'done' || s == 'notListening') && mounted) {
+          setState(() => _listening = false);
+        }
+      },
+      onError: (_) {
+        if (mounted) setState(() => _listening = false);
+      },
+    );
+    if (!available) {
+      _snack('Speech recognition unavailable on this device', error: true);
+      return;
+    }
+    _dictBase = _text.text.isEmpty ? '' : '${_text.text.trimRight()} ';
+    setState(() => _listening = true);
+    await _speech.listen(
+      onResult: (r) {
+        _text.text = '$_dictBase${r.recognizedWords}';
+        _text.selection =
+            TextSelection.collapsed(offset: _text.text.length);
+      },
+      listenFor: const Duration(minutes: 1),
+      pauseFor: const Duration(seconds: 4),
+      listenOptions: SpeechListenOptions(partialResults: true),
+    );
+  }
+
+  // ── Image ──────────────────────────────────────────────────────────────
+  Future<void> _captureImage() async {
+    final source = await showModalBottomSheet<ImageSource>(
+      context: context,
+      backgroundColor: AppColors.surface1,
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: Icon(Icons.camera_alt_outlined, color: AppColors.tx),
+              title: Text('Take a photo', style: TextStyle(color: AppColors.tx)),
+              onTap: () => Navigator.pop(ctx, ImageSource.camera),
+            ),
+            ListTile(
+              leading: Icon(Icons.photo_library_outlined, color: AppColors.tx),
+              title: Text('Choose from gallery', style: TextStyle(color: AppColors.tx)),
+              onTap: () => Navigator.pop(ctx, ImageSource.gallery),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (source == null || !mounted) return;
+
+    final XFile? img =
+        await _picker.pickImage(source: source, imageQuality: 85, maxWidth: 2000);
+    if (img == null || !mounted) return;
+
+    setState(() => _sending = true);
+    await context.read<LifeCubit>().addMediaCapture(
+          img.path,
+          filename: img.name,
+          mimeType: img.mimeType ?? _mimeFromPath(img.path),
+          caption: _caption,
+        );
+    _text.clear();
+    if (mounted) setState(() => _sending = false);
+  }
+
+  String _mimeFromPath(String path) {
+    final p = path.toLowerCase();
+    if (p.endsWith('.png')) return 'image/png';
+    if (p.endsWith('.webp')) return 'image/webp';
+    if (p.endsWith('.heic')) return 'image/heic';
+    return 'image/jpeg';
   }
 
   static const _captureTypes = ['TASK', 'HABIT', 'NOTE', 'RESOURCE', 'VAULT'];
@@ -210,28 +307,68 @@ class _CaptureSheetState extends State<CaptureSheet> {
                     ),
                   ),
                 ),
-                const SizedBox(height: 12),
-                SizedBox(
-                  width: double.infinity,
-                  height: 50,
-                  child: FilledButton.icon(
-                    onPressed: _sending ? null : _send,
-                    icon: _sending
-                        ? SizedBox(
-                            width: 18,
-                            height: 18,
-                            child: CircularProgressIndicator(
-                                strokeWidth: 2.2,
-                                color: AppColors.accentInk))
-                        : const Icon(Icons.send_rounded, size: 17),
-                    label: const Text('Capture'),
-                    style: FilledButton.styleFrom(
-                      backgroundColor: AppColors.accent,
-                      foregroundColor: AppColors.accentInk,
-                      shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(14)),
-                    ),
+                if (_listening) ...[
+                  const SizedBox(height: 10),
+                  Row(
+                    children: [
+                      Container(
+                        width: 9,
+                        height: 9,
+                        decoration: BoxDecoration(
+                          color: AppColors.accent,
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Text('Listening — speak now, tap mic to stop',
+                          style: TextStyle(
+                              fontSize: 12.5,
+                              fontWeight: FontWeight.w600,
+                              color: AppColors.accent)),
+                    ],
                   ),
+                ],
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    // Image capture
+                    _MediaIconButton(
+                      icon: Icons.image_outlined,
+                      onTap: (_sending || _listening) ? null : _captureImage,
+                    ),
+                    const SizedBox(width: 8),
+                    // Voice → on-device dictation
+                    _MediaIconButton(
+                      icon: _listening ? Icons.stop_rounded : Icons.mic_none_rounded,
+                      active: _listening,
+                      onTap: _sending ? null : _toggleDictation,
+                    ),
+                    const SizedBox(width: 8),
+                    // Text capture
+                    Expanded(
+                      child: SizedBox(
+                        height: 50,
+                        child: FilledButton.icon(
+                          onPressed: (_sending || _listening) ? null : _send,
+                          icon: _sending
+                              ? SizedBox(
+                                  width: 18,
+                                  height: 18,
+                                  child: CircularProgressIndicator(
+                                      strokeWidth: 2.2,
+                                      color: AppColors.accentInk))
+                              : const Icon(Icons.send_rounded, size: 17),
+                          label: const Text('Capture'),
+                          style: FilledButton.styleFrom(
+                            backgroundColor: AppColors.accent,
+                            foregroundColor: AppColors.accentInk,
+                            shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(14)),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
                 const SizedBox(height: 18),
                 BlocBuilder<LifeCubit, LifeState>(
@@ -274,16 +411,31 @@ class _CaptureSheetState extends State<CaptureSheet> {
                                 ),
                                 child: Row(
                                   children: [
+                                    if (c.isMedia) ...[
+                                      _CaptureThumb(c),
+                                      const SizedBox(width: 10),
+                                    ],
                                     Expanded(
                                       child: Column(
                                         crossAxisAlignment:
                                             CrossAxisAlignment.start,
                                         children: [
-                                          Text(c.text,
+                                          Text(
+                                              c.text.isNotEmpty
+                                                  ? c.text
+                                                  : (c.mediaType == 'AUDIO'
+                                                      ? 'Voice note'
+                                                      : 'Image'),
                                               maxLines: 2,
                                               overflow: TextOverflow.ellipsis,
-                                              style: const TextStyle(
-                                                  fontSize: 13.5)),
+                                              style: TextStyle(
+                                                  fontSize: 13.5,
+                                                  fontStyle: c.text.isEmpty
+                                                      ? FontStyle.italic
+                                                      : FontStyle.normal,
+                                                  color: c.text.isEmpty
+                                                      ? AppColors.tx3
+                                                      : AppColors.tx)),
                                           const SizedBox(height: 5),
                                           if (!c.isClassified)
                                             Row(
@@ -299,7 +451,10 @@ class _CaptureSheetState extends State<CaptureSheet> {
                                                               AppColors.tx4),
                                                 ),
                                                 const SizedBox(width: 7),
-                                                Text('Sorting…',
+                                                Text(
+                                                    c.isMedia
+                                                        ? 'Transcribing…'
+                                                        : 'Sorting…',
                                                     style: TextStyle(
                                                         fontSize: 11.5,
                                                         color: AppColors.tx4)),
@@ -363,6 +518,71 @@ class _CaptureSheetState extends State<CaptureSheet> {
       ),
     );
   }
+}
+
+/// Square icon button used for the image / voice capture actions.
+class _MediaIconButton extends StatelessWidget {
+  final IconData icon;
+  final VoidCallback? onTap;
+  final bool active;
+  const _MediaIconButton({required this.icon, this.onTap, this.active = false});
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: 50,
+      height: 50,
+      child: Material(
+        color: active ? AppColors.accent : AppColors.surface2,
+        borderRadius: BorderRadius.circular(14),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(14),
+          onTap: onTap,
+          child: Icon(
+            icon,
+            size: 20,
+            color: active
+                ? AppColors.accentInk
+                : (onTap == null ? AppColors.tx4 : AppColors.tx2),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Small leading thumbnail for a media capture in the inbox: the stored image,
+/// or a mic glyph for a voice note.
+class _CaptureThumb extends StatelessWidget {
+  final Capture capture;
+  const _CaptureThumb(this.capture);
+
+  @override
+  Widget build(BuildContext context) {
+    if (capture.mediaType == 'IMAGE' && capture.mediaUrl != null) {
+      return ClipRRect(
+        borderRadius: BorderRadius.circular(10),
+        child: Image.network(
+          capture.mediaUrl!,
+          width: 40,
+          height: 40,
+          fit: BoxFit.cover,
+          errorBuilder: (_, __, ___) => _glyph(Icons.image_outlined),
+        ),
+      );
+    }
+    return _glyph(Icons.graphic_eq_rounded);
+  }
+
+  Widget _glyph(IconData icon) => Container(
+        width: 40,
+        height: 40,
+        decoration: BoxDecoration(
+          color: AppColors.surface3,
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: Icon(icon, size: 20, color: AppColors.tx3),
+      );
 }
 
 /// Simple single-select list sheet — returns the picked id via Navigator.pop.

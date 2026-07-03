@@ -48,8 +48,7 @@ class _FocusScreenState extends State<FocusScreen> {
     setState(() => _active = false);
     if (_sessionId != null) {
       try {
-        await _repo.stopFocus(_sessionId!,
-            durationMinutes: (_seconds / 60).round());
+        await _repo.stopFocus(_sessionId!);
       } catch (_) {}
       _sessionId = null;
     }

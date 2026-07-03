@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../core/theme/app_colors.dart';
+import '../auth/bloc/auth_bloc.dart';
 
 /// Branded launch screen shown while the app boots / resolves auth state.
 ///
@@ -137,13 +139,50 @@ class _SplashScreenState extends State<SplashScreen>
             const Spacer(flex: 5),
             FadeTransition(
               opacity: _textFade,
-              child: SizedBox(
-                width: 22,
-                height: 22,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2,
-                  color: AppColors.accent,
-                ),
+              child: BlocBuilder<AuthBloc, AuthState>(
+                builder: (context, state) {
+                  if (state.error != null) {
+                    return Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 36),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            "Having trouble reaching the server — this can "
+                            "take up to a minute if it's been asleep.",
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              color: AppColors.tx3,
+                              fontSize: 12.5,
+                              height: 1.4,
+                            ),
+                          ),
+                          const SizedBox(height: 14),
+                          OutlinedButton(
+                            onPressed: () => context
+                                .read<AuthBloc>()
+                                .add(const AuthStarted()),
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: AppColors.tx,
+                              side: BorderSide(color: AppColors.line2),
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 20, vertical: 10),
+                            ),
+                            child: const Text('Retry'),
+                          ),
+                        ],
+                      ),
+                    );
+                  }
+                  return SizedBox(
+                    width: 22,
+                    height: 22,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: AppColors.accent,
+                    ),
+                  );
+                },
               ),
             ),
             const SizedBox(height: 56),

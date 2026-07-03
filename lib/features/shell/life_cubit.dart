@@ -319,6 +319,25 @@ class LifeCubit extends Cubit<LifeState> {
     }
   }
 
+  /// Retroactively logs a missed day for [h] — e.g. "I did this yesterday but
+  /// forgot to check it off."
+  Future<void> backfillHabitLog(
+    Habit h,
+    DateTime date, {
+    required bool completed,
+    int? count,
+    int? minutes,
+  }) async {
+    try {
+      await _repo.logHabit(h.id,
+          completed: completed, count: count, minutes: minutes, date: date);
+      final habits = await _repo.habits();
+      emit(state.copyWith(habits: habits));
+    } on ApiException catch (e) {
+      emit(state.copyWith(error: e.message));
+    }
+  }
+
   Future<void> addCapture(String text) async {
     try {
       await _repo.createCapture(text);
@@ -327,6 +346,28 @@ class LifeCubit extends Cubit<LifeState> {
       // Poll a couple of times so the type + worth rating appear without the
       // user pulling to refresh. Best-effort: ignore failures, stop if any
       // pending capture is still unclassified after the last attempt.
+      _pollCaptureClassification();
+    } on ApiException catch (e) {
+      emit(state.copyWith(error: e.message));
+    }
+  }
+
+  /// Uploads a photo or voice note as a capture. The server transcribes and
+  /// classifies it; we poll for the result like a text capture.
+  Future<void> addMediaCapture(
+    String filePath, {
+    required String filename,
+    required String mimeType,
+    String? caption,
+  }) async {
+    try {
+      await _repo.createMediaCapture(
+        filePath,
+        filename: filename,
+        mimeType: mimeType,
+        caption: caption,
+      );
+      await _refreshCaptures();
       _pollCaptureClassification();
     } on ApiException catch (e) {
       emit(state.copyWith(error: e.message));

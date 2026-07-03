@@ -16,6 +16,10 @@ class Capture {
   final String? detectedUrl;
   final DateTime? createdAt;
 
+  /// Input modality + stored file URL for image/audio captures.
+  final String mediaType; // TEXT | IMAGE | AUDIO
+  final String? mediaUrl;
+
   /// AI worth-triage: act on it now, save for later, or not relevant — and why.
   /// null until background classification has run.
   final String? worthCheck; // WORTH_NOW | SAVE_LATER | NOT_RELEVANT
@@ -40,7 +44,11 @@ class Capture {
     this.worthReason,
     this.meta = const {},
     this.createdOutput,
+    this.mediaType = 'TEXT',
+    this.mediaUrl,
   });
+
+  bool get isMedia => mediaType != 'TEXT';
 
   /// True once the background AI classification has produced a confidence
   /// score. Until then the inbox should show a "sorting…" state.
@@ -71,6 +79,8 @@ class Capture {
         createdAt: asDate(j['createdAt']),
         worthCheck: asStringOrNull(j['worthCheck']),
         worthReason: asStringOrNull(j['worthReason']),
+        mediaType: asString(j['mediaType'], 'TEXT'),
+        mediaUrl: asStringOrNull(j['mediaUrl']),
         meta: j['meta'] is Map ? Json.from(j['meta'] as Map) : const {},
         createdOutput: j['createdOutput'] is Map
             ? Json.from(j['createdOutput'] as Map)

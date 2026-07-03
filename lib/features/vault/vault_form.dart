@@ -9,6 +9,12 @@ import '../../widgets/form_kit.dart';
 /// Backend vaultType enum.
 const _vaultTypes = ['REFLECTION', 'MEMORY', 'MOTIVATION', 'RECOVERY'];
 
+/// Backend mediaType enum. Icons mirror web's constants.tsx: text -> sticky
+/// note, quote -> format_quote, video -> videocam, audio -> mic, image ->
+/// image. Not currently rendered here (selChip is text-only) but kept for
+/// any future icon-chip usage / the vault screen's secondary badge.
+const _mediaTypes = ['TEXT', 'QUOTE', 'VIDEO', 'AUDIO', 'IMAGE'];
+
 class VaultForm extends StatefulWidget {
   final VaultItem? item;
   const VaultForm({super.key, this.item});
@@ -23,6 +29,7 @@ class _VaultFormState extends State<VaultForm> {
   late final TextEditingController _url;
   late final TextEditingController _tags;
   String _type = 'MOTIVATION';
+  String _mediaType = 'TEXT';
   bool _saving = false;
 
   bool get _isEdit => widget.item != null;
@@ -37,6 +44,9 @@ class _VaultFormState extends State<VaultForm> {
     _tags = TextEditingController(text: (v?.triggerTags ?? const []).join(', '));
     if (v != null && _vaultTypes.contains(v.vaultType.toUpperCase())) {
       _type = v.vaultType.toUpperCase();
+    }
+    if (v != null && _mediaTypes.contains(v.mediaType.toUpperCase())) {
+      _mediaType = v.mediaType.toUpperCase();
     }
   }
 
@@ -67,6 +77,7 @@ class _VaultFormState extends State<VaultForm> {
             title: title,
             content: content,
             vaultType: _type,
+            mediaType: _mediaType,
             url: _url.text.trim(),
             triggerTags: _tagList);
       } else {
@@ -74,6 +85,7 @@ class _VaultFormState extends State<VaultForm> {
             title: title,
             content: content,
             vaultType: _type,
+            mediaType: _mediaType,
             url: _url.text.trim(),
             triggerTags: _tagList);
       }
@@ -102,6 +114,14 @@ class _VaultFormState extends State<VaultForm> {
           for (final t in _vaultTypes)
             selChip(titleCaseWord(t), _type == t,
                 () => setState(() => _type = t)),
+        ]),
+        const SizedBox(height: 14),
+        formLabel('Media'),
+        chipWrap([
+          for (final m in _mediaTypes)
+            selChip(
+                titleCaseWord(m), _mediaType == m,
+                () => setState(() => _mediaType = m)),
         ]),
         const SizedBox(height: 14),
         formLabel('Link (optional)'),

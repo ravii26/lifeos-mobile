@@ -11,6 +11,7 @@ import '../../widgets/bits.dart';
 import '../../widgets/glass.dart';
 import '../../widgets/screen_header.dart';
 import 'review_compose_screen.dart';
+import 'review_edit_sheet.dart';
 
 class ReviewScreen extends StatefulWidget {
   const ReviewScreen({super.key});
@@ -38,6 +39,16 @@ class _ReviewScreenState extends State<ReviewScreen> {
       MaterialPageRoute(builder: (_) => const ReviewComposeScreen()),
     );
     if (saved == true) _reload();
+  }
+
+  Future<void> _editLatest(Review latest) async {
+    final changed = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => ReviewEditSheet(review: latest),
+    );
+    if (changed == true) _reload();
   }
 
   @override
@@ -70,6 +81,7 @@ class _ReviewScreenState extends State<ReviewScreen> {
                   children: [
                     GlassCard(
                       padding: const EdgeInsets.all(16),
+                      onTap: latest != null ? () => _editLatest(latest) : null,
                       child: Column(
                         children: [
                           Eyebrow('Week of ${_weekLabel()}'),

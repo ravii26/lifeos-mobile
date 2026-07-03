@@ -26,9 +26,15 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     try {
       final user = await _repo.me();
       emit(state.copyWith(status: AuthStatus.authenticated, user: user));
-    } on ApiException {
-      await _repo.logout();
-      emit(state.copyWith(status: AuthStatus.unauthenticated));
+    } on ApiException catch (e) {
+      if (e.isUnauthorized) {
+        await _repo.logout();
+        emit(state.copyWith(status: AuthStatus.unauthenticated));
+      } else {
+        // Network/server issue (e.g. Render cold start) — keep the token and
+        // let the user retry instead of being kicked to login.
+        emit(state.copyWith(status: AuthStatus.unknown, error: e.message));
+      }
     }
   }
 

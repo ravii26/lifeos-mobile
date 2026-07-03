@@ -10,6 +10,7 @@ import '../../data/models/notebook.dart';
 import '../../data/models/topic.dart';
 import '../../data/repositories/life_repository.dart';
 import '../../widgets/bits.dart';
+import '../../widgets/form_kit.dart' show titleCaseWord;
 import '../../widgets/glass.dart';
 import '../../widgets/screen_header.dart';
 import '../shell/life_cubit.dart';
@@ -123,28 +124,41 @@ class _KnowledgeView extends StatelessWidget {
 
   // --- topic filter row ---
   Widget _topicFilter(BuildContext context, KnowledgeState s) {
-    return SizedBox(
-      height: 38,
-      child: ListView(
-        scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 16),
-        children: [
-          _filterChip(context, 'All', s.selectedTopicId == null,
-              () => context.read<KnowledgeCubit>().selectTopic(null)),
-          for (final t in s.topics)
-            _filterChip(context, t.title, s.selectedTopicId == t.id,
-                () => context.read<KnowledgeCubit>().selectTopic(t.id)),
-        ],
-      ),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SizedBox(
+          height: 38,
+          child: ListView(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            children: [
+              _filterChip(context, 'All', s.selectedTopicId == null,
+                  () => context.read<KnowledgeCubit>().selectTopic(null)),
+              for (final t in s.topics)
+                _filterChip(context, t.title, s.selectedTopicId == t.id,
+                    () => context.read<KnowledgeCubit>().selectTopic(t.id),
+                    onLongPress: () => _editTopic(context, t)),
+            ],
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.only(left: 16, top: 6),
+          child: Text('Long-press a topic to edit',
+              style: TextStyle(fontSize: 11, color: AppColors.tx4)),
+        ),
+      ],
     );
   }
 
   Widget _filterChip(
-      BuildContext context, String label, bool selected, VoidCallback onTap) {
+      BuildContext context, String label, bool selected, VoidCallback onTap,
+      {VoidCallback? onLongPress}) {
     return Padding(
       padding: const EdgeInsets.only(right: 8),
       child: GestureDetector(
         onTap: onTap,
+        onLongPress: onLongPress,
         child: Container(
           alignment: Alignment.center,
           padding: const EdgeInsets.symmetric(horizontal: 14),
@@ -276,6 +290,11 @@ class _KnowledgeView extends StatelessWidget {
     _sheet(context, cubit, TopicForm(areas: areas));
   }
 
+  void _editTopic(BuildContext context, Topic t) {
+    final cubit = context.read<KnowledgeCubit>();
+    _sheet(context, cubit, TopicForm(areas: areas, topic: t));
+  }
+
   void _sheet(BuildContext context, KnowledgeCubit cubit, Widget child) {
     showModalBottomSheet(
       context: context,
@@ -372,7 +391,7 @@ class NoteTile extends StatelessWidget {
                           fontSize: 14.5, fontWeight: FontWeight.w600)),
                 ),
                 const SizedBox(width: 8),
-                Chip3(titleCase(note.noteType)),
+                Chip3(titleCaseWord(note.noteType)),
               ],
             ),
             const SizedBox(height: 6),
@@ -660,7 +679,8 @@ class _NotebookFormState extends State<NotebookForm> {
 
 class TopicForm extends StatefulWidget {
   final List<Area> areas;
-  const TopicForm({super.key, required this.areas});
+  final Topic? topic;
+  const TopicForm({super.key, required this.areas, this.topic});
 
   @override
   State<TopicForm> createState() => _TopicFormState();
@@ -672,12 +692,16 @@ class _TopicFormState extends State<TopicForm> {
   String? _areaId;
   bool _saving = false;
 
+  bool get _isEdit => widget.topic != null;
+
   @override
   void initState() {
     super.initState();
-    _title = TextEditingController();
-    _desc = TextEditingController();
-    _areaId = widget.areas.isNotEmpty ? widget.areas.first.id : null;
+    final t = widget.topic;
+    _title = TextEditingController(text: t?.title ?? '');
+    _desc = TextEditingController(text: t?.description ?? '');
+    _areaId = t?.areaId ??
+        (widget.areas.isNotEmpty ? widget.areas.first.id : null);
   }
 
   @override
@@ -691,18 +715,51 @@ class _TopicFormState extends State<TopicForm> {
     final title = _title.text.trim();
     if (title.isEmpty || _areaId == null) return;
     setState(() => _saving = true);
-    await context
-        .read<KnowledgeCubit>()
-        .createTopic(title: title, areaId: _areaId!, description: _desc.text.trim());
+    final cubit = context.read<KnowledgeCubit>();
+    if (_isEdit) {
+      await cubit.updateTopic(widget.topic!.id,
+          title: title, description: _desc.text.trim(), areaId: _areaId!);
+    } else {
+      await cubit.createTopic(
+          title: title, areaId: _areaId!, description: _desc.text.trim());
+    }
     if (mounted) Navigator.of(context).pop();
+  }
+
+  void _confirmDelete() {
+    final t = widget.topic!;
+    showDialog(
+      context: context,
+      builder: (dctx) => AlertDialog(
+        backgroundColor: AppColors.surface2,
+        title: const Text('Delete topic?', style: TextStyle(fontSize: 16)),
+        content: Text(
+            'Notebooks and notes under “${t.title}” may be affected.',
+            style: TextStyle(fontSize: 13, color: AppColors.tx3)),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.of(dctx).pop(),
+              child: const Text('Cancel')),
+          TextButton(
+            onPressed: () {
+              context.read<KnowledgeCubit>().deleteTopic(t.id);
+              Navigator.of(dctx).pop();
+              Navigator.of(context).pop();
+            },
+            child: const Text('Delete',
+                style: TextStyle(color: AppColors.danger)),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     return _SheetScaffold(
-      title: 'New topic',
+      title: _isEdit ? 'Edit topic' : 'New topic',
       children: [
-        _formField(_title, 'Topic title', autofocus: true),
+        _formField(_title, 'Topic title', autofocus: !_isEdit),
         const SizedBox(height: 10),
         _formField(_desc, 'Description (optional)', lines: 2),
         const SizedBox(height: 16),
@@ -738,7 +795,19 @@ class _TopicFormState extends State<TopicForm> {
           ],
         ),
         const SizedBox(height: 20),
-        _saveButton(_saving, _save, 'Create topic'),
+        _saveButton(_saving, _save, _isEdit ? 'Save changes' : 'Create topic'),
+        if (_isEdit) ...[
+          const SizedBox(height: 6),
+          Center(
+            child: TextButton.icon(
+              onPressed: _confirmDelete,
+              icon: const Icon(Icons.delete_outline,
+                  size: 18, color: AppColors.danger),
+              label: const Text('Delete topic',
+                  style: TextStyle(color: AppColors.danger)),
+            ),
+          ),
+        ],
       ],
     );
   }

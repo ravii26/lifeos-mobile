@@ -5,6 +5,7 @@ class VaultItem {
   final String title;
   final String content;
   final String vaultType; // QUOTE | WIN | PROTOCOL | NOTE ...
+  final String mediaType; // TEXT | QUOTE | VIDEO | AUDIO | IMAGE
   final String? url;
   final List<String> triggerTags;
   final int usedCount;
@@ -15,6 +16,7 @@ class VaultItem {
     required this.title,
     required this.content,
     required this.vaultType,
+    this.mediaType = 'TEXT',
     this.url,
     this.triggerTags = const [],
     required this.usedCount,
@@ -26,6 +28,7 @@ class VaultItem {
         title: asString(j['title']),
         content: asString(j['content']),
         vaultType: asString(j['vaultType'], 'NOTE'),
+        mediaType: asString(j['mediaType'], 'TEXT'),
         url: asStringOrNull(j['url']),
         triggerTags: asStringList(j['triggerTags']),
         usedCount: asInt(j['usedCount']),

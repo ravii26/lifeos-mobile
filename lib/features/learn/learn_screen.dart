@@ -8,6 +8,8 @@ import '../../data/repositories/life_repository.dart';
 import '../../widgets/bits.dart';
 import '../../widgets/glass.dart';
 import '../../widgets/screen_header.dart';
+import 'resource_form.dart';
+import 'resource_progress_sheet.dart';
 
 class LearnScreen extends StatefulWidget {
   const LearnScreen({super.key});
@@ -25,10 +27,39 @@ class _LearnScreenState extends State<LearnScreen> {
     _future = getIt<LifeRepository>().resources();
   }
 
+  void _reload() => setState(() => _future = getIt<LifeRepository>().resources());
+
+  Future<void> _openForm({Resource? item}) async {
+    final changed = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => ResourceForm(item: item),
+    );
+    if (changed == true) _reload();
+  }
+
+  Future<void> _openProgress(Resource r) async {
+    final changed = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => ResourceProgressSheet(resource: r),
+    );
+    if (changed == true) _reload();
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.bg,
+      floatingActionButton: FloatingActionButton.extended(
+        backgroundColor: AppColors.accent,
+        foregroundColor: AppColors.accentInk,
+        onPressed: () => _openForm(),
+        icon: const Icon(Icons.add, size: 20),
+        label: const Text('Add'),
+      ),
       body: FutureBuilder<List<Resource>>(
         future: _future,
         builder: (context, snap) {
@@ -71,7 +102,10 @@ class _LearnScreenState extends State<LearnScreen> {
                       for (final r in all)
                         Padding(
                           padding: const EdgeInsets.only(bottom: 10),
-                          child: _resourceTile(r),
+                          child: GestureDetector(
+                            onTap: () => _openForm(item: r),
+                            child: _resourceTile(r),
+                          ),
                         ),
                     ],
                   ],
@@ -104,7 +138,7 @@ class _LearnScreenState extends State<LearnScreen> {
             SizedBox(
               width: double.infinity,
               child: FilledButton.icon(
-                onPressed: () {},
+                onPressed: () => _openProgress(r),
                 icon: const Icon(Icons.play_arrow, size: 16),
                 label: Text('Resume lesson ${r.lessonsCompleted + 1}'),
                 style: FilledButton.styleFrom(

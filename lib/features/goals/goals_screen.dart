@@ -10,6 +10,7 @@ import '../../data/models/area.dart';
 import '../../data/models/goal.dart';
 import '../../data/repositories/life_repository.dart';
 import '../../widgets/bits.dart';
+import '../../widgets/form_kit.dart' show titleCaseWord;
 import '../../widgets/glass.dart';
 import '../../widgets/screen_header.dart';
 import '../shell/life_cubit.dart';
@@ -457,7 +458,7 @@ class _GoalFormState extends State<_GoalForm> {
               _label('Priority'),
               _chipWrap([
                 for (final p in const ['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'])
-                  _selChip(_titleCase(p), _priority == p,
+                  _selChip(titleCaseWord(p), _priority == p,
                       () => setState(() => _priority = p)),
               ]),
               if (_isEdit) ...[
@@ -471,7 +472,7 @@ class _GoalFormState extends State<_GoalForm> {
                     'PAUSED',
                     'ABANDONED'
                   ])
-                    _selChip(_titleCase(st), _status == st,
+                    _selChip(titleCaseWord(st), _status == st,
                         () => setState(() => _status = st)),
                 ]),
               ],
@@ -686,6 +687,3 @@ class _GoalFormState extends State<_GoalForm> {
     );
   }
 }
-
-String _titleCase(String s) =>
-    s.isEmpty ? s : s[0] + s.substring(1).toLowerCase();

@@ -2,10 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:google_fonts/google_fonts.dart';
 
-import '../../core/di/service_locator.dart';
 import '../../core/theme/app_colors.dart';
 import '../../data/models/decision.dart';
-import '../../data/repositories/life_repository.dart';
 import '../../widgets/bits.dart';
 import '../../widgets/glass.dart';
 import '../../widgets/screen_header.dart';
@@ -18,6 +16,7 @@ import '../projects/projects_screen.dart';
 import '../review/review_screen.dart';
 import '../shell/life_cubit.dart';
 import '../vault/vault_screen.dart';
+import 'decisions_cubit.dart';
 
 class NowScreen extends StatefulWidget {
   const NowScreen({super.key});
@@ -27,16 +26,16 @@ class NowScreen extends StatefulWidget {
 }
 
 class _NowScreenState extends State<NowScreen> {
-  late Future<DecisionResult> _future;
-
   @override
   void initState() {
     super.initState();
-    _future = getIt<LifeRepository>().decisionsNow();
+    // Kick a refresh if we haven't loaded yet (e.g. first ever navigation to
+    // this tab before the post-auth refresh landed). Cheap no-op otherwise.
+    final cubit = context.read<DecisionsCubit>();
+    if (cubit.state.status == LoadStatus.initial) cubit.refresh();
   }
 
-  void _reload() =>
-      setState(() => _future = getIt<LifeRepository>().decisionsNow());
+  void _reload() => context.read<DecisionsCubit>().refresh();
 
   /// Acts on a coach suggestion. TASK/HABIT are completed/logged inline; every
   /// other type navigates to the relevant screen (the project, the inbox, a
@@ -124,9 +123,8 @@ class _NowScreenState extends State<NowScreen> {
         color: AppColors.accent,
         backgroundColor: AppColors.surface2,
         onRefresh: () async => _reload(),
-        child: FutureBuilder<DecisionResult>(
-          future: _future,
-          builder: (context, snap) {
+        child: BlocBuilder<DecisionsCubit, DecisionsState>(
+          builder: (context, s) {
             return ListView(
               padding: const EdgeInsets.only(bottom: 60),
               children: [
@@ -134,17 +132,18 @@ class _NowScreenState extends State<NowScreen> {
                     eyebrow: 'Decision engine',
                     title: 'What now',
                     color: AppColors.accent),
-                if (snap.connectionState != ConnectionState.done)
+                if (s.status == LoadStatus.initial ||
+                    s.status == LoadStatus.loading && s.result == null)
                   Padding(
                     padding: const EdgeInsets.only(top: 60),
                     child: Center(
                         child: CircularProgressIndicator(
                             color: AppColors.accent)),
                   )
-                else if (snap.hasError)
-                  _error(snap.error.toString())
-                else
-                  ..._content(snap.data!),
+                else if (s.status == LoadStatus.error && s.result == null)
+                  _error(s.error ?? 'Unknown error')
+                else if (s.result != null)
+                  ..._content(s.result!),
               ],
             );
           },

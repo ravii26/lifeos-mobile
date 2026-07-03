@@ -70,12 +70,18 @@ class Modules {
         Icons.school_outlined),
     ModuleDef(ModuleId.identity, 'Identity', 'Purpose, values & vision',
         Icons.self_improvement),
+    // Toggling these three never actually gated their telemetry/fetches, only
+    // nav visibility — a false impression of control, so they're always-on
+    // until real gating is built.
     ModuleDef(ModuleId.behaviour, 'Behaviour', 'Your activity signals',
-        Icons.insights_outlined),
+        Icons.insights_outlined,
+        core: true),
     ModuleDef(ModuleId.graph, 'Graph', 'How everything connects',
-        Icons.hub_outlined),
+        Icons.hub_outlined,
+        core: true),
     ModuleDef(ModuleId.decisions, 'What now', 'Your next best move',
-        Icons.auto_awesome_outlined),
+        Icons.auto_awesome_outlined,
+        core: true),
   ];
 
   static final _byKey = {for (final m in all) m.key: m};

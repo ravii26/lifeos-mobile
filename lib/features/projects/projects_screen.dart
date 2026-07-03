@@ -11,6 +11,7 @@ import '../../data/models/goal.dart';
 import '../../data/models/project.dart';
 import '../../data/repositories/life_repository.dart';
 import '../../widgets/bits.dart';
+import '../../widgets/form_kit.dart' show titleCaseWord;
 import '../../widgets/glass.dart';
 import '../../widgets/screen_header.dart';
 import '../shell/life_cubit.dart';
@@ -324,9 +325,6 @@ String _fmtDate(DateTime d) {
   return '${m[d.month - 1]} ${d.day}';
 }
 
-String _titleCase(String s) =>
-    s.isEmpty ? s : s[0] + s.substring(1).toLowerCase();
-
 // ----------------------------------------------------------------- form
 class _ProjectForm extends StatefulWidget {
   final List<Area> areas;
@@ -469,7 +467,7 @@ class _ProjectFormState extends State<_ProjectForm> {
                     'PAUSED',
                     'ABANDONED'
                   ])
-                    _selChip(_titleCase(st), _status == st,
+                    _selChip(titleCaseWord(st), _status == st,
                         () => setState(() => _status = st)),
                 ]),
               ],

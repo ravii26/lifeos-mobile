@@ -58,7 +58,16 @@ class HabitDetailScreen extends StatelessWidget {
                     ),
                     const SizedBox(height: 14),
                     _logCard(context, habit, color),
-                    const SizedBox(height: 14),
+                    const SizedBox(height: 10),
+                    Center(
+                      child: TextButton.icon(
+                        onPressed: () => _backfillDay(context, habit),
+                        icon: const Icon(Icons.event_available, size: 16),
+                        label: const Text('Log a missed day'),
+                        style: TextButton.styleFrom(foregroundColor: color),
+                      ),
+                    ),
+                    const SizedBox(height: 4),
                     GlassCard(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -386,6 +395,57 @@ class HabitDetailScreen extends StatelessWidget {
         ],
       ),
     );
+  }
+
+  Future<void> _backfillDay(BuildContext context, Habit h) async {
+    final now = DateTime.now();
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: now.subtract(const Duration(days: 1)),
+      firstDate: now.subtract(const Duration(days: 60)),
+      lastDate: now.subtract(const Duration(days: 1)),
+      helpText: 'Log a missed day',
+    );
+    if (picked == null || !context.mounted) return;
+
+    if (h.kind == 'boolean') {
+      context.read<LifeCubit>().backfillHabitLog(h, picked, completed: true);
+      return;
+    }
+
+    final controller = TextEditingController();
+    final unit = h.kind == 'timer' ? 'min' : 'count';
+    final value = await showDialog<int>(
+      context: context,
+      builder: (dctx) => AlertDialog(
+        backgroundColor: AppColors.surface2,
+        title: Text('${picked.month}/${picked.day} — how much?'),
+        content: TextField(
+          controller: controller,
+          keyboardType: TextInputType.number,
+          autofocus: true,
+          decoration: InputDecoration(hintText: 'e.g. ${h.target} ($unit)'),
+        ),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.of(dctx).pop(),
+              child: const Text('Cancel')),
+          TextButton(
+            onPressed: () =>
+                Navigator.of(dctx).pop(int.tryParse(controller.text)),
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
+    if (value == null || !context.mounted) return;
+    context.read<LifeCubit>().backfillHabitLog(
+          h,
+          picked,
+          completed: value >= h.target,
+          count: h.kind == 'count' ? value : null,
+          minutes: h.kind == 'timer' ? value : null,
+        );
   }
 
   Widget _info(String k, String v) => Row(

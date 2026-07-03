@@ -6,6 +6,8 @@ class Resource {
   final String title;
   final String resourceType;
   final String? platform;
+  final String? url;
+  final String? notes;
   final String status;
   final String? topicId;
   final int totalLessons;
@@ -17,6 +19,8 @@ class Resource {
     required this.title,
     required this.resourceType,
     this.platform,
+    this.url,
+    this.notes,
     required this.status,
     this.topicId,
     required this.totalLessons,
@@ -32,6 +36,8 @@ class Resource {
         title: asString(j['title']),
         resourceType: asString(j['resourceType'], 'COURSE'),
         platform: asStringOrNull(j['platform']),
+        url: asStringOrNull(j['url']),
+        notes: asStringOrNull(j['notes']),
         status: asString(j['status'], 'ACTIVE'),
         topicId: asStringOrNull(j['topicId']),
         totalLessons: asInt(j['totalLessons']),
