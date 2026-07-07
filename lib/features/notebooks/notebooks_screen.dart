@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:google_fonts/google_fonts.dart';
 
 import '../../core/di/service_locator.dart';
 import '../../core/theme/app_colors.dart';
@@ -10,7 +9,7 @@ import '../../data/models/notebook.dart';
 import '../../data/models/topic.dart';
 import '../../data/repositories/life_repository.dart';
 import '../../widgets/bits.dart';
-import '../../widgets/form_kit.dart' show titleCaseWord;
+import '../../widgets/form_kit.dart';
 import '../../widgets/glass.dart';
 import '../../widgets/screen_header.dart';
 import '../shell/life_cubit.dart';
@@ -603,78 +602,45 @@ class _NotebookFormState extends State<NotebookForm> {
 
   @override
   Widget build(BuildContext context) {
-    return _SheetScaffold(
+    return FormSheet(
       title: _isEdit ? 'Edit notebook' : 'New notebook',
       children: [
-        _field(_title, 'Notebook title', autofocus: !_isEdit),
+        formField(_title, 'Notebook title', autofocus: !_isEdit),
         const SizedBox(height: 10),
-        _field(_desc, 'Description (optional)', lines: 2),
+        formField(_desc, 'Description (optional)', lines: 2),
         const SizedBox(height: 16),
         if (!_isEdit) ...[
-          _label('Topic'),
-          _chipWrap([
+          formLabel('Topic'),
+          chipWrap([
             for (final t in widget.topics)
-              _selChip(t.title, _topicId == t.id,
+              selChip(t.title, _topicId == t.id,
                   () => setState(() => _topicId = t.id)),
           ]),
           const SizedBox(height: 14),
         ],
-        _label('Tags (comma-separated)'),
-        _field(_tags, 'e.g. reference, deep-dive'),
+        formLabel('Tags (comma-separated)'),
+        formField(_tags, 'e.g. reference, deep-dive'),
         const SizedBox(height: 20),
-        _saveButton(_saving, _save, _isEdit ? 'Save changes' : 'Create notebook'),
+        saveButton(
+            _saving, _save, _isEdit ? 'Save changes' : 'Create notebook'),
         if (_isEdit) ...[
           const SizedBox(height: 6),
-          Center(
-            child: TextButton.icon(
-              onPressed: _confirmDelete,
-              icon: const Icon(Icons.delete_outline,
-                  size: 18, color: AppColors.danger),
-              label: const Text('Delete notebook',
-                  style: TextStyle(color: AppColors.danger)),
-            ),
-          ),
+          deleteRow(context, 'Delete notebook', _confirmDelete),
         ],
       ],
     );
   }
 
-  void _confirmDelete() {
+  Future<void> _confirmDelete() async {
     final nb = widget.notebook!;
-    showDialog(
-      context: context,
-      builder: (dctx) => AlertDialog(
-        backgroundColor: AppColors.surface2,
-        title: const Text('Delete notebook?', style: TextStyle(fontSize: 16)),
-        content: Text(
-            'Notes inside “${nb.title}” are kept but unfiled.',
-            style: TextStyle(fontSize: 13, color: AppColors.tx3)),
-        actions: [
-          TextButton(
-              onPressed: () => Navigator.of(dctx).pop(),
-              child: const Text('Cancel')),
-          TextButton(
-            onPressed: () {
-              context.read<KnowledgeCubit>().deleteNotebook(nb.id);
-              Navigator.of(dctx).pop();
-              Navigator.of(context).pop();
-              Navigator.of(context).maybePop();
-            },
-            child: const Text('Delete',
-                style: TextStyle(color: AppColors.danger)),
-          ),
-        ],
-      ),
-    );
+    if (await confirmDelete(
+        context, 'Notes inside “${nb.title}” are kept but unfiled.')) {
+      if (!mounted) return;
+      context.read<KnowledgeCubit>().deleteNotebook(nb.id);
+      Navigator.of(context).pop();
+      Navigator.of(context).maybePop();
+    }
   }
-
-  Widget _field(TextEditingController c, String hint,
-          {int lines = 1, bool autofocus = false}) =>
-      _formField(c, hint, lines: lines, autofocus: autofocus);
-  Widget _label(String t) => _formLabel(t);
-  Widget _chipWrap(List<Widget> chips) =>
-      Wrap(spacing: 8, runSpacing: 8, children: chips);
-  Widget _selChip(String l, bool s, VoidCallback t) => _formSelChip(l, s, t);
 }
 
 class TopicForm extends StatefulWidget {
@@ -726,215 +692,40 @@ class _TopicFormState extends State<TopicForm> {
     if (mounted) Navigator.of(context).pop();
   }
 
-  void _confirmDelete() {
+  Future<void> _confirmDelete() async {
     final t = widget.topic!;
-    showDialog(
-      context: context,
-      builder: (dctx) => AlertDialog(
-        backgroundColor: AppColors.surface2,
-        title: const Text('Delete topic?', style: TextStyle(fontSize: 16)),
-        content: Text(
-            'Notebooks and notes under “${t.title}” may be affected.',
-            style: TextStyle(fontSize: 13, color: AppColors.tx3)),
-        actions: [
-          TextButton(
-              onPressed: () => Navigator.of(dctx).pop(),
-              child: const Text('Cancel')),
-          TextButton(
-            onPressed: () {
-              context.read<KnowledgeCubit>().deleteTopic(t.id);
-              Navigator.of(dctx).pop();
-              Navigator.of(context).pop();
-            },
-            child: const Text('Delete',
-                style: TextStyle(color: AppColors.danger)),
-          ),
-        ],
-      ),
-    );
+    if (await confirmDelete(context,
+        'Notebooks and notes under “${t.title}” may be affected.')) {
+      if (!mounted) return;
+      context.read<KnowledgeCubit>().deleteTopic(t.id);
+      Navigator.of(context).pop();
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    return _SheetScaffold(
+    return FormSheet(
       title: _isEdit ? 'Edit topic' : 'New topic',
       children: [
-        _formField(_title, 'Topic title', autofocus: !_isEdit),
+        formField(_title, 'Topic title', autofocus: !_isEdit),
         const SizedBox(height: 10),
-        _formField(_desc, 'Description (optional)', lines: 2),
+        formField(_desc, 'Description (optional)', lines: 2),
         const SizedBox(height: 16),
-        _formLabel('Area'),
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children: [
-            for (final a in widget.areas)
-              GestureDetector(
-                onTap: () => setState(() => _areaId = a.id),
-                child: Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 13, vertical: 8),
-                  decoration: BoxDecoration(
-                    color: _areaId == a.id
-                        ? a.color.withValues(alpha: 0.16)
-                        : AppColors.surface2,
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(
-                        color: _areaId == a.id ? a.color : AppColors.line,
-                        width: _areaId == a.id ? 1.3 : 1),
-                  ),
-                  child: Text(a.name,
-                      style: TextStyle(
-                          fontSize: 13,
-                          fontWeight: _areaId == a.id
-                              ? FontWeight.w700
-                              : FontWeight.w500,
-                          color: _areaId == a.id ? a.color : AppColors.tx2)),
-                ),
-              ),
-          ],
-        ),
+        formLabel('Area'),
+        chipWrap([
+          for (final a in widget.areas)
+            selChip(a.name, _areaId == a.id,
+                () => setState(() => _areaId = a.id),
+                color: a.color),
+        ]),
         const SizedBox(height: 20),
-        _saveButton(_saving, _save, _isEdit ? 'Save changes' : 'Create topic'),
+        saveButton(_saving, _save, _isEdit ? 'Save changes' : 'Create topic'),
         if (_isEdit) ...[
           const SizedBox(height: 6),
-          Center(
-            child: TextButton.icon(
-              onPressed: _confirmDelete,
-              icon: const Icon(Icons.delete_outline,
-                  size: 18, color: AppColors.danger),
-              label: const Text('Delete topic',
-                  style: TextStyle(color: AppColors.danger)),
-            ),
-          ),
+          deleteRow(context, 'Delete topic', _confirmDelete),
         ],
       ],
     );
   }
 }
 
-// ----------------------------------------------------------------- shared
-class _SheetScaffold extends StatelessWidget {
-  final String title;
-  final List<Widget> children;
-  const _SheetScaffold({required this.title, required this.children});
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding:
-          EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
-      child: Container(
-        decoration: BoxDecoration(
-          color: AppColors.surface1,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
-          border: Border(top: BorderSide(color: AppColors.glassBorder)),
-        ),
-        padding: const EdgeInsets.fromLTRB(18, 12, 18, 24),
-        child: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Center(
-                child: Container(
-                  width: 40,
-                  height: 5,
-                  decoration: BoxDecoration(
-                      color: AppColors.line3,
-                      borderRadius: BorderRadius.circular(10)),
-                ),
-              ),
-              const SizedBox(height: 16),
-              Text(title,
-                  style: GoogleFonts.hankenGrotesk(
-                      fontSize: 20, fontWeight: FontWeight.w700)),
-              const SizedBox(height: 16),
-              ...children,
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-Widget _saveButton(bool saving, VoidCallback onTap, String label) => SizedBox(
-      width: double.infinity,
-      child: FilledButton(
-        onPressed: saving ? null : onTap,
-        style: FilledButton.styleFrom(
-          backgroundColor: AppColors.accent,
-          foregroundColor: AppColors.accentInk,
-          padding: const EdgeInsets.symmetric(vertical: 15),
-        ),
-        child: saving
-            ? const SizedBox(
-                width: 18,
-                height: 18,
-                child: CircularProgressIndicator(strokeWidth: 2))
-            : Text(label),
-      ),
-    );
-
-Widget _formLabel(String t) => Padding(
-      padding: const EdgeInsets.only(bottom: 8, left: 2),
-      child: Text(t,
-          style: TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
-              color: AppColors.tx3)),
-    );
-
-Widget _formField(TextEditingController c, String hint,
-        {int lines = 1, bool autofocus = false}) =>
-    TextField(
-      controller: c,
-      autofocus: autofocus,
-      maxLines: lines,
-      style: const TextStyle(fontSize: 15),
-      decoration: InputDecoration(
-        hintText: hint,
-        hintStyle: TextStyle(color: AppColors.tx4),
-        filled: true,
-        fillColor: AppColors.surface2,
-        contentPadding:
-            const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
-          borderSide: BorderSide(color: AppColors.line),
-        ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
-          borderSide: BorderSide(color: AppColors.line),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
-          borderSide: BorderSide(color: AppColors.accentLine),
-        ),
-      ),
-    );
-
-Widget _formSelChip(String label, bool selected, VoidCallback onTap) {
-  final c = AppColors.accent;
-  return GestureDetector(
-    onTap: onTap,
-    child: Container(
-      padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 8),
-      constraints: const BoxConstraints(maxWidth: 260),
-      decoration: BoxDecoration(
-        color: selected ? c.withValues(alpha: 0.16) : AppColors.surface2,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-            color: selected ? c : AppColors.line, width: selected ? 1.3 : 1),
-      ),
-      child: Text(label,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: TextStyle(
-              fontSize: 13,
-              fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
-              color: selected ? c : AppColors.tx2)),
-    ),
-  );
-}

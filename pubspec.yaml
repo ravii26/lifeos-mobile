@@ -47,6 +47,15 @@ dependencies:
   intl: ^0.20.1
   rename: ^3.1.0
 
+  # Home-screen widget bridge (Android Glance + iOS WidgetKit shared storage)
+  home_widget: ^0.7.0
+  # Periodic background refresh of widget data (Android only)
+  workmanager: ^0.9.0+3
+  # lifeos:// deep link handling (widget taps -> in-app navigation/actions)
+  app_links: ^6.3.3
+  # Non-sensitive local flags (active focus session marker for the widget)
+  shared_preferences: ^2.3.3
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

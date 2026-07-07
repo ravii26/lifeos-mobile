@@ -2,7 +2,9 @@ import 'package:equatable/equatable.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../core/api/api_exception.dart';
+import '../../core/di/service_locator.dart';
 import '../../core/notifications/notification_service.dart';
+import '../../core/widget/widget_sync_service.dart';
 import '../../data/models/area.dart';
 import '../../data/models/capture.dart';
 import '../../data/models/goal.dart';
@@ -139,12 +141,18 @@ class LifeCubit extends Cubit<LifeState> {
       ));
       // Best-effort: keep local habit reminders in sync with the backend.
       NotificationService.instance.syncHabitReminders(habits);
+      _syncWidgetHabits(habits);
     } on ApiException catch (e) {
       emit(state.copyWith(status: LoadStatus.error, error: e.message));
     }
   }
 
   Future<void> refresh() => load();
+
+  /// Best-effort: keeps the home-screen widget's habit checklist in sync.
+  void _syncWidgetHabits(List<Habit> habits) {
+    getIt<WidgetSyncService>().pushHabits(habits);
+  }
 
   Future<void> completeTask(String id) async {
     try {
@@ -264,6 +272,7 @@ class LifeCubit extends Cubit<LifeState> {
       final habits = await _repo.habits();
       emit(state.copyWith(habits: habits));
       NotificationService.instance.syncHabitReminders(habits);
+      _syncWidgetHabits(habits);
       return true;
     } on ApiException catch (e) {
       emit(state.copyWith(error: e.message));
@@ -277,6 +286,7 @@ class LifeCubit extends Cubit<LifeState> {
     try {
       await _repo.deleteHabit(id);
       NotificationService.instance.syncHabitReminders(state.habits);
+      _syncWidgetHabits(state.habits);
     } on ApiException catch (_) {
       await refresh();
     }
@@ -304,6 +314,7 @@ class LifeCubit extends Cubit<LifeState> {
       }
       final habits = await _repo.habits();
       emit(state.copyWith(habits: habits));
+      _syncWidgetHabits(habits);
     } on ApiException catch (e) {
       emit(state.copyWith(error: e.message));
     }
@@ -314,6 +325,7 @@ class LifeCubit extends Cubit<LifeState> {
       await _repo.logHabit(h.id, completed: completed, count: count, minutes: minutes);
       final habits = await _repo.habits();
       emit(state.copyWith(habits: habits));
+      _syncWidgetHabits(habits);
     } on ApiException catch (e) {
       emit(state.copyWith(error: e.message));
     }

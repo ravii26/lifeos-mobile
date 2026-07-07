@@ -3,9 +3,11 @@ import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import 'core/api/api_client.dart';
+import 'core/deeplink/deep_link_service.dart';
 import 'core/di/service_locator.dart';
 import 'core/notifications/notification_service.dart';
 import 'core/theme/app_theme.dart';
+import 'core/widget/widget_sync_service.dart';
 import 'data/repositories/auth_repository.dart';
 import 'data/repositories/life_repository.dart';
 import 'features/appearance/appearance_cubit.dart';
@@ -24,8 +26,17 @@ Future<void> main() async {
   ));
   await setupLocator();
   await NotificationService.instance.init();
+  await getIt<WidgetSyncService>().init();
   runApp(const LifeOSApp());
+  // Deferred to after the first frame so `rootNavigatorKey.currentState` is
+  // attached before a cold-start `lifeos://` link tries to push a route.
+  WidgetsBinding.instance
+      .addPostFrameCallback((_) => DeepLinkService(rootNavigatorKey).init());
 }
+
+/// Used by [DeepLinkService] to push routes (e.g. the focus screen) from
+/// outside the widget tree when the app is opened via a `lifeos://` link.
+final rootNavigatorKey = GlobalKey<NavigatorState>();
 
 class LifeOSApp extends StatelessWidget {
   const LifeOSApp({super.key});
@@ -61,10 +72,12 @@ class LifeOSApp extends StatelessWidget {
             } else if (auth.status == AuthStatus.unauthenticated) {
               appearance.reset();
               decisions.reset();
+              getIt<WidgetSyncService>().clear();
             }
           },
           child: BlocBuilder<AppearanceCubit, AppearanceState>(
             builder: (context, appearance) => MaterialApp(
+              navigatorKey: rootNavigatorKey,
               title: 'LifeOS',
               debugShowCheckedModeBanner: false,
               theme: AppTheme.build(

@@ -1,6 +1,8 @@
 import 'package:dio/dio.dart';
 
 import '../../core/api/api_client.dart';
+import '../../core/widget/active_focus_store.dart';
+import '../../core/widget/widget_sync_service.dart';
 import '../models/area.dart';
 import '../models/behavior_log.dart';
 import '../models/calendar_block.dart';
@@ -29,7 +31,9 @@ const Object _unset = Object();
 
 class LifeRepository {
   final ApiClient _api;
-  LifeRepository(this._api);
+  final ActiveFocusStore _focusStore;
+  LifeRepository(this._api, [ActiveFocusStore? focusStore])
+      : _focusStore = focusStore ?? ActiveFocusStore();
 
   // ---- Areas ----
   Future<List<Area>> areas() async {
@@ -884,18 +888,27 @@ class LifeRepository {
   }
 
   // ---- Focus sessions ----
-  Future<String> startFocus({String? taskId, String? habitId}) async {
+  /// [label] is a display-only title (e.g. the task's title) persisted
+  /// locally so the home-screen widget can show "Focusing: <label>" without
+  /// an extra round trip.
+  Future<String> startFocus(
+      {String? taskId, String? habitId, String? label}) async {
     final data = await _api.post('/focus', body: {
       'startedAt': DateTime.now().toIso8601String(),
       if (taskId != null) 'taskId': taskId,
       if (habitId != null) 'habitId': habitId,
     });
-    return asString((data as Json)['id']);
+    final id = asString((data as Json)['id']);
+    await _focusStore.start(id, label: label);
+    await WidgetSyncService.instance?.pushFocusState(active: true, label: label);
+    return id;
   }
 
-  Future<void> stopFocus(String id) {
-    return _api.patch('/focus/$id/stop', body: {
+  Future<void> stopFocus(String id) async {
+    await _api.patch('/focus/$id/stop', body: {
       'endedAt': DateTime.now().toIso8601String(),
     });
+    await _focusStore.clear();
+    await WidgetSyncService.instance?.pushFocusState(active: false);
   }
 }

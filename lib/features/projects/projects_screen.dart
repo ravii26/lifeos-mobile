@@ -1,7 +1,6 @@
 import 'package:equatable/equatable.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:google_fonts/google_fonts.dart';
 
 import '../../core/api/api_exception.dart';
 import '../../core/di/service_locator.dart';
@@ -11,7 +10,7 @@ import '../../data/models/goal.dart';
 import '../../data/models/project.dart';
 import '../../data/repositories/life_repository.dart';
 import '../../widgets/bits.dart';
-import '../../widgets/form_kit.dart' show titleCaseWord;
+import '../../widgets/form_kit.dart';
 import '../../widgets/glass.dart';
 import '../../widgets/screen_header.dart';
 import '../shell/life_cubit.dart';
@@ -398,234 +397,98 @@ class _ProjectFormState extends State<_ProjectForm> {
     final linkableGoals = widget.goals
         .where((g) => _areaId == null || g.areaId == _areaId)
         .toList();
-    return Padding(
-      padding:
-          EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
-      child: Container(
-        decoration: BoxDecoration(
-          color: AppColors.surface1,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
-          border: Border(top: BorderSide(color: AppColors.glassBorder)),
-        ),
-        padding: const EdgeInsets.fromLTRB(18, 12, 18, 24),
-        child: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Center(
-                child: Container(
-                  width: 40,
-                  height: 5,
-                  decoration: BoxDecoration(
-                      color: AppColors.line3,
-                      borderRadius: BorderRadius.circular(10)),
-                ),
-              ),
-              const SizedBox(height: 16),
-              Text(_isEdit ? 'Edit project' : 'New project',
-                  style: GoogleFonts.hankenGrotesk(
-                      fontSize: 20, fontWeight: FontWeight.w700)),
-              const SizedBox(height: 16),
-              _field(_title, 'Project title', autofocus: !_isEdit),
-              const SizedBox(height: 10),
-              _field(_desc, 'Notes (optional)', lines: 3),
-              const SizedBox(height: 16),
-              _label('Area'),
-              _chipWrap([
-                for (final a in widget.areas)
-                  _selChip(a.name, _areaId == a.id, () {
-                    setState(() {
-                      _areaId = a.id;
-                      // Drop a goal link that no longer matches the area.
-                      if (_goalId != null &&
-                          !widget.goals.any(
-                              (g) => g.id == _goalId && g.areaId == a.id)) {
-                        _goalId = null;
-                      }
-                    });
-                  }, color: a.color),
-              ]),
-              if (linkableGoals.isNotEmpty) ...[
-                const SizedBox(height: 14),
-                _label('Linked goal (optional)'),
-                _chipWrap([
-                  _selChip('None', _goalId == null,
-                      () => setState(() => _goalId = null)),
-                  for (final g in linkableGoals)
-                    _selChip(g.title, _goalId == g.id,
-                        () => setState(() => _goalId = g.id)),
-                ]),
-              ],
-              if (_isEdit) ...[
-                const SizedBox(height: 14),
-                _label('Status'),
-                _chipWrap([
-                  for (final st in const [
-                    'ACTIVE',
-                    'COMPLETED',
-                    'PAUSED',
-                    'ABANDONED'
-                  ])
-                    _selChip(titleCaseWord(st), _status == st,
-                        () => setState(() => _status = st)),
-                ]),
-              ],
-              const SizedBox(height: 14),
-              _label('Deadline'),
-              Row(
-                children: [
-                  OutlinedButton.icon(
-                    onPressed: () async {
-                      final now = DateTime.now();
-                      final picked = await showDatePicker(
-                        context: context,
-                        initialDate: _deadline ?? now,
-                        firstDate: now.subtract(const Duration(days: 1)),
-                        lastDate: DateTime(now.year + 6),
-                      );
-                      if (picked != null) setState(() => _deadline = picked);
-                    },
-                    icon: const Icon(Icons.calendar_today_outlined, size: 15),
-                    label: Text(
-                        _deadline == null ? 'Set date' : _fmtDate(_deadline!)),
-                    style: OutlinedButton.styleFrom(
-                        foregroundColor: AppColors.tx2,
-                        side: BorderSide(color: AppColors.line2)),
-                  ),
-                  if (_deadline != null)
-                    TextButton(
-                        onPressed: () => setState(() => _deadline = null),
-                        child: const Text('Clear')),
-                ],
-              ),
-              const SizedBox(height: 20),
-              SizedBox(
-                width: double.infinity,
-                child: FilledButton(
-                  onPressed: _saving ? null : _save,
-                  style: FilledButton.styleFrom(
-                    backgroundColor: AppColors.accent,
-                    foregroundColor: AppColors.accentInk,
-                    padding: const EdgeInsets.symmetric(vertical: 15),
-                  ),
-                  child: _saving
-                      ? const SizedBox(
-                          width: 18,
-                          height: 18,
-                          child: CircularProgressIndicator(strokeWidth: 2))
-                      : Text(_isEdit ? 'Save changes' : 'Create project'),
-                ),
-              ),
-              if (_isEdit) ...[
-                const SizedBox(height: 6),
-                Center(
-                  child: TextButton.icon(
-                    onPressed: () => _confirmDelete(widget.project!),
-                    icon: const Icon(Icons.delete_outline,
-                        size: 18, color: AppColors.danger),
-                    label: const Text('Delete project',
-                        style: TextStyle(color: AppColors.danger)),
-                  ),
-                ),
-              ],
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  void _confirmDelete(Project p) {
-    showDialog(
-      context: context,
-      builder: (dctx) => AlertDialog(
-        backgroundColor: AppColors.surface2,
-        title: const Text('Delete project?', style: TextStyle(fontSize: 16)),
-        content: Text('“${p.title}” will be removed.',
-            style: TextStyle(fontSize: 13, color: AppColors.tx3)),
-        actions: [
-          TextButton(
-              onPressed: () => Navigator.of(dctx).pop(),
-              child: const Text('Cancel')),
-          TextButton(
-            onPressed: () {
-              context.read<ProjectsCubit>().remove(p.id);
-              Navigator.of(dctx).pop();
-              Navigator.of(context).pop();
-            },
-            child: const Text('Delete',
-                style: TextStyle(color: AppColors.danger)),
-          ),
+    return FormSheet(
+      title: _isEdit ? 'Edit project' : 'New project',
+      children: [
+        formField(_title, 'Project title', autofocus: !_isEdit),
+        const SizedBox(height: 10),
+        formField(_desc, 'Notes (optional)', lines: 3),
+        const SizedBox(height: 16),
+        formLabel('Area'),
+        chipWrap([
+          for (final a in widget.areas)
+            selChip(a.name, _areaId == a.id, () {
+              setState(() {
+                _areaId = a.id;
+                // Drop a goal link that no longer matches the area.
+                if (_goalId != null &&
+                    !widget.goals
+                        .any((g) => g.id == _goalId && g.areaId == a.id)) {
+                  _goalId = null;
+                }
+              });
+            }, color: a.color),
+        ]),
+        if (linkableGoals.isNotEmpty) ...[
+          const SizedBox(height: 14),
+          formLabel('Linked goal (optional)'),
+          chipWrap([
+            selChip('None', _goalId == null,
+                () => setState(() => _goalId = null)),
+            for (final g in linkableGoals)
+              selChip(g.title, _goalId == g.id,
+                  () => setState(() => _goalId = g.id)),
+          ]),
         ],
-      ),
+        if (_isEdit) ...[
+          const SizedBox(height: 14),
+          formLabel('Status'),
+          chipWrap([
+            for (final st in const [
+              'ACTIVE',
+              'COMPLETED',
+              'PAUSED',
+              'ABANDONED'
+            ])
+              selChip(titleCaseWord(st), _status == st,
+                  () => setState(() => _status = st)),
+          ]),
+        ],
+        const SizedBox(height: 14),
+        formLabel('Deadline'),
+        Row(
+          children: [
+            OutlinedButton.icon(
+              onPressed: () async {
+                final now = DateTime.now();
+                final picked = await showDatePicker(
+                  context: context,
+                  initialDate: _deadline ?? now,
+                  firstDate: now.subtract(const Duration(days: 1)),
+                  lastDate: DateTime(now.year + 6),
+                );
+                if (picked != null) setState(() => _deadline = picked);
+              },
+              icon: const Icon(Icons.calendar_today_outlined, size: 15),
+              label: Text(
+                  _deadline == null ? 'Set date' : _fmtDate(_deadline!)),
+              style: OutlinedButton.styleFrom(
+                  foregroundColor: AppColors.tx2,
+                  side: BorderSide(color: AppColors.line2)),
+            ),
+            if (_deadline != null)
+              TextButton(
+                  onPressed: () => setState(() => _deadline = null),
+                  child: const Text('Clear')),
+          ],
+        ),
+        const SizedBox(height: 20),
+        saveButton(
+            _saving, _save, _isEdit ? 'Save changes' : 'Create project'),
+        if (_isEdit) ...[
+          const SizedBox(height: 6),
+          deleteRow(context, 'Delete project',
+              () => _confirmDelete(widget.project!)),
+        ],
+      ],
     );
   }
 
-  // --- shared form helpers ---
-  Widget _label(String t) => Padding(
-        padding: const EdgeInsets.only(bottom: 8, left: 2),
-        child: Text(t,
-            style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-                color: AppColors.tx3)),
-      );
-
-  Widget _field(TextEditingController c, String hint,
-          {int lines = 1, bool autofocus = false}) =>
-      TextField(
-        controller: c,
-        autofocus: autofocus,
-        maxLines: lines,
-        style: const TextStyle(fontSize: 15),
-        decoration: InputDecoration(
-          hintText: hint,
-          hintStyle: TextStyle(color: AppColors.tx4),
-          filled: true,
-          fillColor: AppColors.surface2,
-          contentPadding:
-              const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(14),
-            borderSide: BorderSide(color: AppColors.line),
-          ),
-          enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(14),
-            borderSide: BorderSide(color: AppColors.line),
-          ),
-          focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(14),
-            borderSide: BorderSide(color: AppColors.accentLine),
-          ),
-        ),
-      );
-
-  Widget _chipWrap(List<Widget> chips) =>
-      Wrap(spacing: 8, runSpacing: 8, children: chips);
-
-  Widget _selChip(String label, bool selected, VoidCallback onTap,
-      {Color? color}) {
-    final c = color ?? AppColors.accent;
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 8),
-        constraints: const BoxConstraints(maxWidth: 260),
-        decoration: BoxDecoration(
-          color: selected ? c.withValues(alpha: 0.16) : AppColors.surface2,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(
-              color: selected ? c : AppColors.line, width: selected ? 1.3 : 1),
-        ),
-        child: Text(label,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(
-                fontSize: 13,
-                fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
-                color: selected ? c : AppColors.tx2)),
-      ),
-    );
+  Future<void> _confirmDelete(Project p) async {
+    if (await confirmDelete(context, '“${p.title}” will be removed.')) {
+      if (!mounted) return;
+      context.read<ProjectsCubit>().remove(p.id);
+      Navigator.of(context).pop();
+    }
   }
 }

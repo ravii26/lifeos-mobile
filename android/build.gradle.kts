@@ -23,13 +23,20 @@ subprojects {
 }
 
 subprojects {
-    tasks.withType<KotlinCompile>().configureEach {
-        compilerOptions {
-            jvmTarget.set(
-                org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17
-            )
+    val alignKotlinTarget: Project.() -> Unit = {
+        tasks.withType<KotlinCompile>().configureEach {
+            compilerOptions {
+                jvmTarget.set(
+                    org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17
+                )
+            }
         }
     }
+    // Some plugins (e.g. workmanager_android) pin their own Kotlin jvmTarget
+    // (e.g. 1.8) directly in their build script, which registers its
+    // configureEach *after* this one unless we also defer to afterEvaluate —
+    // otherwise theirs runs last and wins, breaking the Java/Kotlin match below.
+    if (state.executed) alignKotlinTarget() else afterEvaluate { alignKotlinTarget() }
     // Keep Java compilation on the same JVM target as Kotlin (above). Some
     // plugins (e.g. flutter_timezone, flutter_tts) declare their Java
     // compileOptions at 11 while their Kotlin targets 17, which Gradle rejects

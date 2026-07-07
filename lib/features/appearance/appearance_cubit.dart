@@ -2,8 +2,10 @@ import 'package:equatable/equatable.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
+import '../../core/di/service_locator.dart';
 import '../../core/modules/module_registry.dart';
 import '../../core/theme/app_colors.dart';
+import '../../core/widget/widget_sync_service.dart';
 import '../../data/repositories/life_repository.dart';
 
 class AppearanceState extends Equatable {
@@ -148,6 +150,14 @@ class AppearanceCubit extends Cubit<AppearanceState> {
   void _emit(AppearanceState s) {
     AppColors.apply(light: s.light, accent: s.accent);
     emit(s);
+    // Best-effort: keep the home-screen widget's theme in sync with the app's.
+    getIt<WidgetSyncService>().pushTheme(
+      bgColor: AppColors.bg.toARGB32(),
+      textColor: AppColors.tx.toARGB32(),
+      mutedTextColor: AppColors.tx2.toARGB32(),
+      accentColor: AppColors.accent.toARGB32(),
+      accentInkColor: AppColors.accentInk.toARGB32(),
+    );
   }
 
   Future<void> _save(Future<void> Function() op) async {

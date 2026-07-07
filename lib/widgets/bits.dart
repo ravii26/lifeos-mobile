@@ -157,6 +157,95 @@ class PriorityTag extends StatelessWidget {
   }
 }
 
+/// Segmented control — `.seg` / `.seg button`. Pass equal-length [labels]
+/// and [values]; [selected] must be one of [values].
+class SegmentedControl<T> extends StatelessWidget {
+  final List<T> values;
+  final List<String> labels;
+  final T selected;
+  final ValueChanged<T> onChanged;
+  const SegmentedControl({
+    super.key,
+    required this.values,
+    required this.labels,
+    required this.selected,
+    required this.onChanged,
+  }) : assert(values.length == labels.length);
+
+  @override
+  Widget build(BuildContext context) => Container(
+        padding: const EdgeInsets.all(3),
+        decoration: BoxDecoration(
+          color: AppColors.surface2,
+          borderRadius: BorderRadius.circular(9),
+          border: Border.all(color: AppColors.line),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            for (var i = 0; i < values.length; i++)
+              GestureDetector(
+                onTap: () => onChanged(values[i]),
+                child: Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+                  decoration: BoxDecoration(
+                    color: values[i] == selected
+                        ? AppColors.surface4
+                        : Colors.transparent,
+                    borderRadius: BorderRadius.circular(7),
+                  ),
+                  child: Text(labels[i],
+                      style: TextStyle(
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.w600,
+                          color: values[i] == selected
+                              ? AppColors.tx
+                              : AppColors.tx3)),
+                ),
+              ),
+          ],
+        ),
+      );
+}
+
+/// Toggle switch — `.switch`.
+class ToggleSwitch extends StatelessWidget {
+  final bool value;
+  final ValueChanged<bool> onChanged;
+  const ToggleSwitch({super.key, required this.value, required this.onChanged});
+
+  @override
+  Widget build(BuildContext context) => GestureDetector(
+        onTap: () => onChanged(!value),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 180),
+          width: 38,
+          height: 22,
+          padding: const EdgeInsets.all(2),
+          decoration: BoxDecoration(
+            color: value ? AppColors.accent : AppColors.surface4,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(
+                color: value ? Colors.transparent : AppColors.line2),
+          ),
+          child: AnimatedAlign(
+            duration: const Duration(milliseconds: 180),
+            curve: Curves.easeOut,
+            alignment: value ? Alignment.centerRight : Alignment.centerLeft,
+            child: Container(
+              width: 16,
+              height: 16,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: value ? AppColors.accentInk : AppColors.tx2,
+              ),
+            ),
+          ),
+        ),
+      );
+}
+
 /// Circular score ring — `Donut`.
 class Donut extends StatelessWidget {
   final double value; // 0..100

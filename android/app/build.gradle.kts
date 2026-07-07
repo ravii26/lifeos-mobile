@@ -1,5 +1,7 @@
 plugins {
     id("com.android.application")
+    // Compose compiler, needed for the Glance (Jetpack Compose) home-screen widget.
+    id("org.jetbrains.kotlin.plugin.compose")
     // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
     id("dev.flutter.flutter-gradle-plugin")
 }
@@ -14,6 +16,10 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
 
         isCoreLibraryDesugaringEnabled = true
+    }
+
+    buildFeatures {
+        compose = true
     }
 
     defaultConfig {
@@ -43,4 +49,7 @@ flutter {
 
 dependencies {
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.5")
+    // Home-screen widget (Glance) + its WorkManager-based periodic refresh.
+    implementation("androidx.glance:glance-appwidget:1.1.1")
+    implementation("androidx.work:work-runtime-ktx:2.9.1")
 }

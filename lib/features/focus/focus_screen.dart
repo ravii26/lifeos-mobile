@@ -37,7 +37,8 @@ class _FocusScreenState extends State<FocusScreen> {
     _timer = Timer.periodic(
         const Duration(seconds: 1), (_) => setState(() => _seconds++));
     try {
-      _sessionId = await _repo.startFocus(taskId: widget.task?.id);
+      _sessionId = await _repo.startFocus(
+          taskId: widget.task?.id, label: widget.task?.title);
     } catch (_) {
       // Session logging is best-effort; the timer still runs locally.
     }
