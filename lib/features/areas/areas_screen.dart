@@ -11,7 +11,7 @@ import '../shell/life_cubit.dart';
 import 'area_detail_screen.dart';
 import 'area_form.dart';
 
-void _openAreaForm(BuildContext context, {Area? area}) {
+void openAreaForm(BuildContext context, {Area? area}) {
   final cubit = context.read<LifeCubit>();
   showModalBottomSheet(
     context: context,
@@ -73,14 +73,14 @@ class AreasScreen extends StatelessWidget {
                               ));
                             },
                             onLongPress: () =>
-                                _openAreaForm(context, area: a),
+                                openAreaForm(context, area: a),
                             child: _AreaCard(area: a),
                           ),
                         ),
                     const SizedBox(height: 4),
                     AddTile(
                         label: 'New area',
-                        onTap: () => _openAreaForm(context)),
+                        onTap: () => openAreaForm(context)),
                   ],
                 ),
               ),

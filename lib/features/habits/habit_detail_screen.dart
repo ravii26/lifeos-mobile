@@ -8,6 +8,7 @@ import '../../widgets/bits.dart';
 import '../../widgets/glass.dart';
 import '../../widgets/screen_header.dart';
 import '../shell/life_cubit.dart';
+import 'habits_screen.dart' show openHabitForm;
 
 class HabitDetailScreen extends StatelessWidget {
   final String habitId;
@@ -42,7 +43,8 @@ class HabitDetailScreen extends StatelessWidget {
               BackHeader(
                   eyebrow: 'Habit',
                   title: habit.title,
-                  color: color),
+                  color: color,
+                  onEdit: () => openHabitForm(context, habit: habit)),
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16),
                 child: Column(

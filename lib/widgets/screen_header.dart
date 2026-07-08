@@ -150,8 +150,16 @@ class BackHeader extends StatelessWidget {
   final String eyebrow;
   final String title;
   final Color? color;
+  /// Optional trailing action (e.g. an edit button) shown where the balancing
+  /// spacer normally sits. Falls back to the plain spacer when omitted, so
+  /// every other existing call site is unaffected.
+  final VoidCallback? onEdit;
   const BackHeader(
-      {super.key, required this.eyebrow, required this.title, this.color});
+      {super.key,
+      required this.eyebrow,
+      required this.title,
+      this.color,
+      this.onEdit});
 
   @override
   Widget build(BuildContext context) {
@@ -176,7 +184,9 @@ class BackHeader extends StatelessWidget {
               ],
             ),
           ),
-          const SizedBox(width: 40),
+          onEdit != null
+              ? _HeadButton(icon: Icons.edit_outlined, onTap: onEdit!)
+              : const SizedBox(width: 40),
         ],
       ),
     );

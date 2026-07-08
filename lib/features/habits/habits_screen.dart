@@ -11,7 +11,7 @@ import '../shell/life_cubit.dart';
 import 'habit_detail_screen.dart';
 import 'habit_form.dart';
 
-void _openHabitForm(BuildContext context, {Habit? habit}) {
+void openHabitForm(BuildContext context, {Habit? habit}) {
   final cubit = context.read<LifeCubit>();
   showModalBottomSheet(
     context: context,
@@ -81,7 +81,7 @@ class HabitsScreen extends StatelessWidget {
                           padding: const EdgeInsets.only(bottom: 11),
                           child: GestureDetector(
                             onLongPress: () =>
-                                _openHabitForm(context, habit: h),
+                                openHabitForm(context, habit: h),
                             child: _HabitCard(
                                 habit: h,
                                 areaColor: s.areaById(h.areaId)?.color),
@@ -90,7 +90,7 @@ class HabitsScreen extends StatelessWidget {
                     const SizedBox(height: 4),
                     AddTile(
                         label: 'New habit',
-                        onTap: () => _openHabitForm(context)),
+                        onTap: () => openHabitForm(context)),
                   ],
                 ),
               ),

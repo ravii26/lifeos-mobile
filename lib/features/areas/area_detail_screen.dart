@@ -14,6 +14,7 @@ import '../../widgets/screen_header.dart';
 import '../shell/life_cubit.dart';
 import '../tasks/task_detail_screen.dart';
 import '../tasks/task_row.dart';
+import 'areas_screen.dart' show openAreaForm;
 
 class AreaDetailScreen extends StatefulWidget {
   final String areaId;
@@ -60,7 +61,8 @@ class _AreaDetailScreenState extends State<AreaDetailScreen> {
               BackHeader(
                   eyebrow: area.type == 'PRIMARY' ? 'Primary area' : 'Area',
                   title: area.name,
-                  color: area.color),
+                  color: area.color,
+                  onEdit: () => openAreaForm(context, area: area)),
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16),
                 child: Column(
