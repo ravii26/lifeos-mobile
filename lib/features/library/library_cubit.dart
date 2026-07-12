@@ -197,7 +197,7 @@ class LibraryCubit extends Cubit<LibraryState> {
     try {
       final updated =
           await _repo.acceptSuggestion(s.id, areaId: areaId, priority: priority);
-      final list = [...(state.suggestions[s.documentId] ?? const [])];
+      final list = <DocumentSuggestion>[...(state.suggestions[s.documentId] ?? const [])];
       final idx = list.indexWhere((x) => x.id == s.id);
       if (idx >= 0) list[idx] = updated;
       emit(state.copyWith(
@@ -215,7 +215,7 @@ class LibraryCubit extends Cubit<LibraryState> {
     emit(state.copyWith(busySuggestions: {...state.busySuggestions, s.id}));
     try {
       await _repo.dismissSuggestion(s.id);
-      final list = [...(state.suggestions[s.documentId] ?? const [])]
+      final list = <DocumentSuggestion>[...(state.suggestions[s.documentId] ?? const [])]
         ..removeWhere((x) => x.id == s.id);
       emit(state.copyWith(
         suggestions: {...state.suggestions, s.documentId: list},
