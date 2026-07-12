@@ -4,6 +4,8 @@ import '../../data/repositories/auth_repository.dart';
 import '../../data/repositories/life_repository.dart';
 import '../api/api_client.dart';
 import '../api/token_store.dart';
+import '../intents/capture_intent_bus.dart';
+import '../share/share_intent_service.dart';
 import '../widget/widget_sync_service.dart';
 
 final getIt = GetIt.instance;
@@ -22,4 +24,7 @@ Future<void> setupLocator() async {
   getIt.registerSingleton<LifeRepository>(LifeRepository(getIt<ApiClient>()));
   getIt.registerSingleton<WidgetSyncService>(
       WidgetSyncService(getIt<LifeRepository>()));
+  getIt.registerSingleton<CaptureIntentBus>(CaptureIntentBus());
+  getIt.registerSingleton<ShareIntentService>(
+      ShareIntentService(getIt<CaptureIntentBus>()));
 }

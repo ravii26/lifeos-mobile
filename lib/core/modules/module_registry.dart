@@ -21,6 +21,7 @@ enum ModuleId {
   focus,
   review,
   learn,
+  library,
   identity,
   behaviour,
   graph,
@@ -68,6 +69,8 @@ class Modules {
         Icons.refresh),
     ModuleDef(ModuleId.learn, 'Learn', 'Courses, notes & resources',
         Icons.school_outlined),
+    ModuleDef(ModuleId.library, 'Library',
+        'Ask & extract from your documents', Icons.auto_stories_outlined),
     ModuleDef(ModuleId.identity, 'Identity', 'Purpose, values & vision',
         Icons.self_improvement),
     // Toggling these three never actually gated their telemetry/fetches, only

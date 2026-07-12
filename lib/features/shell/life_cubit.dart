@@ -174,8 +174,9 @@ class LifeCubit extends Cubit<LifeState> {
         tasks: state.tasks.where((t) => t.id != id).toList()));
     try {
       await _repo.deleteTask(id);
-    } on ApiException catch (_) {
+    } on ApiException catch (e) {
       await refresh();
+      emit(state.copyWith(error: e.message));
     }
   }
 
@@ -228,8 +229,9 @@ class LifeCubit extends Cubit<LifeState> {
         areas: state.areas.where((a) => a.id != id).toList()));
     try {
       await _repo.deleteArea(id);
-    } on ApiException catch (_) {
+    } on ApiException catch (e) {
       await refresh();
+      emit(state.copyWith(error: e.message));
     }
   }
 
@@ -287,8 +289,9 @@ class LifeCubit extends Cubit<LifeState> {
       await _repo.deleteHabit(id);
       NotificationService.instance.syncHabitReminders(state.habits);
       _syncWidgetHabits(state.habits);
-    } on ApiException catch (_) {
+    } on ApiException catch (e) {
       await refresh();
+      emit(state.copyWith(error: e.message));
     }
   }
 
@@ -417,8 +420,9 @@ class LifeCubit extends Cubit<LifeState> {
         captures: state.captures.where((c) => c.id != id).toList()));
     try {
       await _repo.dismissCapture(id);
-    } on ApiException catch (_) {
+    } on ApiException catch (e) {
       await refresh();
+      emit(state.copyWith(error: e.message));
     }
   }
 

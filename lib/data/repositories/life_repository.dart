@@ -8,6 +8,7 @@ import '../models/behavior_log.dart';
 import '../models/calendar_block.dart';
 import '../models/capture.dart';
 import '../models/decision.dart';
+import '../models/document.dart';
 import '../models/goal.dart';
 import '../models/graph_data.dart';
 import '../models/habit.dart';
@@ -911,4 +912,67 @@ class LifeRepository {
     await _focusStore.clear();
     await WidgetSyncService.instance?.pushFocusState(active: false);
   }
+
+  // ---- Library (document ingest + RAG Q&A + action extraction) ----
+  Future<List<LibraryDocument>> documents() async {
+    final data = await _api.get('/documents');
+    return (data as List)
+        .map((e) => LibraryDocument.fromJson(Json.from(e as Map)))
+        .toList();
+  }
+
+  Future<LibraryDocument> createDocument({
+    String? title,
+    required String text,
+  }) async {
+    final data = await _api.post('/documents', body: {
+      if (title != null && title.isNotEmpty) 'title': title,
+      'text': text,
+    });
+    return LibraryDocument.fromJson(data as Json);
+  }
+
+  Future<LibraryDocument> document(String id) async {
+    final data = await _api.get('/documents/$id');
+    return LibraryDocument.fromJson(data as Json);
+  }
+
+  Future<void> deleteDocument(String id) => _api.delete('/documents/$id');
+
+  Future<AskResult> askLibrary(String question, {String? documentId}) async {
+    final data = await _api.post('/documents/ask', body: {
+      'question': question,
+      if (documentId != null) 'documentId': documentId,
+    });
+    return AskResult.fromJson(data as Json);
+  }
+
+  Future<List<DocumentSuggestion>> extractActions(String documentId) async {
+    final data = await _api.post('/documents/$documentId/extract');
+    return (data as List)
+        .map((e) => DocumentSuggestion.fromJson(Json.from(e as Map)))
+        .toList();
+  }
+
+  Future<List<DocumentSuggestion>> suggestions(String documentId) async {
+    final data = await _api.get('/documents/$documentId/suggestions');
+    return (data as List)
+        .map((e) => DocumentSuggestion.fromJson(Json.from(e as Map)))
+        .toList();
+  }
+
+  Future<DocumentSuggestion> acceptSuggestion(
+    String id, {
+    String? areaId,
+    String? priority,
+  }) async {
+    final data = await _api.post('/documents/suggestions/$id/accept', body: {
+      if (areaId != null) 'areaId': areaId,
+      if (priority != null) 'priority': priority,
+    });
+    return DocumentSuggestion.fromJson(data as Json);
+  }
+
+  Future<void> dismissSuggestion(String id) =>
+      _api.post('/documents/suggestions/$id/dismiss');
 }

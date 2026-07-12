@@ -15,6 +15,7 @@ import '../goals/goals_screen.dart';
 import '../graph/graph_screen.dart';
 import '../identity/identity_screen.dart';
 import '../learn/learn_screen.dart';
+import '../library/library_screen.dart';
 import '../notebooks/notebooks_screen.dart';
 import '../now/now_screen.dart';
 import '../projects/projects_screen.dart';
@@ -41,6 +42,7 @@ class MoreSheet extends StatelessWidget {
     ModuleId.calendar,
     ModuleId.review,
     ModuleId.learn,
+    ModuleId.library,
     ModuleId.vault,
   ];
 
@@ -216,6 +218,7 @@ class MoreSheet extends StatelessWidget {
         ModuleId.calendar => const CalendarScreen(),
         ModuleId.review => const ReviewScreen(),
         ModuleId.learn => const LearnScreen(),
+        ModuleId.library => const LibraryScreen(),
         ModuleId.vault => const VaultScreen(),
         _ => SettingsScreen(user: user),
       };

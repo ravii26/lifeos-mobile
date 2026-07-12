@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
@@ -16,8 +17,24 @@ import '../shell/life_cubit.dart';
 
 /// Quick-capture brain dump — posts to /captures, shows pending inbox with
 /// convert/dismiss actions.
+///
+/// Can be pre-populated from outside its own UI — a shared link/image from
+/// the OS share sheet, or a `lifeos://capture?voice=1` deep link from the
+/// widget mic button / an assistant shortcut — via `CaptureIntentBus`. See
+/// `HomeShell` for where those params get filled in.
 class CaptureSheet extends StatefulWidget {
-  const CaptureSheet({super.key});
+  final String? initialText;
+  final String? initialImagePath;
+  final String? initialImageMime;
+  final bool autoStartVoice;
+
+  const CaptureSheet({
+    super.key,
+    this.initialText,
+    this.initialImagePath,
+    this.initialImageMime,
+    this.autoStartVoice = false,
+  });
 
   @override
   State<CaptureSheet> createState() => _CaptureSheetState();
@@ -32,6 +49,24 @@ class _CaptureSheetState extends State<CaptureSheet> {
   // The text already in the field when dictation began; recognised words are
   // appended to it so typing + speaking compose naturally.
   String _dictBase = '';
+  // Set when this sheet was opened with an image already supplied (shared in
+  // from another app) rather than picked here — shown as an attached
+  // thumbnail instead of uploading immediately.
+  (String path, String mime)? _pendingImage;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.initialText != null) _text.text = widget.initialText!;
+    if (widget.initialImagePath != null) {
+      _pendingImage =
+          (widget.initialImagePath!, widget.initialImageMime ?? 'image/jpeg');
+    }
+    if (widget.autoStartVoice) {
+      WidgetsBinding.instance
+          .addPostFrameCallback((_) => _toggleDictation());
+    }
+  }
 
   @override
   void dispose() {
@@ -45,7 +80,27 @@ class _CaptureSheetState extends State<CaptureSheet> {
     return t.isEmpty ? null : t;
   }
 
+  void _removePendingImage() => setState(() => _pendingImage = null);
+
   Future<void> _send() async {
+    final pending = _pendingImage;
+    if (pending != null) {
+      setState(() => _sending = true);
+      await context.read<LifeCubit>().addMediaCapture(
+            pending.$1,
+            filename: pending.$1.split(RegExp(r'[\\/]')).last,
+            mimeType: pending.$2,
+            caption: _caption,
+          );
+      _text.clear();
+      if (mounted) {
+        setState(() {
+          _sending = false;
+          _pendingImage = null;
+        });
+      }
+      return;
+    }
     final t = _text.text.trim();
     if (t.isEmpty) return;
     setState(() => _sending = true);
@@ -307,6 +362,40 @@ class _CaptureSheetState extends State<CaptureSheet> {
                     ),
                   ),
                 ),
+                if (_pendingImage != null) ...[
+                  const SizedBox(height: 10),
+                  Row(
+                    children: [
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(10),
+                        child: Image.file(
+                          File(_pendingImage!.$1),
+                          width: 40,
+                          height: 40,
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, __, ___) => Container(
+                            width: 40,
+                            height: 40,
+                            color: AppColors.surface3,
+                            child: Icon(Icons.image_outlined,
+                                size: 18, color: AppColors.tx3),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text('Shared image attached',
+                            style: TextStyle(
+                                fontSize: 12.5, color: AppColors.tx3)),
+                      ),
+                      IconButton(
+                        onPressed: _removePendingImage,
+                        icon: Icon(Icons.close, color: AppColors.tx4, size: 18),
+                        tooltip: 'Remove image',
+                      ),
+                    ],
+                  ),
+                ],
                 if (_listening) ...[
                   const SizedBox(height: 10),
                   Row(

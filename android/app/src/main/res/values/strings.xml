@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- App Actions / static shortcut labels (see res/xml/shortcuts.xml) -->
+    <string name="shortcut_add_to_dump_short">Add to LifeOS</string>
+    <string name="shortcut_add_to_dump_long">Add to LifeOS dump</string>
+</resources>

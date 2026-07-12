@@ -6,6 +6,7 @@ import 'core/api/api_client.dart';
 import 'core/deeplink/deep_link_service.dart';
 import 'core/di/service_locator.dart';
 import 'core/notifications/notification_service.dart';
+import 'core/share/share_intent_service.dart';
 import 'core/theme/app_theme.dart';
 import 'core/widget/widget_sync_service.dart';
 import 'data/repositories/auth_repository.dart';
@@ -30,8 +31,10 @@ Future<void> main() async {
   runApp(const LifeOSApp());
   // Deferred to after the first frame so `rootNavigatorKey.currentState` is
   // attached before a cold-start `lifeos://` link tries to push a route.
-  WidgetsBinding.instance
-      .addPostFrameCallback((_) => DeepLinkService(rootNavigatorKey).init());
+  WidgetsBinding.instance.addPostFrameCallback((_) {
+    DeepLinkService(rootNavigatorKey).init();
+    getIt<ShareIntentService>().init();
+  });
 }
 
 /// Used by [DeepLinkService] to push routes (e.g. the focus screen) from

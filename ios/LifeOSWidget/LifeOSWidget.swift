@@ -121,10 +121,14 @@ struct LifeOSWidgetView: View {
       if !hasHabitList {
         Spacer(minLength: 0)
       }
-      Text(headerText)
-        .font(.system(size: 15, weight: .medium))
-        .foregroundColor(focusActive ? accent : fg)
-        .lineLimit(2)
+      HStack(alignment: .top, spacing: 8) {
+        Text(headerText)
+          .font(.system(size: 15, weight: .medium))
+          .foregroundColor(focusActive ? accent : fg)
+          .lineLimit(2)
+        Spacer(minLength: 0)
+        MicButton(accent: accent)
+      }
 
       if hasHabitList, let habits = entry.snapshot?.habits {
         VStack(alignment: .leading, spacing: 4) {
@@ -139,6 +143,31 @@ struct LifeOSWidgetView: View {
     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     .background(bg)
     .widgetURL(headerUrl)
+  }
+}
+
+/// Mic button — opens the app straight into the Capture sheet, already
+/// listening (`lifeos://capture?voice=1`, routed by `DeepLinkService`
+/// through `CaptureIntentBus`). Same destination the shortcuts.xml-style
+/// Assistant capability and `CaptureIntent.swift`'s Siri shortcut use on
+/// Android/iOS respectively.
+///
+/// Like the habit-toggle button, a widget can only have more than one
+/// distinct tap target from iOS 17 onward — pre-17 this `Link` falls back to
+/// the same single whole-widget `widgetURL` everything else uses (a known
+/// v1 limitation, see WIDGET_IOS_SETUP.md).
+private struct MicButton: View {
+  let accent: Color
+
+  var body: some View {
+    Link(destination: URL(string: "lifeos://capture?voice=1")!) {
+      Image(systemName: "mic.fill")
+        .font(.system(size: 11, weight: .semibold))
+        .foregroundColor(.black.opacity(0.75))
+        .padding(6)
+        .background(accent)
+        .clipShape(Circle())
+    }
   }
 }
 

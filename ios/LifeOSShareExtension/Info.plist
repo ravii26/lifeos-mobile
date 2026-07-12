@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+  <dict>
+    <!-- App Group the plugin uses to hand shared content to the host app.
+         Hardcoded to match the App Group already used by LifeOSWidget
+         (see WIDGET_IOS_SETUP.md) rather than the plugin README's
+         $(CUSTOM_GROUP_ID) build-setting indirection — one less manual
+         Xcode step, same App Group either way. -->
+    <key>AppGroupId</key>
+    <string>group.com.example.lifeosMobile.widget</string>
+    <key>CFBundleVersion</key>
+    <string>$(FLUTTER_BUILD_NUMBER)</string>
+    <key>CFBundleShortVersionString</key>
+    <string>$(FLUTTER_BUILD_NAME)</string>
+    <key>NSExtension</key>
+    <dict>
+      <key>NSExtensionAttributes</key>
+      <dict>
+        <key>NSExtensionActivationRule</key>
+        <dict>
+          <!-- Text and links -->
+          <key>NSExtensionActivationSupportsText</key>
+          <true/>
+          <key>NSExtensionActivationSupportsWebURLWithMaxCount</key>
+          <integer>1</integer>
+          <!-- Images (single item — Capture reviews one item at a time,
+               same as the Android share intent-filters). -->
+          <key>NSExtensionActivationSupportsImageWithMaxCount</key>
+          <integer>1</integer>
+        </dict>
+      </dict>
+      <key>NSExtensionMainStoryboard</key>
+      <string>MainInterface</string>
+      <key>NSExtensionPointIdentifier</key>
+      <string>com.apple.share-services</string>
+      <key>NSExtensionPrincipalClass</key>
+      <string>$(PRODUCT_MODULE_NAME).ShareViewController</string>
+    </dict>
+  </dict>
+</plist>

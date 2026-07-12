@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Static shortcut + Google Assistant App Action for voice-triggered capture.
+
+  Both the shortcut (long-press the launcher icon -> "Add to LifeOS") and the
+  Assistant capability below open `lifeos://capture?voice=1`, which
+  `DeepLinkService` routes to `CaptureIntentBus` -> the Capture sheet opened
+  already listening. Same destination the home-screen widget's mic button
+  uses.
+
+  Note: `actions.xml` (the older, separate App Actions file) is deprecated —
+  capabilities are declared here directly, per
+  https://developer.android.com/develop/devices/assistant/action-schema.
+  Test with: adb shell am start -a android.intent.action.VIEW
+    -d "lifeos://capture?voice=1" com.example.lifeos_mobile
+  and Google's App Actions Test Tool. A production "Hey Google, open dump in
+  LifeOS" experience additionally needs a Play Console App Actions
+  submission — that's a store-listing step, not a code change.
+-->
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+    <capability android:name="actions.intent.OPEN_APP_FEATURE">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:targetPackage="com.example.lifeos_mobile"
+            android:targetClass="com.example.lifeos_mobile.MainActivity"
+            android:data="lifeos://capture?voice=1">
+            <parameter
+                android:name="feature"
+                android:key="featureParam"/>
+        </intent>
+    </capability>
+
+    <shortcut
+        android:shortcutId="add_to_dump"
+        android:enabled="true"
+        android:icon="@mipmap/ic_launcher"
+        android:shortcutShortLabel="@string/shortcut_add_to_dump_short"
+        android:shortcutLongLabel="@string/shortcut_add_to_dump_long">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:targetPackage="com.example.lifeos_mobile"
+            android:targetClass="com.example.lifeos_mobile.MainActivity"
+            android:data="lifeos://capture?voice=1"/>
+        <capability-binding android:key="actions.intent.OPEN_APP_FEATURE">
+            <parameter-binding android:key="featureParam" android:value="dump"/>
+        </capability-binding>
+    </shortcut>
+</shortcuts>

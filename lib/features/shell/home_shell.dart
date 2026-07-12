@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../core/di/service_locator.dart';
+import '../../core/intents/capture_intent_bus.dart';
 import '../../core/modules/module_registry.dart';
 import '../../core/notifications/notification_service.dart';
 import '../../core/theme/app_colors.dart';
@@ -39,6 +40,11 @@ class HomeShell extends StatefulWidget {
 
 class _HomeShellState extends State<HomeShell> {
   int _index = 0;
+  // The `LifeCubit`-scoped context, captured each build — needed so a
+  // capture intent (share/voice) that arrives outside the widget tree's own
+  // event handlers can still open the Capture sheet with the Cubit in scope.
+  BuildContext? _cubitContext;
+  StreamSubscription<PendingCaptureIntent>? _captureIntentSub;
 
   @override
   void initState() {
@@ -46,6 +52,28 @@ class _HomeShellState extends State<HomeShell> {
     NotificationService.instance.requestPermission();
     // Behaviour signal: the app was opened (once per session, on shell mount).
     getIt<LifeRepository>().recordBehavior('APP_OPEN').ignore();
+
+    final bus = getIt<CaptureIntentBus>();
+    _captureIntentSub = bus.stream.listen(_handleCaptureIntent);
+    final pending = bus.pending;
+    if (pending != null) {
+      bus.consumePending();
+      WidgetsBinding.instance
+          .addPostFrameCallback((_) => _handleCaptureIntent(pending));
+    }
+  }
+
+  @override
+  void dispose() {
+    _captureIntentSub?.cancel();
+    super.dispose();
+  }
+
+  void _handleCaptureIntent(PendingCaptureIntent intent) {
+    getIt<CaptureIntentBus>().consumePending();
+    final context = _cubitContext;
+    if (context == null || !context.mounted) return;
+    _openCapture(context, pending: intent);
   }
 
   @override
@@ -53,6 +81,7 @@ class _HomeShellState extends State<HomeShell> {
     return BlocProvider(
       create: (_) => LifeCubit(getIt<LifeRepository>())..load(),
       child: Builder(builder: (context) {
+        _cubitContext = context;
         return BlocBuilder<AppearanceCubit, AppearanceState>(
           buildWhen: (a, b) => a.rawModules != b.rawModules,
           builder: (context, appearance) {
@@ -121,7 +150,7 @@ class _HomeShellState extends State<HomeShell> {
     ];
   }
 
-  void _openCapture(BuildContext context) {
+  void _openCapture(BuildContext context, {PendingCaptureIntent? pending}) {
     final cubit = context.read<LifeCubit>();
     showModalBottomSheet(
       context: context,
@@ -129,7 +158,12 @@ class _HomeShellState extends State<HomeShell> {
       backgroundColor: Colors.transparent,
       builder: (_) => BlocProvider.value(
         value: cubit,
-        child: const CaptureSheet(),
+        child: CaptureSheet(
+          initialText: pending?.text,
+          initialImagePath: pending?.imagePath,
+          initialImageMime: pending?.imageMime,
+          autoStartVoice: pending?.startVoice ?? false,
+        ),
       ),
     );
   }

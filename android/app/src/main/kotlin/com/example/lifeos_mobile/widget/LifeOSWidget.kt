@@ -90,7 +90,12 @@ class LifeOSWidget : GlanceAppWidget() {
             contentAlignment = if (compact) Alignment.CenterStart else Alignment.TopStart,
         ) {
             Column(modifier = GlanceModifier.padding(14.dp)) {
-                HeaderRow(snapshot, theme)
+                Row(verticalAlignment = Alignment.Vertical.Top) {
+                    Box(modifier = GlanceModifier.padding(end = 8.dp)) {
+                        HeaderRow(snapshot, theme)
+                    }
+                    MicButton(context, theme)
+                }
                 if (!compact) {
                     Spacer(modifier = GlanceModifier.height(10.dp))
                     HabitsList(snapshot, theme)
@@ -184,6 +189,26 @@ class LifeOSWidget : GlanceAppWidget() {
                     style = TextStyle(color = solid(theme.fgMuted), fontSize = 12.sp),
                 )
             }
+        }
+    }
+
+    /** Mic button — opens the app straight into the Capture sheet, already
+     * listening (`lifeos://capture?voice=1`, routed by `DeepLinkService`
+     * through `CaptureIntentBus`). A nested `clickable` inside the
+     * whole-widget tap target, same pattern the habit checkboxes already use
+     * to take priority over the outer header tap. */
+    @Composable
+    private fun MicButton(context: Context, theme: WidgetTheme) {
+        Box(
+            modifier = GlanceModifier
+                .width(28.dp)
+                .height(28.dp)
+                .background(day = theme.accent, night = theme.accent)
+                .cornerRadius(14.dp)
+                .clickable(onClick = openApp(context, Uri.parse("lifeos://capture?voice=1"))),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text("🎙", style = TextStyle(color = solid(theme.accentInk), fontSize = 13.sp))
         }
     }
 

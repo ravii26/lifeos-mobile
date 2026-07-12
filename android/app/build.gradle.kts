@@ -8,7 +8,10 @@ plugins {
 
 android {
     namespace = "com.example.lifeos_mobile"
-    compileSdk = flutter.compileSdkVersion
+    // receive_sharing_intent (share-sheet capture) requires SDK 37; the
+    // Flutter default (flutter.compileSdkVersion) is lower and everything
+    // else here is backward compatible with 37.
+    compileSdk = 37
     ndkVersion = flutter.ndkVersion
 
     compileOptions {

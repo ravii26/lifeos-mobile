@@ -32,15 +32,31 @@
 		<string>????</string>
 		<key>CFBundleVersion</key>
 		<string>$(FLUTTER_BUILD_NUMBER)</string>
-		<!-- lifeos:// deep links (home-screen widget taps, see app_links) -->
+		<!-- App Group the receive_sharing_intent Share Extension uses to hand
+		     shared content to this app (see LifeOSShareExtension/Info.plist and
+		     SHARE_VOICE_IOS_SETUP.md). Same App Group already used by the
+		     widget. -->
+		<key>AppGroupId</key>
+		<string>group.com.example.lifeosMobile.widget</string>
 		<key>CFBundleURLTypes</key>
 		<array>
+			<!-- lifeos:// deep links (home-screen widget taps, see app_links) -->
 			<dict>
 				<key>CFBundleURLName</key>
 				<string>com.example.lifeosMobile.widgetlink</string>
 				<key>CFBundleURLSchemes</key>
 				<array>
 					<string>lifeos</string>
+				</array>
+			</dict>
+			<!-- receive_sharing_intent's redirect-back scheme (fixed format the
+			     plugin itself opens after handling a share). -->
+			<dict>
+				<key>CFBundleTypeRole</key>
+				<string>Editor</string>
+				<key>CFBundleURLSchemes</key>
+				<array>
+					<string>ShareMedia-$(PRODUCT_BUNDLE_IDENTIFIER)</string>
 				</array>
 			</dict>
 		</array>
