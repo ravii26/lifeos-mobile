@@ -16,6 +16,7 @@ import '../models/identity.dart';
 import '../models/json.dart';
 import '../models/note.dart';
 import '../models/notebook.dart';
+import '../models/onboarding.dart';
 import '../models/project.dart';
 import '../models/resource.dart';
 import '../models/topic.dart';
@@ -817,6 +818,15 @@ class LifeRepository {
     return DecisionResult.fromJson(data as Json);
   }
 
+  // ---- Assistant ("Jarvis") ----
+  // Same unified persona endpoint the web overlay calls — one message in,
+  // one grounded reply out (either the decisions engine's briefing or a
+  // knowledge/life-data answer, decided server-side).
+  Future<String> assistantAsk(String message) async {
+    final data = await _api.post('/assistant/ask', body: {'message': message});
+    return (data as Json)['answer'] as String? ?? '';
+  }
+
   // ---- Identity ----
   Future<Identity> identity() async {
     final data = await _api.get('/identity');
@@ -975,4 +985,14 @@ class LifeRepository {
 
   Future<void> dismissSuggestion(String id) =>
       _api.post('/documents/suggestions/$id/dismiss');
+
+  // ---- Onboarding (cold-start setup) ----
+  /// Turns a few sentences about the user's life into a proposed starter
+  /// setup — Areas plus Goals/Habits/Tasks under them. Stateless on the
+  /// server; nothing is created until the caller submits the individual
+  /// createArea/createGoal/createHabit/createTask calls itself.
+  Future<OnboardingExtraction> extractOnboarding(String text) async {
+    final data = await _api.post('/onboarding/extract', body: {'text': text});
+    return OnboardingExtraction.fromJson(data as Json);
+  }
 }

@@ -5,7 +5,6 @@ import '../../core/di/service_locator.dart';
 import '../../core/theme/app_colors.dart';
 import '../../data/models/behavior_log.dart';
 import '../../data/repositories/life_repository.dart';
-import '../../widgets/bits.dart';
 import '../../widgets/glass.dart';
 import '../../widgets/screen_header.dart';
 
@@ -60,8 +59,7 @@ class _BehaviorScreenState extends State<BehaviorScreen> {
             }
             final ranked = counts.entries.toList()
               ..sort((a, b) => b.value.compareTo(a.value));
-            final maxCount =
-                ranked.isEmpty ? 1 : ranked.first.value;
+            final maxCount = ranked.isEmpty ? 1 : ranked.first.value;
 
             return ListView(
               padding: const EdgeInsets.only(bottom: 60),
@@ -71,8 +69,8 @@ class _BehaviorScreenState extends State<BehaviorScreen> {
                   Padding(
                     padding: const EdgeInsets.only(top: 60),
                     child: Center(
-                        child: CircularProgressIndicator(
-                            color: AppColors.accent)),
+                      child: CircularProgressIndicator(color: AppColors.accent),
+                    ),
                   )
                 else if (logs.isEmpty)
                   Padding(
@@ -80,9 +78,11 @@ class _BehaviorScreenState extends State<BehaviorScreen> {
                     child: SurfaceCard(
                       padding: const EdgeInsets.all(26),
                       child: Center(
-                          child: Text('No activity recorded yet.',
-                              style: TextStyle(
-                                  color: AppColors.tx4, fontSize: 13))),
+                        child: Text(
+                          'No activity recorded yet.',
+                          style: TextStyle(color: AppColors.tx4, fontSize: 13),
+                        ),
+                      ),
                     ),
                   )
                 else
@@ -91,9 +91,13 @@ class _BehaviorScreenState extends State<BehaviorScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text('${logs.length} events tracked',
-                            style: TextStyle(
-                                fontSize: 12.5, color: AppColors.tx3)),
+                        Text(
+                          '${logs.length} events tracked',
+                          style: TextStyle(
+                            fontSize: 12.5,
+                            color: AppColors.tx3,
+                          ),
+                        ),
                         const SizedBox(height: 14),
                         SectionHeader('By type'),
                         const SizedBox(height: 10),
@@ -131,10 +135,12 @@ class _BehaviorScreenState extends State<BehaviorScreen> {
           const SizedBox(width: 9),
           SizedBox(
             width: 96,
-            child: Text(meta.$1,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(fontSize: 12.5)),
+            child: Text(
+              meta.$1,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(fontSize: 12.5),
+            ),
           ),
           Expanded(
             child: ClipRRect(
@@ -143,15 +149,18 @@ class _BehaviorScreenState extends State<BehaviorScreen> {
                 value: count / max,
                 minHeight: 7,
                 backgroundColor: AppColors.surface3,
-                valueColor:
-                    AlwaysStoppedAnimation(AppColors.accent),
+                valueColor: AlwaysStoppedAnimation(AppColors.accent),
               ),
             ),
           ),
           const SizedBox(width: 10),
-          Text('$count',
-              style: GoogleFonts.jetBrainsMono(
-                  fontSize: 11, color: AppColors.tx3)),
+          Text(
+            '$count',
+            style: GoogleFonts.jetBrainsMono(
+              fontSize: 11,
+              color: AppColors.tx3,
+            ),
+          ),
         ],
       ),
     );
@@ -174,13 +183,21 @@ class _BehaviorScreenState extends State<BehaviorScreen> {
           ),
           const SizedBox(width: 12),
           Expanded(
-            child: Text(meta.$1,
-                style: const TextStyle(
-                    fontSize: 13.5, fontWeight: FontWeight.w500)),
+            child: Text(
+              meta.$1,
+              style: const TextStyle(
+                fontSize: 13.5,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
           ),
-          Text(_ago(l.createdAt),
-              style: GoogleFonts.jetBrainsMono(
-                  fontSize: 10.5, color: AppColors.tx4)),
+          Text(
+            _ago(l.createdAt),
+            style: GoogleFonts.jetBrainsMono(
+              fontSize: 10.5,
+              color: AppColors.tx4,
+            ),
+          ),
         ],
       ),
     );

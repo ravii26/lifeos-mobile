@@ -7,11 +7,14 @@ import 'package:flutter_tts/flutter_tts.dart';
 import '../../core/theme/app_colors.dart';
 import '../../data/models/decision.dart';
 import '../now/decisions_cubit.dart';
+import 'assistant_chat_sheet.dart';
 
 /// A persistent, draggable "coach" companion that floats above every screen.
 ///
 /// Tap it and it fetches the current GET /decisions/now payload, shows a glass
-/// speech bubble, and speaks the briefing aloud via on-device TTS. The mascot
+/// speech bubble, and speaks the briefing aloud via on-device TTS. Long-press
+/// it to open a real chat sheet (see [showAssistantChatSheet]) — the same
+/// unified `/assistant/ask` persona the web overlay talks to. The mascot
 /// itself is drawn with a [CustomPainter] (no external asset), so it runs out
 /// of the box. To swap in a real Rive 2.5D character later, replace the
 /// [_Mascot] widget with a `RiveAnimation.asset(...)` and drive its state
@@ -277,6 +280,11 @@ class _CompanionState extends State<CompanionOverlay>
           height: mascot,
           child: GestureDetector(
             onTap: _onTap,
+            onLongPress: () {
+              if (_mode == _Mode.talking) _tts.stop();
+              setState(() => _bubbleOpen = false);
+              showAssistantChatSheet(context);
+            },
             onPanUpdate: (d) => setState(() {
               _pos = Offset(
                 (cx + d.delta.dx) / size.width,

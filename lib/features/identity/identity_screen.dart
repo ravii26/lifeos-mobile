@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 
 import '../../core/api/api_exception.dart';
 import '../../core/di/service_locator.dart';
@@ -56,8 +55,8 @@ class _IdentityScreenState extends State<IdentityScreen> {
                 Padding(
                   padding: const EdgeInsets.only(top: 60),
                   child: Center(
-                      child:
-                          CircularProgressIndicator(color: AppColors.accent)),
+                    child: CircularProgressIndicator(color: AppColors.accent),
+                  ),
                 )
               else
                 Padding(
@@ -66,11 +65,13 @@ class _IdentityScreenState extends State<IdentityScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                          'Who you are and who you are becoming. The compass the rest of LifeOS points to.',
-                          style: TextStyle(
-                              fontSize: 12.5,
-                              height: 1.5,
-                              color: AppColors.tx3)),
+                        'Who you are and who you are becoming. The compass the rest of LifeOS points to.',
+                        style: TextStyle(
+                          fontSize: 12.5,
+                          height: 1.5,
+                          color: AppColors.tx3,
+                        ),
+                      ),
                       const SizedBox(height: 16),
                       if (id.isEmpty)
                         _empty(id)
@@ -91,10 +92,10 @@ class _IdentityScreenState extends State<IdentityScreen> {
                             icon: const Icon(Icons.edit_outlined, size: 17),
                             label: const Text('Edit identity'),
                             style: OutlinedButton.styleFrom(
-                                foregroundColor: AppColors.accent,
-                                side: BorderSide(color: AppColors.accentLine),
-                                padding:
-                                    const EdgeInsets.symmetric(vertical: 14)),
+                              foregroundColor: AppColors.accent,
+                              side: BorderSide(color: AppColors.accentLine),
+                              padding: const EdgeInsets.symmetric(vertical: 14),
+                            ),
                           ),
                         ),
                       ],
@@ -109,25 +110,28 @@ class _IdentityScreenState extends State<IdentityScreen> {
   }
 
   Widget _empty(Identity id) => SurfaceCard(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          children: [
-            Icon(Icons.self_improvement, size: 34, color: AppColors.tx4),
-            const SizedBox(height: 12),
-            Text('Define your foundation.',
-                style: TextStyle(color: AppColors.tx2, fontSize: 14)),
-            const SizedBox(height: 14),
-            FilledButton.icon(
-              onPressed: () => _edit(id),
-              icon: const Icon(Icons.add, size: 18),
-              label: const Text('Set up identity'),
-              style: FilledButton.styleFrom(
-                  backgroundColor: AppColors.accent,
-                  foregroundColor: AppColors.accentInk),
-            ),
-          ],
+    padding: const EdgeInsets.all(24),
+    child: Column(
+      children: [
+        Icon(Icons.self_improvement, size: 34, color: AppColors.tx4),
+        const SizedBox(height: 12),
+        Text(
+          'Define your foundation.',
+          style: TextStyle(color: AppColors.tx2, fontSize: 14),
         ),
-      );
+        const SizedBox(height: 14),
+        FilledButton.icon(
+          onPressed: () => _edit(id),
+          icon: const Icon(Icons.add, size: 18),
+          label: const Text('Set up identity'),
+          style: FilledButton.styleFrom(
+            backgroundColor: AppColors.accent,
+            foregroundColor: AppColors.accentInk,
+          ),
+        ),
+      ],
+    ),
+  );
 
   Widget _text(String label, String? value) {
     if (value == null || value.isEmpty) return const SizedBox.shrink();
@@ -140,9 +144,10 @@ class _IdentityScreenState extends State<IdentityScreen> {
           children: [
             Eyebrow(label),
             const SizedBox(height: 7),
-            Text(value,
-                style: TextStyle(
-                    fontSize: 14, height: 1.5, color: AppColors.tx)),
+            Text(
+              value,
+              style: TextStyle(fontSize: 14, height: 1.5, color: AppColors.tx),
+            ),
           ],
         ),
       ),
@@ -215,7 +220,7 @@ class _IdentityFormState extends State<_IdentityForm> {
       _personality,
       _values,
       _strengths,
-      _weaknesses
+      _weaknesses,
     ]) {
       c.dispose();
     }

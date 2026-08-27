@@ -10,6 +10,7 @@ import '../../widgets/glass.dart';
 import '../../widgets/screen_header.dart';
 import '../appearance/appearance_cubit.dart';
 import '../focus/focus_screen.dart';
+import '../onboarding/onboarding_intake.dart';
 import '../shell/life_cubit.dart';
 import '../tasks/task_row.dart';
 
@@ -36,6 +37,30 @@ class HomeScreen extends StatelessWidget {
         if (s.status == LoadStatus.error) {
           return _ErrorView(
               message: s.error, onRetry: () => context.read<LifeCubit>().load());
+        }
+
+        // A brand-new account has nothing for the rest of Home to show — the
+        // usual cards would just be a wall of "No areas yet."/"Nothing
+        // scheduled." empty states. Replace them with the onboarding intake
+        // until the first Area exists; it swaps back on its own once
+        // s.areas is non-empty (OnboardingIntake calls LifeCubit.refresh()
+        // after creating). Mirrors the web DashboardPage's cold-start branch.
+        if (s.areas.isEmpty) {
+          return ListView(
+            padding: const EdgeInsets.only(bottom: 120),
+            children: [
+              ScreenHeader(
+                eyebrow: '${_weekday(now)} · ${_date(now)}',
+                title: '$greet, ${user.firstName}.',
+                avatarInitial: user.initial,
+                onMore: onOpenMore,
+              ),
+              const Padding(
+                padding: EdgeInsets.symmetric(horizontal: 16),
+                child: OnboardingIntake(),
+              ),
+            ],
+          );
         }
 
         final today = s.todayTasks;
