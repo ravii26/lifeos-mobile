@@ -822,8 +822,11 @@ class LifeRepository {
   // Same unified persona endpoint the web overlay calls — one message in,
   // one grounded reply out (either the decisions engine's briefing or a
   // knowledge/life-data answer, decided server-side).
-  Future<String> assistantAsk(String message) async {
-    final data = await _api.post('/assistant/ask', body: {'message': message});
+  Future<String> assistantAsk(String message, [List<Map<String, String>>? history]) async {
+    final data = await _api.post('/assistant/ask', body: {
+      'message': message,
+      if (history != null) 'history': history,
+    });
     return (data as Json)['answer'] as String? ?? '';
   }
 

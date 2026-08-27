@@ -38,12 +38,18 @@ class AssistantCubit extends Cubit<AssistantState> {
   Future<void> send(String message) async {
     final trimmed = message.trim();
     if (trimmed.isEmpty || state.loading) return;
+    
+    final history = state.turns.map((turn) => {
+      'role': turn.role == ChatRole.user ? 'user' : 'assistant',
+      'text': turn.text,
+    }).toList();
+
     emit(state.copyWith(
       turns: [...state.turns, ChatTurn(ChatRole.user, trimmed)],
       loading: true,
     ));
     try {
-      final answer = await _repo.assistantAsk(trimmed);
+      final answer = await _repo.assistantAsk(trimmed, history);
       emit(state.copyWith(
         turns: [...state.turns, ChatTurn(ChatRole.assistant, answer)],
         loading: false,
