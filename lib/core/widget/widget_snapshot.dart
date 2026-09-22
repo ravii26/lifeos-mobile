@@ -14,6 +14,12 @@ class WidgetSnapshot {
   final String? nextActionTitle;
   final List<WidgetHabit> habits;
 
+  /// Ranked suggestions after the primary action (What Now's suggestions[1:])
+  /// — so the widget reads as a short "here's what you need to do" board,
+  /// not just one line, without the native widget needing to know anything
+  /// about ranking logic itself.
+  final List<WidgetSuggestion> upNext;
+
   /// ARGB32 ints (same packing as Flutter's `Color.toARGB32()` and Android's
   /// `Color` int constructor) so both native widgets render the app's actual
   /// live theme instead of a hardcoded guess. Defaults match AppColors' dark
@@ -33,6 +39,7 @@ class WidgetSnapshot {
     this.nextActionRefId,
     this.nextActionTitle,
     this.habits = const [],
+    this.upNext = const [],
     this.bgColor = 0xFF0A0B0D,
     this.textColor = 0xFFECEEF0,
     this.mutedTextColor = 0xFFA6ABB3,
@@ -52,6 +59,7 @@ class WidgetSnapshot {
     Object? nextActionRefId = _unset,
     Object? nextActionTitle = _unset,
     List<WidgetHabit>? habits,
+    List<WidgetSuggestion>? upNext,
     int? bgColor,
     int? textColor,
     int? mutedTextColor,
@@ -76,6 +84,7 @@ class WidgetSnapshot {
             ? this.nextActionTitle
             : nextActionTitle as String?,
         habits: habits ?? this.habits,
+        upNext: upNext ?? this.upNext,
         bgColor: bgColor ?? this.bgColor,
         textColor: textColor ?? this.textColor,
         mutedTextColor: mutedTextColor ?? this.mutedTextColor,
@@ -92,6 +101,7 @@ class WidgetSnapshot {
         'nextActionRefId': nextActionRefId,
         'nextActionTitle': nextActionTitle,
         'habits': habits.map((h) => h.toJson()).toList(),
+        'upNext': upNext.map((s) => s.toJson()).toList(),
         'bgColor': bgColor,
         'textColor': textColor,
         'mutedTextColor': mutedTextColor,
@@ -111,6 +121,9 @@ class WidgetSnapshot {
         nextActionTitle: j['nextActionTitle'] as String?,
         habits: (j['habits'] as List? ?? const [])
             .map((e) => WidgetHabit.fromJson(e as Map<String, dynamic>))
+            .toList(),
+        upNext: (j['upNext'] as List? ?? const [])
+            .map((e) => WidgetSuggestion.fromJson(e as Map<String, dynamic>))
             .toList(),
         bgColor: j['bgColor'] as int? ?? 0xFF0A0B0D,
         textColor: j['textColor'] as int? ?? 0xFFECEEF0,
@@ -146,5 +159,19 @@ class WidgetHabit {
         id: j['id'] as String,
         title: j['title'] as String,
         done: j['done'] as bool? ?? false,
+      );
+}
+
+class WidgetSuggestion {
+  final String title;
+  final String urgency; // HIGH | MEDIUM | LOW
+
+  const WidgetSuggestion({required this.title, required this.urgency});
+
+  Map<String, dynamic> toJson() => {'title': title, 'urgency': urgency};
+
+  factory WidgetSuggestion.fromJson(Map<String, dynamic> j) => WidgetSuggestion(
+        title: j['title'] as String? ?? '',
+        urgency: j['urgency'] as String? ?? 'MEDIUM',
       );
 }

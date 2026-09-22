@@ -47,7 +47,7 @@ class DecisionsCubit extends Cubit<DecisionsState> {
       final r = await _repo.decisionsNow();
       emit(state.copyWith(status: LoadStatus.ready, result: r));
       // Best-effort: keep the home-screen widget's "next up" row in sync.
-      getIt<WidgetSyncService>().pushNextAction(r.primaryAction);
+      getIt<WidgetSyncService>().pushNextAction(r.primaryAction, r.suggestions);
     } on ApiException catch (e) {
       emit(state.copyWith(status: LoadStatus.error, error: e.message));
     }

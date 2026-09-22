@@ -65,13 +65,14 @@ class WidgetSyncService {
   }
 
   /// Cheap, no-network update after DecisionsCubit refreshes "what now".
-  Future<void> pushNextAction(PrimaryAction? action) async {
+  Future<void> pushNextAction(PrimaryAction? action, [List<Suggestion>? suggestions]) async {
     final current = await _readCurrent() ?? WidgetSnapshot.empty();
     await _save(current.copyWith(
       updatedAt: DateTime.now(),
       nextActionType: action?.type,
       nextActionRefId: action?.refId,
       nextActionTitle: action?.title,
+      upNext: _upNext(suggestions),
     ));
   }
 
@@ -128,6 +129,7 @@ class WidgetSyncService {
       nextActionRefId: decision?.primaryAction?.refId,
       nextActionTitle: decision?.primaryAction?.title,
       habits: _topHabits(habits),
+      upNext: _upNext(decision?.suggestions),
     ));
   }
 
@@ -157,6 +159,18 @@ class WidgetSyncService {
       qualifiedAndroidName: _androidWidgetQualifiedName,
       iOSName: _iosWidgetName,
     );
+  }
+
+  // suggestions[0] is mirrored by nextAction on both the app and the widget;
+  // this is "up next" — a couple more so the widget reads as a short board,
+  // not just one line.
+  List<WidgetSuggestion> _upNext(List<Suggestion>? suggestions) {
+    if (suggestions == null || suggestions.length <= 1) return const [];
+    return suggestions
+        .skip(1)
+        .take(2)
+        .map((s) => WidgetSuggestion(title: s.title, urgency: s.urgency))
+        .toList();
   }
 
   List<WidgetHabit> _topHabits(List<Habit> habits) {

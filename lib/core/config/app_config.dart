@@ -16,6 +16,7 @@ class AppConfig {
   /// `--dart-define=API_BASE_URL=http://LAN-IP:3000/api/v1`
   static String get apiBaseUrl {
     if (_override.isNotEmpty) return _override;
-    return 'https://lifeos-api-2sjo.onrender.com/api/v1';
+    // return 'https://lifeos-api-2sjo.onrender.com/api/v1';
+    return 'http://10.96.98.160:3000/api/v1';
   }
 }

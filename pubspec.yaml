@@ -55,6 +55,11 @@ dependencies:
   workmanager: ^0.9.0+3
   # lifeos:// deep link handling (widget taps -> in-app navigation/actions)
   app_links: ^6.3.3
+  # Hosts the real-time 3D companion character (same Three.js scene as the
+  # web app) — Flutter's native 3D rendering options are weak/immature, so a
+  # transparent WebView running the identical WebGL scene is the practical
+  # way to get one true 3D character shared across both platforms.
+  webview_flutter: ^4.9.0
   # Non-sensitive local flags (active focus session marker for the widget)
   shared_preferences: ^2.3.3
 
@@ -70,6 +75,7 @@ flutter:
   uses-material-design: true
   assets:
     - assets/logo/
+    - assets/avatar3d/
 
 flutter_launcher_icons:
   android: true

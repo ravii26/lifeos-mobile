@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
@@ -8,17 +9,20 @@ import '../../core/theme/app_colors.dart';
 import '../../data/models/decision.dart';
 import '../now/decisions_cubit.dart';
 import 'assistant_chat_sheet.dart';
+import 'avatar_3d_webview.dart';
 
-/// A persistent, draggable "coach" companion that floats above every screen.
+/// A persistent, real-time-3D "coach" companion that floats above every
+/// screen and roams the app on its own (not drag-positioned — it moves
+/// itself, on a timer, between a small set of resting spots).
 ///
 /// Tap it and it fetches the current GET /decisions/now payload, shows a glass
 /// speech bubble, and speaks the briefing aloud via on-device TTS. Long-press
 /// it to open a real chat sheet (see [showAssistantChatSheet]) — the same
-/// unified `/assistant/ask` persona the web overlay talks to. The mascot
-/// itself is drawn with a [CustomPainter] (no external asset), so it runs out
-/// of the box. To swap in a real Rive 2.5D character later, replace the
-/// [_Mascot] widget with a `RiveAnimation.asset(...)` and drive its state
-/// machine from [_CompanionState.mode] — nothing else needs to change.
+/// unified `/assistant/ask` persona the web overlay talks to. The character
+/// itself is the same cel-shaded Three.js toon body as the web app, hosted in
+/// a transparent WebView ([Avatar3DWebView]) — Flutter has no mature native
+/// 3D renderer, so this reuses the web character wholesale rather than
+/// building/maintaining a second one.
 ///
 /// Mount it once, high in the tree (see main.dart) so it survives route pushes.
 class CompanionOverlay extends StatefulWidget {
@@ -30,11 +34,8 @@ class CompanionOverlay extends StatefulWidget {
 
 enum _Mode { idle, thinking, talking }
 
-class _CompanionState extends State<CompanionOverlay>
-    with TickerProviderStateMixin {
+class _CompanionState extends State<CompanionOverlay> {
   final _tts = FlutterTts();
-  late final AnimationController _idle; // bob + blink loop
-  late final AnimationController _mouth; // drives talking mouth
 
   _Mode _mode = _Mode.idle;
   DecisionResult? _result;
@@ -45,18 +46,49 @@ class _CompanionState extends State<CompanionOverlay>
   String _friendlyBriefing = '';
   String _friendlySpeech = '';
 
-  // Position of the mascot's centre, as a fraction of the screen (draggable).
-  Offset _pos = const Offset(0.86, 0.78);
+  // Position of the character's centre, as a fraction of the screen — driven
+  // by [_roam], not drag. Starts at a predictable home corner.
+  Offset _pos = const Offset(0.82, 0.8);
+  Timer? _roamTimer;
+  bool _reducedMotion = false;
 
   @override
   void initState() {
     super.initState();
-    _idle = AnimationController(
-        vsync: this, duration: const Duration(milliseconds: 2600))
-      ..repeat();
-    _mouth = AnimationController(
-        vsync: this, duration: const Duration(milliseconds: 220));
     _initTts();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _startRoaming());
+  }
+
+  // Wanders to a random point most of the time, occasionally resting back at
+  // the home corner — same "ambient presence" idea as the web overlay, minus
+  // the card-anchored peek states (mobile's Home tab has no single persistent
+  // "What Now" card the way the web dashboard does, so there's nothing
+  // stable to tuck behind/perch on here).
+  void _startRoaming() {
+    _reducedMotion = MediaQuery.of(context).disableAnimations;
+    if (_reducedMotion) return; // stays at the initial home corner
+    _scheduleNextRoam();
+  }
+
+  void _scheduleNextRoam() {
+    _roamTimer = Timer(
+      Duration(milliseconds: 4500 + math.Random().nextInt(3500)),
+      () {
+        if (!mounted || _bubbleOpen) {
+          _scheduleNextRoam();
+          return;
+        }
+        setState(() {
+          _pos = math.Random().nextDouble() < 0.25
+              ? const Offset(0.82, 0.8) // home corner
+              : Offset(
+                  0.12 + math.Random().nextDouble() * 0.76,
+                  0.18 + math.Random().nextDouble() * 0.55,
+                );
+        });
+        _scheduleNextRoam();
+      },
+    );
   }
 
   Future<void> _initTts() async {
@@ -65,22 +97,18 @@ class _CompanionState extends State<CompanionOverlay>
     await _tts.setVolume(1.0);
     _tts.setStartHandler(() {
       if (mounted) setState(() => _mode = _Mode.talking);
-      _mouth.repeat(reverse: true);
     });
     _tts.setCompletionHandler(_stopTalking);
     _tts.setCancelHandler(_stopTalking);
   }
 
   void _stopTalking() {
-    _mouth.stop();
-    _mouth.value = 0;
     if (mounted) setState(() => _mode = _Mode.idle);
   }
 
   @override
   void dispose() {
-    _idle.dispose();
-    _mouth.dispose();
+    _roamTimer?.cancel();
     _tts.stop();
     super.dispose();
   }
@@ -248,7 +276,7 @@ class _CompanionState extends State<CompanionOverlay>
   Widget build(BuildContext context) {
     final size = MediaQuery.of(context).size;
     final pad = MediaQuery.of(context).padding;
-    const mascot = 64.0;
+    const mascot = 112.0; // matches the web character's footprint — a real presence, not a corner badge
 
     final cx = (_pos.dx * size.width).clamp(mascot, size.width - mascot);
     final cy = (_pos.dy * size.height)
@@ -273,28 +301,24 @@ class _CompanionState extends State<CompanionOverlay>
               _tts.stop();
             }),
           ),
-        Positioned(
+        AnimatedPositioned(
+          duration: const Duration(milliseconds: 1800),
+          curve: Curves.easeInOut,
           left: cx - mascot / 2,
           top: cy - mascot / 2,
           width: mascot,
           height: mascot,
-          child: GestureDetector(
+          child: AvatarTapListener(
             onTap: _onTap,
             onLongPress: () {
               if (_mode == _Mode.talking) _tts.stop();
               setState(() => _bubbleOpen = false);
               showAssistantChatSheet(context);
             },
-            onPanUpdate: (d) => setState(() {
-              _pos = Offset(
-                (cx + d.delta.dx) / size.width,
-                (cy + d.delta.dy) / size.height,
-              );
-            }),
-            child: _Mascot(
-              idle: _idle,
-              mouth: _mouth,
-              mode: _mode,
+            child: Avatar3DWebView(
+              size: mascot,
+              talking: _mode == _Mode.talking,
+              thinking: _mode == _Mode.thinking,
               accent: _result == null
                   ? AppColors.accent
                   : _toneColor(_result!.tone),
@@ -304,312 +328,6 @@ class _CompanionState extends State<CompanionOverlay>
       ],
     );
   }
-}
-
-/// The mascot itself — a glowing orb with ears, sprout, rosy cheeks, and expressive animations.
-class _Mascot extends StatelessWidget {
-  final Animation<double> idle;
-  final Animation<double> mouth;
-  final _Mode mode;
-  final Color accent;
-  const _Mascot({
-    required this.idle,
-    required this.mouth,
-    required this.mode,
-    required this.accent,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: Listenable.merge([idle, mouth]),
-      builder: (context, _) {
-        final phase = idle.value * 2 * math.pi;
-        // Bouncy floating animation
-        final bob = math.sin(phase) * 4.0;
-        
-        // Squash and stretch animations (squashes when bobbing reverses direction)
-        final scaleY = 1.0 + math.cos(phase * 2) * 0.05;
-        final scaleX = 1.0 - math.cos(phase * 2) * 0.05;
-        
-        // Gentle rotation sway that is out of phase with bobbing
-        final tilt = math.sin(phase - math.pi / 4) * 0.06;
-
-        // Blink logic: eyes closed at the end of the idle animation loop
-        final blink = idle.value > 0.93 ? 1.0 : 0.0;
-        final mouthOpen = mode == _Mode.talking ? mouth.value : 0.0;
-
-        return Transform.translate(
-          offset: Offset(0, bob),
-          child: Transform.rotate(
-            angle: tilt,
-            child: Transform.scale(
-              scaleX: scaleX,
-              scaleY: scaleY,
-              alignment: Alignment.center,
-              child: CustomPaint(
-                painter: _MascotPainter(
-                  accent: accent,
-                  blink: blink,
-                  mouthOpen: mouthOpen,
-                  thinking: mode == _Mode.thinking,
-                ),
-              ),
-            ),
-          ),
-        );
-      },
-    );
-  }
-}
-
-class _MascotPainter extends CustomPainter {
-  final Color accent;
-  final double blink; // 0 open, 1 closed
-  final double mouthOpen; // 0..1
-  final bool thinking;
-  _MascotPainter({
-    required this.accent,
-    required this.blink,
-    required this.mouthOpen,
-    required this.thinking,
-  });
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final c = Offset(size.width / 2, size.height / 2);
-    final r = size.width / 2 - 8; // slightly smaller to give ears/sprout space
-
-    // 1. Outer body glow
-    canvas.drawCircle(
-      c,
-      r + 4,
-      Paint()
-        ..color = accent.withValues(alpha: 0.35)
-        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 10),
-    );
-
-    // 2. Cute rounded helper ears (drawn behind body)
-    final leftEarCenter = Offset(c.dx - r * 0.75, c.dy - r * 0.75);
-    final rightEarCenter = Offset(c.dx + r * 0.75, c.dy - r * 0.75);
-    final earRadius = r * 0.38;
-
-    final earPaint = Paint()
-      ..shader = LinearGradient(
-        begin: Alignment.topLeft,
-        end: Alignment.bottomRight,
-        colors: [accent, AppColors.surface2],
-      ).createShader(Rect.fromCircle(center: c, radius: r));
-
-    canvas.drawCircle(leftEarCenter, earRadius, earPaint);
-    canvas.drawCircle(rightEarCenter, earRadius, earPaint);
-
-    // Translucent pink inner ear centers
-    final innerEarPaint = Paint()..color = const Color(0xFFFF8A80).withValues(alpha: 0.4);
-    canvas.drawCircle(leftEarCenter, earRadius * 0.55, innerEarPaint);
-    canvas.drawCircle(rightEarCenter, earRadius * 0.55, innerEarPaint);
-
-    final earStroke = Paint()
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.4
-      ..color = Colors.white.withValues(alpha: 0.18);
-    canvas.drawCircle(leftEarCenter, earRadius, earStroke);
-    canvas.drawCircle(rightEarCenter, earRadius, earStroke);
-
-    // 3. Cute feet nubbins (drawn behind body)
-    final leftFootCenter = Offset(c.dx - r * 0.45, c.dy + r * 0.85);
-    final rightFootCenter = Offset(c.dx + r * 0.45, c.dy + r * 0.85);
-    final footRadius = r * 0.25;
-    final footPaint = Paint()
-      ..shader = LinearGradient(
-        begin: Alignment.topCenter,
-        end: Alignment.bottomCenter,
-        colors: [accent, AppColors.surface3],
-      ).createShader(Rect.fromCircle(center: leftFootCenter, radius: footRadius));
-
-    canvas.drawCircle(leftFootCenter, footRadius, footPaint);
-    canvas.drawCircle(rightFootCenter, footRadius, footPaint);
-
-    final footStroke = Paint()
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.2
-      ..color = Colors.white.withValues(alpha: 0.18);
-    canvas.drawCircle(leftFootCenter, footRadius, footStroke);
-    canvas.drawCircle(rightFootCenter, footRadius, footStroke);
-
-    // 4. Main body gradient
-    final bodyPaint = Paint()
-      ..shader = LinearGradient(
-        begin: Alignment.topLeft,
-        end: Alignment.bottomRight,
-        colors: [accent, AppColors.surface2],
-      ).createShader(Rect.fromCircle(center: c, radius: r));
-    canvas.drawCircle(c, r, bodyPaint);
-    canvas.drawCircle(
-      c,
-      r,
-      Paint()
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 1.4
-        ..color = Colors.white.withValues(alpha: 0.18),
-    );
-
-    // 5. Cute plant sprout on top of head
-    final stemStart = Offset(c.dx, c.dy - r + 1);
-    final stemPath = Path()
-      ..moveTo(stemStart.dx, stemStart.dy)
-      ..quadraticBezierTo(c.dx - 1.0, c.dy - r - 3, c.dx, c.dy - r - 6);
-    
-    canvas.drawPath(
-      stemPath,
-      Paint()
-        ..color = const Color(0xFF81C784)
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 2.0
-        ..strokeCap = StrokeCap.round,
-    );
-
-    final leafCenter = Offset(c.dx, c.dy - r - 6);
-    final leafPaint = Paint()
-      ..color = const Color(0xFFC8E6C9)
-      ..style = PaintingStyle.fill;
-    final leafStroke = Paint()
-      ..color = const Color(0xFF388E3C)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.0;
-
-    // Left leaf
-    final leafLeft = Path()
-      ..moveTo(leafCenter.dx, leafCenter.dy)
-      ..quadraticBezierTo(leafCenter.dx - 5.5, leafCenter.dy - 3.5, leafCenter.dx - 7.5, leafCenter.dy)
-      ..quadraticBezierTo(leafCenter.dx - 3.5, leafCenter.dy + 2.5, leafCenter.dx, leafCenter.dy)
-      ..close();
-    canvas.drawPath(leafLeft, leafPaint);
-    canvas.drawPath(leafLeft, leafStroke);
-
-    // Right leaf
-    final leafRight = Path()
-      ..moveTo(leafCenter.dx, leafCenter.dy)
-      ..quadraticBezierTo(leafCenter.dx + 5.5, leafCenter.dy - 3.5, leafCenter.dx + 7.5, leafCenter.dy)
-      ..quadraticBezierTo(leafCenter.dx + 3.5, leafCenter.dy + 2.5, leafCenter.dx, leafCenter.dy)
-      ..close();
-    canvas.drawPath(leafRight, leafPaint);
-    canvas.drawPath(leafRight, leafStroke);
-
-    // 6. Face features
-    final ink = Paint()..color = AppColors.accentInk;
-    final eyeY = c.dy - r * 0.15;
-    final eyeDx = r * 0.35;
-
-    // Rosy cheeks (cute blush circles under the eyes)
-    final cheekPaint = Paint()
-      ..color = const Color(0xFFFF8A80).withValues(alpha: 0.45)
-      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 2);
-    canvas.drawCircle(Offset(c.dx - eyeDx - 3, eyeY + 5), 4.5, cheekPaint);
-    canvas.drawCircle(Offset(c.dx + eyeDx + 3, eyeY + 5), 4.5, cheekPaint);
-
-    // Tiny cute nose
-    canvas.drawCircle(Offset(c.dx, eyeY + 2.5), 1.5, Paint()..color = ink.color.withValues(alpha: 0.5));
-
-    // Eyes
-    if (thinking) {
-      // Look up-and-to-the-right with curious eyes
-      for (final dx in [-eyeDx, eyeDx]) {
-        final eyeCenter = Offset(c.dx + dx + 1.2, eyeY - 1.8);
-        canvas.drawCircle(eyeCenter, 4.5, ink);
-        canvas.drawCircle(Offset(eyeCenter.dx + 1.0, eyeCenter.dy - 1.0), 1.2,
-            Paint()..color = Colors.white.withValues(alpha: 0.9));
-      }
-    } else if (blink > 0.5) {
-      // Happy arch-curved blinks
-      final p = Paint()
-        ..color = ink.color
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 2.5
-        ..strokeCap = StrokeCap.round;
-      for (final dx in [-eyeDx, eyeDx]) {
-        final eyePath = Path()
-          ..moveTo(c.dx + dx - 3.5, eyeY - 0.5)
-          ..quadraticBezierTo(c.dx + dx, eyeY + 1.5, c.dx + dx + 3.5, eyeY - 0.5);
-        canvas.drawPath(eyePath, p);
-      }
-    } else {
-      // Sparkly friendly eyes (anime-style double highlights)
-      for (final dx in [-eyeDx, eyeDx]) {
-        final eyeCenter = Offset(c.dx + dx, eyeY);
-        canvas.drawCircle(eyeCenter, 5.0, ink);
-        // Primary spark
-        canvas.drawCircle(Offset(eyeCenter.dx - 1.4, eyeCenter.dy - 1.4), 1.6,
-            Paint()..color = Colors.white);
-        // Secondary spark
-        canvas.drawCircle(Offset(eyeCenter.dx + 1.4, eyeCenter.dy + 1.4), 0.7,
-            Paint()..color = Colors.white.withValues(alpha: 0.8));
-      }
-    }
-
-    // Mouth
-    final mouthCenterY = c.dy + r * 0.32;
-    if (thinking) {
-      // Cute wave mouth
-      final wavePaint = Paint()
-        ..color = ink.color
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 2.0
-        ..strokeCap = StrokeCap.round;
-      final wavePath = Path()
-        ..moveTo(c.dx - 5.0, mouthCenterY)
-        ..quadraticBezierTo(c.dx - 2.5, mouthCenterY - 1.8, c.dx, mouthCenterY)
-        ..quadraticBezierTo(c.dx + 2.5, mouthCenterY + 1.8, c.dx + 5.0, mouthCenterY);
-      canvas.drawPath(wavePath, wavePaint);
-    } else if (mouthOpen > 0.0) {
-      // Animated mouth that opens with a little pink tongue inside
-      final openMouthHeight = 3.0 + mouthOpen * 9.5;
-      final openMouthWidth = 11.5;
-      final mouthRect = Rect.fromCenter(
-        center: Offset(c.dx, mouthCenterY),
-        width: openMouthWidth,
-        height: openMouthHeight,
-      );
-
-      canvas.save();
-      canvas.clipRRect(RRect.fromRectAndRadius(mouthRect, Radius.circular(openMouthHeight / 2)));
-      canvas.drawPaint(Paint()..color = ink.color);
-      // Tongue at bottom
-      canvas.drawCircle(
-        Offset(c.dx, mouthRect.bottom),
-        openMouthWidth * 0.42,
-        Paint()..color = const Color(0xFFFF8A80),
-      );
-      canvas.restore();
-
-      // Outer mouth border
-      canvas.drawRRect(
-        RRect.fromRectAndRadius(mouthRect, Radius.circular(openMouthHeight / 2)),
-        Paint()
-          ..color = ink.color
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = 1.4,
-      );
-    } else {
-      // Friendly smile
-      final smilePaint = Paint()
-        ..color = ink.color
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 2.4
-        ..strokeCap = StrokeCap.round;
-      final smilePath = Path()
-        ..moveTo(c.dx - 5.0, mouthCenterY - 0.8)
-        ..quadraticBezierTo(c.dx, mouthCenterY + 2.2, c.dx + 5.0, mouthCenterY - 0.8);
-      canvas.drawPath(smilePath, smilePaint);
-    }
-  }
-
-  @override
-  bool shouldRepaint(_MascotPainter old) =>
-      old.blink != blink ||
-      old.mouthOpen != mouthOpen ||
-      old.thinking != thinking ||
-      old.accent != accent;
 }
 
 /// Glass speech bubble that renders the coaching text near the mascot.

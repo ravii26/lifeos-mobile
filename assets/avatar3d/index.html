@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" />
+<style>
+  html, body { margin: 0; padding: 0; background: transparent; overflow: hidden; height: 100%; }
+  canvas { display: block; touch-action: none; }
+</style>
+</head>
+<body>
+<script type="importmap">
+{ "imports": { "three": "https://unpkg.com/three@0.169.0/build/three.module.js" } }
+</script>
+<script type="module">
+import * as THREE from "three";
+
+// Same cel-shaded toon character as the web app's Avatar3D.tsx — kept in
+// sync by hand since this runs inside a WebView, not the React bundle.
+//
+// `loadFlutterAsset` loads this file by its literal asset key — it can't
+// carry a "?accent=...&size=..." query string (that's not a URL parser,
+// just a filename lookup), so init params arrive via window.initAvatar(...),
+// called from Dart's onPageFinished once the page has actually loaded.
+// window.setAvatarState(talking, thinking) updates animation state after
+// that. A tap/long-press on the canvas posts to the AvatarTap JS channel so
+// Flutter can react (open the chat sheet, etc).
+
+const BAND_COUNT = 3;
+function createToonGradientMap() {
+  const data = new Uint8Array(BAND_COUNT);
+  for (let i = 0; i < BAND_COUNT; i++) data[i] = Math.floor((i / (BAND_COUNT - 1)) * 255);
+  const tex = new THREE.DataTexture(data, BAND_COUNT, 1, THREE.RedFormat);
+  tex.magFilter = THREE.NearestFilter;
+  tex.minFilter = THREE.NearestFilter;
+  tex.needsUpdate = true;
+  return tex;
+}
+
+let ready = false;
+let scene, camera, renderer, bodyGroup, eyes, pupils, arms;
+let blinkAt = 0;
+let start = 0;
+const reducedMotion = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+window.initAvatar = (accent, size) => {
+  if (ready) return; // idempotent — Dart may call this more than once defensively
+  ready = true;
+
+  scene = new THREE.Scene();
+  camera = new THREE.PerspectiveCamera(32, 1, 0.1, 20);
+  camera.position.set(0, 0.15, 5.2);
+
+  renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+  renderer.setSize(size, size);
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+  document.body.appendChild(renderer.domElement);
+
+  const gradientMap = createToonGradientMap();
+  scene.add(new THREE.AmbientLight(0xffffff, 0.55));
+  const key = new THREE.DirectionalLight(0xffffff, 1.1);
+  key.position.set(2, 3, 4);
+  scene.add(key);
+
+  bodyGroup = new THREE.Group();
+  scene.add(bodyGroup);
+
+  const bodyMat = new THREE.MeshToonMaterial({ color: accent, gradientMap });
+  const body = new THREE.Mesh(new THREE.SphereGeometry(1.05, 24, 20), bodyMat);
+  body.scale.set(1, 1.15, 1);
+  bodyGroup.add(body);
+
+  const bellyMat = new THREE.MeshToonMaterial({ color: 0xfff3e8, gradientMap });
+  const belly = new THREE.Mesh(new THREE.SphereGeometry(0.62, 20, 16), bellyMat);
+  belly.position.set(0, -0.15, 0.85);
+  belly.scale.set(1, 1.2, 0.4);
+  bodyGroup.add(belly);
+
+  const eyeWhiteMat = new THREE.MeshToonMaterial({ color: 0xffffff, gradientMap });
+  const pupilMat = new THREE.MeshBasicMaterial({ color: 0x18140f });
+  eyes = new THREE.Group();
+  pupils = [];
+  for (const x of [-0.42, 0.42]) {
+    const white = new THREE.Mesh(new THREE.SphereGeometry(0.34, 16, 16), eyeWhiteMat);
+    white.position.set(x, 0.32, 0.92);
+    eyes.add(white);
+    const pupil = new THREE.Mesh(new THREE.SphereGeometry(0.16, 12, 12), pupilMat);
+    pupil.position.set(x, 0.32, 1.2);
+    eyes.add(pupil);
+    pupils.push(pupil);
+  }
+  bodyGroup.add(eyes);
+
+  const armMat = new THREE.MeshToonMaterial({ color: accent, gradientMap });
+  arms = [];
+  for (const side of [-1, 1]) {
+    const arm = new THREE.Mesh(new THREE.CapsuleGeometry(0.16, 0.5, 4, 8), armMat);
+    arm.position.set(side * 1.05, -0.1, 0);
+    arm.rotation.z = side * 0.5;
+    bodyGroup.add(arm);
+    arms.push(arm);
+  }
+
+  blinkAt = performance.now() + 2000 + Math.random() * 2500;
+  start = performance.now();
+  requestAnimationFrame(animate);
+};
+
+window.__avatarState = { talking: false, thinking: false };
+window.setAvatarState = (talking, thinking) => {
+  window.__avatarState = { talking: !!talking, thinking: !!thinking };
+};
+
+function animate() {
+  requestAnimationFrame(animate);
+  const t = (performance.now() - start) / 1000;
+  const { talking, thinking } = window.__avatarState;
+
+  if (!reducedMotion) {
+    bodyGroup.position.y = Math.sin(t * 1.6) * 0.06;
+    bodyGroup.rotation.z = Math.sin(t * 0.9) * 0.035;
+    bodyGroup.scale.setScalar(1 + Math.sin(t * 1.6) * 0.015);
+
+    arms.forEach((arm, i) => {
+      const dir = i === 0 ? -1 : 1;
+      arm.rotation.z = dir * (0.5 + Math.sin(t * 1.4 + i) * 0.18);
+    });
+
+    const now = performance.now();
+    const sinceBlink = now - blinkAt;
+    if (sinceBlink > 0 && sinceBlink < 140) {
+      eyes.scale.y = 0.12;
+    } else {
+      eyes.scale.y = 1;
+      if (sinceBlink >= 140 && sinceBlink < 160) {
+        blinkAt = now + 2200 + Math.random() * 3000;
+      }
+    }
+
+    if (thinking) {
+      const look = Math.sin(t * 2.2) * 0.18;
+      pupils.forEach((p) => (p.position.x = (p.position.x > 0 ? 0.42 : -0.42) + look));
+      eyes.position.y = 0.06;
+    } else {
+      pupils.forEach((p) => (p.position.x = p.position.x > 0 ? 0.42 : -0.42));
+      eyes.position.y = 0;
+    }
+
+    if (talking) {
+      bodyGroup.scale.y = 1 + Math.abs(Math.sin(t * 9)) * 0.05;
+    }
+  }
+
+  renderer.render(scene, camera);
+}
+
+// A WebView captures touch input itself, so this distinguishes tap vs.
+// long-press in JS and posts a single message describing which happened —
+// Flutter's own GestureDetector on the WebView's rect won't see these.
+let downPoint = null;
+let longPressFired = false;
+let longPressTimer = null;
+
+const onDown = (x, y) => {
+  downPoint = { x, y };
+  longPressFired = false;
+  longPressTimer = setTimeout(() => {
+    longPressFired = true;
+    if (window.AvatarTap) window.AvatarTap.postMessage("longpress");
+  }, 450);
+};
+const onUp = () => {
+  if (longPressTimer) clearTimeout(longPressTimer);
+  if (!longPressFired && window.AvatarTap) window.AvatarTap.postMessage("tap");
+};
+const onMove = (x, y) => {
+  if (!downPoint) return;
+  const moved = Math.hypot(x - downPoint.x, y - downPoint.y);
+  if (moved > 12 && longPressTimer) {
+    clearTimeout(longPressTimer);
+    longPressTimer = null;
+  }
+};
+
+document.body.addEventListener("pointerdown", (e) => onDown(e.clientX, e.clientY));
+document.body.addEventListener("pointerup", onUp);
+document.body.addEventListener("pointermove", (e) => onMove(e.clientX, e.clientY));
+document.body.addEventListener("pointercancel", () => {
+  if (longPressTimer) clearTimeout(longPressTimer);
+});
+</script>
+</body>
+</html>
