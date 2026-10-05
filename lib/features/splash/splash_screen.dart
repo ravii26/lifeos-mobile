@@ -126,7 +126,7 @@ class _SplashScreenState extends State<SplashScreen>
                   ),
                   const SizedBox(height: 6),
                   Text(
-                    'Your life, in command.',
+                    'Always on your side.',
                     style: TextStyle(
                       color: AppColors.tx3,
                       fontSize: 13,

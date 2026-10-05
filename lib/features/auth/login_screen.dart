@@ -158,7 +158,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 ],
               ),
               child: Center(
-                child: Text('L',
+                child: Text('A',
                     style: GoogleFonts.hankenGrotesk(
                         fontSize: 28,
                         fontWeight: FontWeight.w800,
@@ -173,8 +173,8 @@ class _LoginScreenState extends State<LoginScreen> {
                     fontWeight: FontWeight.w700,
                     color: AppColors.tx),
                 children: [
-                  TextSpan(text: 'Life'),
-                  TextSpan(text: 'OS', style: TextStyle(color: AppColors.accent)),
+                  TextSpan(text: 'Ally'),
+                  TextSpan(text: '.', style: TextStyle(color: AppColors.accent)),
                 ],
               ),
             ),
