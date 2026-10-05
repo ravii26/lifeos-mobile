@@ -116,7 +116,7 @@ class _SplashScreenState extends State<SplashScreen>
               child: Column(
                 children: [
                   Text(
-                    'LifeOS',
+                    'Ally',
                     style: TextStyle(
                       color: AppColors.tx,
                       fontSize: 26,

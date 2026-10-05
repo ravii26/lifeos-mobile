@@ -7,6 +7,7 @@ import '../models/area.dart';
 import '../models/behavior_log.dart';
 import '../models/calendar_block.dart';
 import '../models/capture.dart';
+import '../models/chat.dart';
 import '../models/decision.dart';
 import '../models/document.dart';
 import '../models/goal.dart';
@@ -22,6 +23,7 @@ import '../models/resource.dart';
 import '../models/topic.dart';
 import '../models/review.dart';
 import '../models/task.dart';
+import '../models/tonight.dart';
 import '../models/user_settings.dart';
 import '../models/vault_item.dart';
 
@@ -48,10 +50,12 @@ class LifeRepository {
     String type = 'PRIMARY',
     required String color,
     String icon = 'target',
+    String? tier, // MAIN | SECONDARY | MAINTAIN | LATER
   }) async {
     final data = await _api.post('/areas', body: {
       'name': name,
       'type': type,
+      if (tier != null) 'tier': tier,
       'color': color,
       'icon': icon,
     });
@@ -65,8 +69,10 @@ class LifeRepository {
     String? color,
     String? icon,
     bool? isActive,
+    String? tier, // MAIN | SECONDARY | MAINTAIN | LATER
   }) async {
     final data = await _api.patch('/areas/$id', body: {
+      if (tier != null) 'tier': tier,
       if (name != null) 'name': name,
       if (type != null) 'type': type,
       if (color != null) 'color': color,
@@ -92,9 +98,12 @@ class LifeRepository {
     String? projectId,
     String priority = 'MEDIUM',
     DateTime? dueDate,
+    String? minimumVersion,
   }) async {
     final data = await _api.post('/tasks', body: {
       'title': title,
+      if (minimumVersion != null && minimumVersion.isNotEmpty)
+        'minimumVersion': minimumVersion,
       if (areaId != null) 'areaId': areaId,
       if (goalId != null) 'goalId': goalId,
       if (projectId != null) 'projectId': projectId,
@@ -816,6 +825,112 @@ class LifeRepository {
   Future<DecisionResult> decisionsNow() async {
     final data = await _api.get('/decisions/now');
     return DecisionResult.fromJson(data as Json);
+  }
+
+  // ---- Guide (tonight's one thing) ----
+  Future<Tonight> guideTonight() async {
+    final data = await _api.get('/guide/tonight');
+    return Tonight.fromJson(data as Json);
+  }
+
+  Future<Tonight> guideSwap() async {
+    final data = await _api.post('/guide/tonight/swap');
+    return Tonight.fromJson(data as Json);
+  }
+
+  /// [status] is DONE | MINIMUM | SKIPPED. [date] pins the night being
+  /// answered (a late answer after midnight still lands on the right night).
+  Future<Commitment> guideRespond(String status,
+      {String? reason, String? date}) async {
+    final data = await _api.post('/guide/tonight/respond', body: {
+      'status': status,
+      if (reason != null && reason.trim().isNotEmpty) 'reason': reason.trim(),
+      if (date != null) 'date': date,
+    });
+    return Commitment.fromJson(data as Json);
+  }
+
+  Future<NextStep?> guideNext() async {
+    final data = await _api.get('/guide/next');
+    return data is Json ? NextStep.fromJson(data) : null;
+  }
+
+  Future<GuideHistory> guideHistory({int days = 7}) async {
+    final data = await _api.get('/guide/history', query: {'days': '$days'});
+    return GuideHistory.fromJson(data as Json);
+  }
+
+  /// Something the person saved (a link or text) → one proposed action.
+  Future<SaveProposal> createSave(String text) async {
+    final data = await _api.post('/guide/saves', body: {'text': text});
+    return SaveProposal.fromJson(data as Json);
+  }
+
+  /// A screenshot of a saved reel/post → one proposed action.
+  Future<SaveProposal> createSaveFromImage(String filePath,
+      {required String mimeType, String? caption}) async {
+    final parts = mimeType.split('/');
+    final form = FormData.fromMap({
+      if (caption != null && caption.isNotEmpty) 'text': caption,
+      'file': await MultipartFile.fromFile(
+        filePath,
+        filename: filePath.split(RegExp(r'[\/]')).last,
+        contentType: DioMediaType(parts.first, parts.length > 1 ? parts[1] : 'jpeg'),
+      ),
+    });
+    final data = await _api.post('/guide/saves', body: form);
+    return SaveProposal.fromJson(data as Json);
+  }
+
+  /// [choice] is ACTION | SHELF | DROP. Returns true when the action became
+  /// tonight's one thing.
+  Future<bool> decideSave(String id,
+      {required String choice,
+      String? action,
+      String? minimum,
+      String? areaId,
+      String? when}) async {
+    final data = await _api.post('/guide/saves/$id/decide', body: {
+      'choice': choice,
+      if (action != null) 'action': action,
+      if (minimum != null) 'minimum': minimum,
+      if (areaId != null) 'areaId': areaId,
+      if (when != null) 'when': when,
+    });
+    return asBool((data as Json)['setAsTonight']);
+  }
+
+  /// The nightly nudge time, or null when the person hasn't turned it on.
+  Future<void> setNightlyTime(String? hhmm) =>
+      _api.patch('/settings', body: {'nightlyTime': hhmm});
+
+  Future<String?> nightlyNudge() async {
+    final data = await _api.get('/settings');
+    return asStringOrNull((data as Json)['nightlyTime']);
+  }
+
+  // ---- Chat (assistant that acts) ----
+  Future<ChatReply> chat(String message, List<ChatMessage> history) async {
+    final data = await _api.post('/assistant/chat', body: {
+      'message': message,
+      'history': [
+        for (final m in history.length > 10 ? history.sublist(history.length - 10) : history)
+          {'role': m.fromUser ? 'user' : 'assistant', 'text': m.text},
+      ],
+    });
+    return ChatReply.fromJson(data as Json);
+  }
+
+  Future<List<MemoryItem>> memories() async {
+    final data = await _api.get('/assistant/memories');
+    return (data as List).whereType<Json>().map(MemoryItem.fromJson).toList();
+  }
+
+  Future<void> deleteMemory(String id) => _api.delete('/assistant/memories/$id');
+
+  Future<List<Reminder>> reminders() async {
+    final data = await _api.get('/assistant/reminders');
+    return (data as List).whereType<Json>().map(Reminder.fromJson).toList();
   }
 
   // ---- Assistant ("Jarvis") ----

@@ -7,7 +7,7 @@
     <uses-permission android:name="android.permission.RECORD_AUDIO"/>
     <uses-feature android:name="android.hardware.camera" android:required="false"/>
     <application
-        android:label="LifeOS"
+        android:label="Ally"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity
@@ -58,11 +58,28 @@
             </intent-filter>
         </activity>
 
+        <!-- flutter_local_notifications: fire scheduled notifications (habit
+             reminders, the nightly nudge), restore them after a reboot, and
+             deliver notification-button answers (Done / Minimum / Not tonight). -->
+        <receiver android:exported="false"
+            android:name="com.dexterous.flutterlocalnotifications.ScheduledNotificationReceiver"/>
+        <receiver android:exported="false"
+            android:name="com.dexterous.flutterlocalnotifications.ScheduledNotificationBootReceiver">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED"/>
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED"/>
+                <action android:name="android.intent.action.QUICKBOOT_POWERON"/>
+                <action android:name="com.htc.intent.action.QUICKBOOT_POWERON"/>
+            </intent-filter>
+        </receiver>
+        <receiver android:exported="false"
+            android:name="com.dexterous.flutterlocalnotifications.ActionBroadcastReceiver"/>
+
         <!-- Home-screen widget (Glance) -->
         <receiver
             android:name=".widget.LifeOSWidgetReceiver"
             android:exported="true"
-            android:label="LifeOS">
+            android:label="Ally">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE"/>
             </intent-filter>

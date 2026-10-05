@@ -3,6 +3,7 @@ import 'package:flutter/widgets.dart';
 import 'package:home_widget/home_widget.dart';
 import 'package:workmanager/workmanager.dart';
 
+import '../notifications/notification_service.dart';
 import '../di/service_locator.dart';
 import '../../data/models/decision.dart';
 import '../../data/models/habit.dart';
@@ -214,6 +215,15 @@ void widgetRefreshCallbackDispatcher() {
       await getIt<WidgetSyncService>().refreshFromNetwork();
     } catch (_) {
       // network unavailable or token expired — widget stays on last-known data
+    }
+    // Keep tonight's nudge carrying tonight's actual pick even on days the
+    // app is never opened.
+    try {
+      await NotificationService.instance.init();
+      await NotificationService.instance
+          .scheduleNightly(await getIt<LifeRepository>().guideTonight());
+    } catch (_) {
+      // the plain "your step is ready" nudge stays scheduled
     }
     return true;
   });

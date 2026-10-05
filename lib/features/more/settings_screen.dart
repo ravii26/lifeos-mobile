@@ -131,7 +131,7 @@ class SettingsScreen extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 20),
-                Text('LifeOS Mobile · v1.0 · Personal Operating System',
+                Text('Ally · v1.0 · Your personal assistant',
                     textAlign: TextAlign.center,
                     style: TextStyle(color: AppColors.tx4, fontSize: 11)),
               ],

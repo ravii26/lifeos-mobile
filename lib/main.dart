@@ -81,7 +81,7 @@ class LifeOSApp extends StatelessWidget {
           child: BlocBuilder<AppearanceCubit, AppearanceState>(
             builder: (context, appearance) => MaterialApp(
               navigatorKey: rootNavigatorKey,
-              title: 'LifeOS',
+              title: 'Ally',
               debugShowCheckedModeBanner: false,
               theme: AppTheme.build(
                   accent: appearance.accent,

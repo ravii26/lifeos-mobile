@@ -117,7 +117,7 @@ class _OnboardingViewState extends State<_OnboardingView> {
         ),
         const SizedBox(height: 8),
         Text(
-          'LifeOS works off Areas, Goals, Habits, and Tasks — instead of filling '
+          'Ally works off Areas, Goals, Habits, and Tasks — instead of filling '
           "those in one at a time, just describe your life and what you want to "
           "work on. I'll propose a starter set you can edit or reject before "
           "anything's created.",

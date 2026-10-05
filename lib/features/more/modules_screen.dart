@@ -32,7 +32,7 @@ class ModulesScreen extends StatelessWidget {
               Padding(
                 padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
                 child: Text(
-                  'Pick what LifeOS shows. Turning a module off hides it everywhere — '
+                  'Pick what Ally shows. Turning a module off hides it everywhere — '
                   'your data stays safe and comes back when you re-enable it.',
                   style: TextStyle(
                       fontSize: 12.5, color: AppColors.tx3, height: 1.5),

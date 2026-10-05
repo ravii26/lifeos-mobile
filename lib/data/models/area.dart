@@ -7,6 +7,7 @@ class Area {
   final String id;
   final String name;
   final String type; // PRIMARY | MAINTENANCE
+  final String tier; // MAIN | SECONDARY | MAINTAIN | LATER
   final String colorHex;
   final String icon;
   final int order;
@@ -23,6 +24,7 @@ class Area {
     required this.id,
     required this.name,
     required this.type,
+    this.tier = 'MAINTAIN',
     required this.colorHex,
     required this.icon,
     required this.order,
@@ -40,6 +42,7 @@ class Area {
         id: asString(j['id']),
         name: asString(j['name']),
         type: asString(j['type'], 'PRIMARY'),
+        tier: asString(j['tier'], 'MAINTAIN'),
         colorHex: asString(j['color'], '#c5f23f'),
         icon: asString(j['icon'], 'target'),
         order: asInt(j['order']),

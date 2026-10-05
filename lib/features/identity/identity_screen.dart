@@ -65,7 +65,7 @@ class _IdentityScreenState extends State<IdentityScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Who you are and who you are becoming. The compass the rest of LifeOS points to.',
+                        'Who you are and who you are becoming. The compass everything in Ally points to.',
                         style: TextStyle(
                           fontSize: 12.5,
                           height: 1.5,

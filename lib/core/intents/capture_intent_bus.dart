@@ -9,11 +9,16 @@ class PendingCaptureIntent {
   final String? imageMime;
   final bool startVoice;
 
+  /// Came from the OS share sheet. A shared link or screenshot is usually a
+  /// save ("watch later"), so it opens the save → action flow instead.
+  final bool fromShare;
+
   const PendingCaptureIntent({
     this.text,
     this.imagePath,
     this.imageMime,
     this.startVoice = false,
+    this.fromShare = false,
   });
 }
 

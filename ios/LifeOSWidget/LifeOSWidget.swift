@@ -215,7 +215,7 @@ struct LifeOSWidget: Widget {
     StaticConfiguration(kind: kind, provider: LifeOSProvider()) { entry in
       LifeOSWidgetView(entry: entry)
     }
-    .configurationDisplayName("LifeOS")
+    .configurationDisplayName("Ally")
     .description("Today's habits, focus session, and what's next.")
     .supportedFamilies([.systemSmall, .systemMedium])
   }

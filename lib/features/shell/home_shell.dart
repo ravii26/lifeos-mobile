@@ -14,6 +14,11 @@ import '../../data/repositories/life_repository.dart';
 import '../appearance/appearance_cubit.dart';
 import '../areas/areas_screen.dart';
 import '../capture/capture_sheet.dart';
+import '../chat/chat_cubit.dart';
+import '../chat/chat_screen.dart';
+import '../guide/save_sheet.dart';
+import '../guide/tonight_cubit.dart';
+import '../guide/tonight_screen.dart';
 import '../habits/habits_screen.dart';
 import '../home/home_screen.dart';
 import '../more/more_sheet.dart';
@@ -73,13 +78,35 @@ class _HomeShellState extends State<HomeShell> {
     getIt<CaptureIntentBus>().consumePending();
     final context = _cubitContext;
     if (context == null || !context.mounted) return;
+    // A shared link or screenshot is a save: turn it into an action instead
+    // of filing it. Plain shared text stays a normal capture.
+    final isSave = intent.fromShare &&
+        (intent.imagePath != null ||
+            RegExp(r'https?://').hasMatch(intent.text ?? ''));
+    if (isSave) {
+      final tonight = context.read<TonightCubit>();
+      openSaveSheet(
+        context,
+        SaveSource(
+            text: intent.text,
+            imagePath: intent.imagePath,
+            imageMime: intent.imageMime),
+      ).then((changed) {
+        if (changed) tonight.load();
+      });
+      return;
+    }
     _openCapture(context, pending: intent);
   }
 
   @override
   Widget build(BuildContext context) {
-    return BlocProvider(
-      create: (_) => LifeCubit(getIt<LifeRepository>())..load(),
+    return MultiBlocProvider(
+      providers: [
+        BlocProvider(create: (_) => LifeCubit(getIt<LifeRepository>())..load()),
+        BlocProvider(create: (_) => TonightCubit(getIt<LifeRepository>())..load()),
+        BlocProvider(create: (_) => ChatCubit(getIt<LifeRepository>())),
+      ],
       child: Builder(builder: (context) {
         _cubitContext = context;
         return BlocBuilder<AppearanceCubit, AppearanceState>(
@@ -134,10 +161,15 @@ class _HomeShellState extends State<HomeShell> {
     );
   }
 
-  /// Bottom-nav tabs: Home + Tasks (core) + Habits (optional) + Areas (core).
+  /// Bottom-nav tabs: Tonight (the guide) + Home + Tasks (core) + Habits
+  /// (optional) + Areas (core).
   List<_TabDef> _buildTabs(BuildContext context, AppearanceState appearance) {
     void openMore() => _openMore(context);
     return [
+      const _TabDef('Chat', Icons.chat_bubble_outline_rounded, Icons.chat_bubble_rounded,
+          ChatScreen()),
+      const _TabDef('Tonight', Icons.nightlight_outlined, Icons.nightlight_round,
+          TonightScreen()),
       _TabDef('Home', Icons.dashboard_outlined, Icons.dashboard,
           HomeScreen(user: widget.user, onOpenMore: openMore)),
       _TabDef('Tasks', Icons.check_circle_outline, Icons.check_circle,

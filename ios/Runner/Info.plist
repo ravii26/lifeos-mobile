@@ -3,19 +3,19 @@
 <plist version="1.0">
 	<dict>
 		<key>NSMicrophoneUsageDescription</key>
-		<string>LifeOS uses the microphone for voice dictation so you can speak your thoughts instead of typing.</string>
+		<string>Ally uses the microphone for voice dictation so you can speak your thoughts instead of typing.</string>
 		<key>NSSpeechRecognitionUsageDescription</key>
-		<string>LifeOS converts your speech to text on-device so you can dictate captures.</string>
+		<string>Ally converts your speech to text on-device so you can dictate captures.</string>
 		<key>NSCameraUsageDescription</key>
-		<string>LifeOS uses the camera to capture photos (whiteboards, book covers, notes) that the AI reads and sorts for you.</string>
+		<string>Ally uses the camera to capture photos (whiteboards, book covers, notes) that the AI reads and sorts for you.</string>
 		<key>NSPhotoLibraryUsageDescription</key>
-		<string>LifeOS lets you attach photos from your library to capture and organize them.</string>
+		<string>Ally lets you attach photos from your library to capture and organize them.</string>
 		<key>CADisableMinimumFrameDurationOnPhone</key>
 		<true/>
 		<key>CFBundleDevelopmentRegion</key>
 		<string>$(DEVELOPMENT_LANGUAGE)</string>
 		<key>CFBundleDisplayName</key>
-		<string>LifeOS</string>
+		<string>Ally</string>
 		<key>CFBundleExecutable</key>
 		<string>$(EXECUTABLE_NAME)</string>
 		<key>CFBundleIdentifier</key>
@@ -23,7 +23,7 @@
 		<key>CFBundleInfoDictionaryVersion</key>
 		<string>6.0</string>
 		<key>CFBundleName</key>
-		<string>LifeOS</string>
+		<string>Ally</string>
 		<key>CFBundlePackageType</key>
 		<string>APPL</string>
 		<key>CFBundleShortVersionString</key>

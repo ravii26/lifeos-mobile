@@ -29,12 +29,13 @@ class ShareIntentService {
     switch (f.type) {
       case SharedMediaType.text:
       case SharedMediaType.url:
-        _bus.push(PendingCaptureIntent(text: f.path));
+        _bus.push(PendingCaptureIntent(text: f.path, fromShare: true));
         break;
       case SharedMediaType.image:
         _bus.push(PendingCaptureIntent(
           imagePath: f.path,
           imageMime: f.mimeType ?? 'image/jpeg',
+          fromShare: true,
         ));
         break;
       default:

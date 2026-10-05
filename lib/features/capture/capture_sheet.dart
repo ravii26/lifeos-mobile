@@ -337,7 +337,7 @@ class _CaptureSheetState extends State<CaptureSheet> {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                    'Capture anything — LifeOS classifies it for you.',
+                    'Capture anything — Ally sorts it for you.',
                     style: TextStyle(fontSize: 12.5, color: AppColors.tx3)),
                 const SizedBox(height: 14),
                 Container(
