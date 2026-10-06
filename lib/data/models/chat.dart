@@ -8,9 +8,21 @@ class ChatAction {
   final DateTime? remindAt;
   final String? kind; // NUDGE_SET: NIGHTLY | MORNING
   final String? time; // NUDGE_SET: HH:mm, or null when turned off
+  final String? activityId; // for Undo
+  final bool undone;
 
   const ChatAction(
-      {required this.type, this.id, required this.text, this.remindAt, this.kind, this.time});
+      {required this.type,
+      this.id,
+      required this.text,
+      this.remindAt,
+      this.kind,
+      this.time,
+      this.activityId,
+      this.undone = false});
+
+  ChatAction markUndone() => ChatAction(
+      type: type, id: id, text: text, remindAt: remindAt, kind: kind, time: time, activityId: activityId, undone: true);
 
   factory ChatAction.fromJson(Json j) => ChatAction(
         type: asString(j['type']),
@@ -19,6 +31,8 @@ class ChatAction {
         remindAt: asDate(j['remindAt'])?.toLocal(),
         kind: asStringOrNull(j['kind']),
         time: asStringOrNull(j['time']),
+        activityId: asStringOrNull(j['activityId']),
+        undone: asBool(j['undone']),
       );
 
   Json toJson() => {
@@ -28,6 +42,8 @@ class ChatAction {
         if (remindAt != null) 'remindAt': remindAt!.toUtc().toIso8601String(),
         if (kind != null) 'kind': kind,
         if (time != null) 'time': time,
+        if (activityId != null) 'activityId': activityId,
+        if (undone) 'undone': true,
       };
 }
 

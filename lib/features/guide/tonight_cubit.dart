@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:equatable/equatable.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
+import '../../core/api/api_client.dart' show QueuedOfflineException;
 import '../../core/api/api_exception.dart';
 import '../../core/notifications/notification_service.dart';
 import '../../data/models/tonight.dart';
@@ -87,9 +88,17 @@ class TonightCubit extends Cubit<TonightState> {
     if (c == null) return;
     emit(state.copyWith(busy: true));
     try {
-      await _repo.guideRespond(status, reason: reason, date: c.date);
+      final answered = await _repo.guideRespond(status, reason: reason, date: c.date);
+      _lastUndo = answered.activityId;
       await load();
       if (status != 'SKIPPED') await _loadNext();
+    } on QueuedOfflineException {
+      // Saved for later: show it as answered now; it syncs when back online.
+      final t = state.tonight!;
+      emit(state.copyWith(
+        tonight: Tonight(date: t.date, commitment: c.withStatus(status), missedNights: t.missedNights),
+        error: "Saved offline. It'll sync when you're back online.",
+      ));
     } on ApiException catch (e) {
       emit(state.copyWith(error: e.message));
     } finally {
@@ -140,6 +149,27 @@ class TonightCubit extends Cubit<TonightState> {
   }
 
   void dismissNext() => emit(state.copyWith(clearNext: true));
+
+  String? _lastUndo;
+
+  /// True right after an answer made in this session, so the card can offer Undo.
+  bool get canUndo => _lastUndo != null;
+
+  Future<void> undoLast() async {
+    final id = _lastUndo;
+    if (id == null) return;
+    emit(state.copyWith(busy: true));
+    try {
+      await _repo.undo(id);
+      _lastUndo = null;
+      emit(state.copyWith(clearNext: true));
+      await load();
+    } on ApiException catch (e) {
+      emit(state.copyWith(error: e.message));
+    } finally {
+      emit(state.copyWith(busy: false));
+    }
+  }
 
   @override
   Future<void> close() {

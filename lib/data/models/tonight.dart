@@ -13,6 +13,8 @@ class Commitment {
   final String mode; // NORMAL | SMALLER
   final String status; // PENDING | DONE | MINIMUM | SKIPPED
   final String? skipReason;
+  // Present right after answering: lets the screen offer Undo.
+  final String? activityId;
 
   const Commitment({
     required this.id,
@@ -26,7 +28,22 @@ class Commitment {
     required this.mode,
     required this.status,
     this.skipReason,
+    this.activityId,
   });
+
+  Commitment withStatus(String s) => Commitment(
+        id: id,
+        date: date,
+        sourceType: sourceType,
+        sourceId: sourceId,
+        title: title,
+        minimum: minimum,
+        why: why,
+        message: message,
+        mode: mode,
+        status: s,
+        skipReason: skipReason,
+      );
 
   bool get isPending => status == 'PENDING';
   bool get isSmaller => mode == 'SMALLER';
@@ -43,6 +60,7 @@ class Commitment {
         mode: asString(j['mode'], 'NORMAL'),
         status: asString(j['status'], 'PENDING'),
         skipReason: asStringOrNull(j['skipReason']),
+        activityId: asStringOrNull(j['activityId']),
       );
 }
 

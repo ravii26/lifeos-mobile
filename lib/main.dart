@@ -75,6 +75,7 @@ class LifeOSApp extends StatelessWidget {
               appearance.reset();
               decisions.reset();
               getIt<WidgetSyncService>().clear();
+              getIt<LifeRepository>().clearOffline().ignore();
             }
           },
           child: BlocBuilder<AppearanceCubit, AppearanceState>(

@@ -137,7 +137,7 @@ class LifeRepository {
   }
 
   Future<Task> completeTask(String id) async {
-    final data = await _api.patch('/tasks/$id/complete');
+    final data = await _api.patch('/tasks/$id/complete', queueOffline: true);
     return Task.fromJson(data as Json);
   }
 
@@ -154,7 +154,7 @@ class LifeRepository {
   /// omit it to log today.
   Future<void> logHabit(String id,
       {bool completed = true, int? count, int? minutes, DateTime? date}) {
-    return _api.post('/habits/$id/log', body: {
+    return _api.post('/habits/$id/log', queueOffline: true, body: {
       'completed': completed,
       if (count != null) 'count': count,
       if (minutes != null) 'minutes': minutes,
@@ -840,15 +840,26 @@ class LifeRepository {
 
   /// [status] is DONE | MINIMUM | SKIPPED. [date] pins the night being
   /// answered (a late answer after midnight still lands on the right night).
+  /// [source] is NOTIFICATION when answered from the notification buttons.
+  /// Offline, the answer is queued and sent later (QueuedOfflineException).
   Future<Commitment> guideRespond(String status,
-      {String? reason, String? date}) async {
-    final data = await _api.post('/guide/tonight/respond', body: {
+      {String? reason, String? date, String source = 'APP'}) async {
+    final data = await _api.post('/guide/tonight/respond', queueOffline: true, body: {
       'status': status,
       if (reason != null && reason.trim().isNotEmpty) 'reason': reason.trim(),
       if (date != null) 'date': date,
+      'source': source,
     });
     return Commitment.fromJson(data as Json);
   }
+
+  /// Reverses one logged action (see the server's /activity/:id/undo).
+  Future<void> undo(String activityId) => _api.post('/activity/$activityId/undo');
+
+  /// Sends anything that was queued while offline.
+  Future<int> syncOffline() => _api.flushQueue();
+
+  Future<void> clearOffline() => _api.offline.clear();
 
   Future<NextStep?> guideNext() async {
     final data = await _api.get('/guide/next');

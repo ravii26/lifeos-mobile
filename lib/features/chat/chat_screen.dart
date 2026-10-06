@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
@@ -115,7 +117,8 @@ class _ChatScreenState extends State<ChatScreen> {
                         itemCount: s.messages.length + (s.sending ? 1 : 0),
                         itemBuilder: (_, i) => i == s.messages.length
                             ? const _Typing()
-                            : _Bubble(s.messages[i]),
+                            : _Bubble(s.messages[i],
+                                onUndo: (ai) => context.read<ChatCubit>().undoAction(i, ai)),
                       ),
               ),
               _Composer(
@@ -174,7 +177,8 @@ const _roleLabel = {
 
 class _Bubble extends StatelessWidget {
   final ChatMessage m;
-  const _Bubble(this.m);
+  final void Function(int actionIndex) onUndo;
+  const _Bubble(this.m, {required this.onUndo});
 
   @override
   Widget build(BuildContext context) {
@@ -209,7 +213,8 @@ class _Bubble extends StatelessWidget {
                     : G.voice(17, color: G.ink),
               ),
             ),
-            for (final a in m.actions) _Receipt(a),
+            for (var ai = 0; ai < m.actions.length; ai++)
+              _Receipt(m.actions[ai], onUndo: () => onUndo(ai)),
           ],
         ),
       ),
@@ -220,7 +225,8 @@ class _Bubble extends StatelessWidget {
 /// A small line under the reply showing what was actually done.
 class _Receipt extends StatelessWidget {
   final ChatAction a;
-  const _Receipt(this.a);
+  final VoidCallback onUndo;
+  const _Receipt(this.a, {required this.onUndo});
 
   @override
   Widget build(BuildContext context) {
@@ -247,14 +253,48 @@ class _Receipt extends StatelessWidget {
       child: Row(mainAxisSize: MainAxisSize.min, children: [
         Icon(icon, size: 16, color: G.good),
         const SizedBox(width: 6),
-        Flexible(child: Text(text, style: G.text(13, color: G.muted, w: FontWeight.w700))),
+        Flexible(
+          child: Text(a.undone ? 'Undone: $text' : text,
+              style: G.text(13,
+                  color: G.muted,
+                  w: FontWeight.w700).copyWith(decoration: a.undone ? TextDecoration.lineThrough : null)),
+        ),
+        if (a.activityId != null && !a.undone)
+          GestureDetector(
+            onTap: onUndo,
+            child: Padding(
+              padding: const EdgeInsets.only(left: 10),
+              child: Text('Undo', style: G.text(13, w: FontWeight.w700, color: G.ink)),
+            ),
+          ),
       ]),
     );
   }
 }
 
-class _Typing extends StatelessWidget {
+class _Typing extends StatefulWidget {
   const _Typing();
+
+  @override
+  State<_Typing> createState() => _TypingState();
+}
+
+/// After a few seconds, say why it's slow: the free server sleeps when idle.
+class _TypingState extends State<_Typing> {
+  bool _slow = false;
+  Timer? _t;
+
+  @override
+  void initState() {
+    super.initState();
+    _t = Timer(const Duration(seconds: 6), () => mounted ? setState(() => _slow = true) : null);
+  }
+
+  @override
+  void dispose() {
+    _t?.cancel();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) => Align(
@@ -263,7 +303,7 @@ class _Typing extends StatelessWidget {
           margin: const EdgeInsets.only(top: 8),
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
           decoration: BoxDecoration(color: G.card, borderRadius: BorderRadius.circular(20)),
-          child: Text('Thinking…', style: G.voice(16)),
+          child: Text(_slow ? 'Waking up the server… a few more seconds.' : 'Thinking…', style: G.voice(16)),
         ),
       );
 }

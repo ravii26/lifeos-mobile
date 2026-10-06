@@ -40,7 +40,7 @@ class HomeShell extends StatefulWidget {
   State<HomeShell> createState() => _HomeShellState();
 }
 
-class _HomeShellState extends State<HomeShell> {
+class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
   int _index = 0;
   // The `LifeCubit`-scoped context, captured each build — needed so a
   // capture intent (share/voice) that arrives outside the widget tree's own
@@ -51,6 +51,7 @@ class _HomeShellState extends State<HomeShell> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     NotificationService.instance.requestPermission();
     // Behaviour signal: the app was opened (once per session, on shell mount).
     getIt<LifeRepository>().recordBehavior('APP_OPEN').ignore();
@@ -67,8 +68,22 @@ class _HomeShellState extends State<HomeShell> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _captureIntentSub?.cancel();
     super.dispose();
+  }
+
+  /// Back in the app: send anything done offline, then refresh today and
+  /// answer chat messages written without a connection.
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state != AppLifecycleState.resumed) return;
+    final context = _cubitContext;
+    getIt<LifeRepository>().syncOffline().then((_) {
+      if (context == null || !context.mounted) return;
+      context.read<TonightCubit>().load();
+      context.read<ChatCubit>().retryPending();
+    }).ignore();
   }
 
   void _handleCaptureIntent(PendingCaptureIntent intent) {

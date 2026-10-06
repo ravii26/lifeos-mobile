@@ -149,8 +149,17 @@ class _TonightCardState extends State<TonightCard> {
             },
             s),
         const SizedBox(height: 4),
-        Text(skipped ? "Tomorrow's version will be easier to start." : c.title,
-            style: G.text(15, w: FontWeight.w600)),
+        Row(children: [
+          Expanded(
+            child: Text(skipped ? "Tomorrow's version will be easier to start." : c.title,
+                style: G.text(15, w: FontWeight.w600)),
+          ),
+          if (cubit.canUndo)
+            TextButton(
+              onPressed: s.busy ? null : cubit.undoLast,
+              child: Text('Undo', style: G.text(14, w: FontWeight.w700, color: G.muted)),
+            ),
+        ]),
         if (s.next != null && !skipped) ...[
           const SizedBox(height: 10),
           Text('Energy left? One more: ${s.next!.title}', style: G.voice(14, color: G.ink)),

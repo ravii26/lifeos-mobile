@@ -112,7 +112,56 @@ class ChatCubit extends Cubit<ChatState> {
       emit(state.copyWith(messages: list, sending: false, openSave: save?.text));
       await _persist(list);
     } on ApiException catch (e) {
+      if (e.statusCode == null) {
+        // Offline or the server is waking: keep the message and send it later.
+        _pending.add(message);
+        final list = [
+          ...withUser,
+          const ChatMessage(fromUser: false, text: "You're offline right now. I'll answer this as soon as you're back."),
+        ];
+        emit(state.copyWith(messages: list, sending: false));
+        await _persist(list);
+        return;
+      }
       emit(state.copyWith(sending: false, error: e.message));
+    }
+  }
+
+  final List<String> _pending = [];
+
+  /// Sends messages written while offline (called when the app comes back).
+  Future<void> retryPending() async {
+    while (_pending.isNotEmpty && !state.sending) {
+      final next = _pending.removeAt(0);
+      // Drop the "you're offline" placeholder and the duplicate user line.
+      final msgs = [...state.messages];
+      final i = msgs.lastIndexWhere((m) => m.fromUser && m.text == next);
+      if (i >= 0) {
+        msgs.removeAt(i);
+        if (i < msgs.length && !msgs[i].fromUser && msgs[i].text.startsWith("You're offline")) msgs.removeAt(i);
+      }
+      emit(state.copyWith(messages: msgs));
+      await send(next);
+    }
+  }
+
+  /// Undo one thing Ally did (a task, reminder, memory, nudge…).
+  Future<void> undoAction(int messageIndex, int actionIndex) async {
+    final m = state.messages[messageIndex];
+    final a = m.actions[actionIndex];
+    if (a.activityId == null || a.undone) return;
+    try {
+      await _repo.undo(a.activityId!);
+      if (a.type == 'REMINDER_SET' && a.id != null) {
+        await NotificationService.instance.cancelReminder(a.id!);
+      }
+      final actions = [...m.actions]..[actionIndex] = a.markUndone();
+      final msgs = [...state.messages]
+        ..[messageIndex] = ChatMessage(fromUser: m.fromUser, text: m.text, actions: actions, role: m.role);
+      emit(state.copyWith(messages: msgs));
+      await _persist(msgs);
+    } on ApiException catch (e) {
+      emit(state.copyWith(error: e.message));
     }
   }
 

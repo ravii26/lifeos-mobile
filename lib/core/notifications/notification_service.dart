@@ -12,6 +12,8 @@ import '../../data/models/chat.dart';
 import '../../data/models/habit.dart';
 import '../../data/models/tonight.dart';
 import '../../data/repositories/life_repository.dart';
+import '../api/api_client.dart' show QueuedOfflineException;
+import '../api/api_exception.dart';
 import '../di/service_locator.dart';
 
 /// Local notifications: daily habit reminders, and the guide's nightly nudge
@@ -152,9 +154,17 @@ class NotificationService {
     );
   }
 
-  /// Schedules every upcoming reminder from the server (idempotent: same id,
-  /// same notification).
+  Future<void> cancelReminder(String id) => _plugin.cancel(_reminderNotifId(id));
+
+  /// Makes the phone match the server: schedules every upcoming reminder
+  /// (same id → same notification) and cancels ones that no longer exist
+  /// (done, undone, or deleted on another device).
   Future<void> syncReminders(List<Reminder> reminders) async {
+    if (!_ready || kIsWeb) return;
+    final keep = {for (final r in reminders) _reminderNotifId(r.id)};
+    for (final p in await _plugin.pendingNotificationRequests()) {
+      if ((p.id & 0x40000000) != 0 && !keep.contains(p.id)) await _plugin.cancel(p.id);
+    }
     for (final r in reminders) {
       await scheduleReminder(r.id, r.text, r.remindAt);
     }
@@ -273,7 +283,10 @@ class NotificationService {
     }
     final repo = getIt<LifeRepository>();
     try {
-      await repo.guideRespond(action, reason: r.input, date: r.payload);
+      await repo.guideRespond(action, reason: r.input, date: r.payload, source: 'NOTIFICATION');
+    } on ApiException catch (e) {
+      // Queued offline still counts as answered; anything else failed.
+      if (e is! QueuedOfflineException) return false;
     } catch (_) {
       return false;
     }
