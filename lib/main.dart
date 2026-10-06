@@ -14,7 +14,6 @@ import 'data/repositories/life_repository.dart';
 import 'features/appearance/appearance_cubit.dart';
 import 'features/auth/bloc/auth_bloc.dart';
 import 'features/auth/login_screen.dart';
-import 'features/companion/companion_overlay.dart';
 import 'features/now/decisions_cubit.dart';
 import 'features/shell/home_shell.dart';
 import 'features/splash/splash_screen.dart';
@@ -99,19 +98,7 @@ class LifeOSApp extends StatelessWidget {
                 return MediaQuery(
                   data: mq.copyWith(
                       textScaler: TextScaler.linear(appearance.textScale)),
-                  // Float the coach companion above every route, but only once
-                  // the user is signed in.
-                  child: Stack(
-                    children: [
-                      child!,
-                      BlocBuilder<AuthBloc, AuthState>(
-                        builder: (context, auth) =>
-                            auth.status == AuthStatus.authenticated
-                                ? const CompanionOverlay()
-                                : const SizedBox.shrink(),
-                      ),
-                    ],
-                  ),
+                  child: child!,
                 );
               },
               home: const _Root(),

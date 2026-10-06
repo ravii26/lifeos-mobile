@@ -4,47 +4,23 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:google_fonts/google_fonts.dart';
 
-import '../../core/modules/module_registry.dart';
 import '../../core/theme/app_colors.dart';
 import '../../data/models/user.dart';
 import '../appearance/appearance_cubit.dart';
 import '../auth/bloc/auth_bloc.dart';
-import '../behavior/behavior_screen.dart';
-import '../calendar/calendar_screen.dart';
 import '../goals/goals_screen.dart';
-import '../graph/graph_screen.dart';
-import '../identity/identity_screen.dart';
-import '../learn/learn_screen.dart';
-import '../library/library_screen.dart';
-import '../notebooks/notebooks_screen.dart';
-import '../now/now_screen.dart';
-import '../projects/projects_screen.dart';
-import '../review/review_screen.dart';
 import '../shell/life_cubit.dart';
 import '../vault/vault_screen.dart';
-import 'modules_screen.dart';
+import '../chat/memories_screen.dart';
 import 'settings_screen.dart';
 
 class MoreSheet extends StatelessWidget {
   final AppUser user;
   const MoreSheet({super.key, required this.user});
 
-  /// Modules surfaced in the More sheet, in display order. (Tasks/Habits/Areas
-  /// live in the bottom nav and Capture is the FAB, so they're not listed here.)
-  static const _moreModules = [
-    ModuleId.decisions,
-    ModuleId.goals,
-    ModuleId.projects,
-    ModuleId.knowledge,
-    ModuleId.identity,
-    ModuleId.graph,
-    ModuleId.behaviour,
-    ModuleId.calendar,
-    ModuleId.review,
-    ModuleId.learn,
-    ModuleId.library,
-    ModuleId.vault,
-  ];
+  // Ally keeps only what helps you act. Removed from the app (data and server
+  // kept, so they can return): Home, What now, Projects, Learn, Library,
+  // Notebooks, Graph, Behaviour, Calendar, Review, Identity, Focus, Modules.
 
   @override
   Widget build(BuildContext context) {
@@ -116,13 +92,14 @@ class MoreSheet extends StatelessWidget {
                     builder: (context, appearance) => Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      for (final id in _moreModules)
-                        if (appearance.enabled.contains(id.name))
-                          _moduleRow(context, Modules.byKey(id.name)!),
+                      _row(context, 'Goals', "What you're aiming at",
+                          Icons.flag_outlined, () => const GoalsScreen()),
+                      _row(context, 'What Ally remembers', 'See or delete what Ally knows about you',
+                          Icons.psychology_alt_outlined, () => const MemoriesScreen()),
+                      _row(context, 'Hard days', 'What helps when a day is heavy',
+                          Icons.favorite_border_rounded, () => const VaultScreen()),
                       const SizedBox(height: 6),
                       const Divider(height: 24),
-                      _row(context, 'Modules', 'Choose what you see',
-                          Icons.tune, () => const ModulesScreen()),
                       _row(context, 'Settings', 'Profile, vibe & preferences',
                           Icons.settings_outlined,
                           () => SettingsScreen(user: user)),
@@ -154,10 +131,6 @@ class MoreSheet extends StatelessWidget {
       ),
     );
   }
-
-  /// A row for a module screen — pushes the module's destination.
-  Widget _moduleRow(BuildContext context, ModuleDef m) =>
-      _row(context, m.label, m.desc, m.icon, () => _destination(m.id));
 
   Widget _row(BuildContext context, String name, String desc, IconData icon,
       Widget Function() destination) {
@@ -206,20 +179,4 @@ class MoreSheet extends StatelessWidget {
       ),
     );
   }
-
-  Widget _destination(ModuleId id) => switch (id) {
-        ModuleId.decisions => const NowScreen(),
-        ModuleId.goals => const GoalsScreen(),
-        ModuleId.projects => const ProjectsScreen(),
-        ModuleId.knowledge => const KnowledgeScreen(),
-        ModuleId.identity => const IdentityScreen(),
-        ModuleId.graph => const GraphScreen(),
-        ModuleId.behaviour => const BehaviorScreen(),
-        ModuleId.calendar => const CalendarScreen(),
-        ModuleId.review => const ReviewScreen(),
-        ModuleId.learn => const LearnScreen(),
-        ModuleId.library => const LibraryScreen(),
-        ModuleId.vault => const VaultScreen(),
-        _ => SettingsScreen(user: user),
-      };
 }

@@ -6,7 +6,6 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../core/di/service_locator.dart';
 import '../../core/intents/capture_intent_bus.dart';
-import '../../core/modules/module_registry.dart';
 import '../../core/notifications/notification_service.dart';
 import '../../core/theme/app_colors.dart';
 import '../../data/models/user.dart';
@@ -19,7 +18,6 @@ import '../chat/chat_screen.dart';
 import '../guide/save_sheet.dart';
 import '../guide/tonight_cubit.dart';
 import '../habits/habits_screen.dart';
-import '../home/home_screen.dart';
 import '../more/more_sheet.dart';
 import '../tasks/tasks_screen.dart';
 import 'life_cubit.dart';
@@ -144,14 +142,12 @@ class _HomeShellState extends State<HomeShell> {
                       children: [for (final t in tabs) t.screen]),
                 ),
               ),
-              floatingActionButtonLocation:
-                  FloatingActionButtonLocation.centerDocked,
-              floatingActionButton:
-                  _CaptureFab(onTap: () => _openCapture(context)),
               bottomNavigationBar: _BottomNav(
                 tabs: tabs,
                 index: index,
-                onTap: (i) => setState(() => _index = i),
+                onTap: (i) => tabs[i].label == _moreLabel
+                    ? _openMore(context)
+                    : setState(() => _index = i),
               ),
             );
           },
@@ -160,22 +156,21 @@ class _HomeShellState extends State<HomeShell> {
     );
   }
 
-  /// Bottom-nav tabs: Tonight (the guide) + Home + Tasks (core) + Habits
-  /// (optional) + Areas (core).
+  /// Bottom-nav tabs. Ally is chat-first: Chat (with today's one thing
+  /// pinned) is home; Tasks, Habits and Life are the lists behind it. "More"
+  /// isn't a screen, it opens the sheet.
   List<_TabDef> _buildTabs(BuildContext context, AppearanceState appearance) {
     void openMore() => _openMore(context);
     return [
       const _TabDef('Chat', Icons.chat_bubble_outline_rounded, Icons.chat_bubble_rounded,
           ChatScreen()),
-      _TabDef('Home', Icons.dashboard_outlined, Icons.dashboard,
-          HomeScreen(user: widget.user, onOpenMore: openMore)),
       _TabDef('Tasks', Icons.check_circle_outline, Icons.check_circle,
           TasksScreen(onOpenMore: openMore)),
-      if (appearance.isEnabled(ModuleId.habits))
-        _TabDef('Habits', Icons.repeat_rounded, Icons.repeat_rounded,
-            HabitsScreen(onOpenMore: openMore)),
-      _TabDef('Areas', Icons.grid_view_outlined, Icons.grid_view_rounded,
+      _TabDef('Habits', Icons.repeat_rounded, Icons.repeat_rounded,
+          HabitsScreen(onOpenMore: openMore)),
+      _TabDef('Life', Icons.grid_view_outlined, Icons.grid_view_rounded,
           AreasScreen(onOpenMore: openMore)),
+      const _TabDef(_moreLabel, Icons.menu_rounded, Icons.menu_rounded, SizedBox.shrink()),
     ];
   }
 
@@ -211,37 +206,7 @@ class _HomeShellState extends State<HomeShell> {
   }
 }
 
-class _CaptureFab extends StatelessWidget {
-  final VoidCallback onTap;
-  const _CaptureFab({required this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    return Transform.translate(
-      offset: const Offset(0, 6),
-      child: GestureDetector(
-        onTap: onTap,
-        child: Container(
-          width: 58,
-          height: 58,
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [AppColors.accent2, AppColors.accent],
-            ),
-            borderRadius: BorderRadius.circular(20),
-            boxShadow: [
-              BoxShadow(color: AppColors.accentGlow, blurRadius: 24, spreadRadius: 1),
-              BoxShadow(color: Colors.black54, blurRadius: 12, offset: Offset(0, 4)),
-            ],
-          ),
-          child: Icon(Icons.bolt, color: AppColors.accentInk, size: 26),
-        ),
-      ),
-    );
-  }
-}
+const _moreLabel = 'More';
 
 class _BottomNav extends StatelessWidget {
   final List<_TabDef> tabs;
@@ -253,8 +218,6 @@ class _BottomNav extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final todo = context.select<LifeCubit, int>((c) => c.state.todayTasks.length);
-    // Split tabs evenly around the center FAB slot.
-    final split = (tabs.length / 2).ceil();
     return Padding(
       padding: const EdgeInsets.fromLTRB(14, 0, 14, 18),
       child: ClipRRect(
@@ -273,9 +236,7 @@ class _BottomNav extends StatelessWidget {
             ),
             child: Row(
               children: [
-                for (int i = 0; i < split; i++) _tab(i, todo),
-                const SizedBox(width: 64), // FAB slot
-                for (int i = split; i < tabs.length; i++) _tab(i, todo),
+                for (int i = 0; i < tabs.length; i++) _tab(i, todo),
               ],
             ),
           ),
