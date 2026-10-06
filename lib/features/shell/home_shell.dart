@@ -18,7 +18,6 @@ import '../chat/chat_cubit.dart';
 import '../chat/chat_screen.dart';
 import '../guide/save_sheet.dart';
 import '../guide/tonight_cubit.dart';
-import '../guide/tonight_screen.dart';
 import '../habits/habits_screen.dart';
 import '../home/home_screen.dart';
 import '../more/more_sheet.dart';
@@ -168,8 +167,6 @@ class _HomeShellState extends State<HomeShell> {
     return [
       const _TabDef('Chat', Icons.chat_bubble_outline_rounded, Icons.chat_bubble_rounded,
           ChatScreen()),
-      const _TabDef('Tonight', Icons.nightlight_outlined, Icons.nightlight_round,
-          TonightScreen()),
       _TabDef('Home', Icons.dashboard_outlined, Icons.dashboard,
           HomeScreen(user: widget.user, onOpenMore: openMore)),
       _TabDef('Tasks', Icons.check_circle_outline, Icons.check_circle,

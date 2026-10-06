@@ -4,7 +4,9 @@ import 'package:intl/intl.dart';
 
 import '../../data/models/chat.dart';
 import '../guide/guide_style.dart';
+import '../guide/guide_setup_sheet.dart';
 import '../guide/save_sheet.dart';
+import '../guide/tonight_card.dart';
 import '../guide/tonight_cubit.dart';
 import 'chat_cubit.dart';
 import 'memories_screen.dart';
@@ -85,6 +87,11 @@ class _ChatScreenState extends State<ChatScreen> {
                 child: Row(children: [
                   Expanded(child: Text('Ally', style: G.display(26))),
                   IconButton(
+                    tooltip: 'Set up your goals and nudges',
+                    onPressed: () => openGuideSetup(context),
+                    icon: const Icon(Icons.tune_rounded, color: G.ink),
+                  ),
+                  IconButton(
                     tooltip: 'What I remember about you',
                     onPressed: () => Navigator.of(context).push(
                         MaterialPageRoute<void>(builder: (_) => const MemoriesScreen())),
@@ -98,6 +105,7 @@ class _ChatScreenState extends State<ChatScreen> {
                     ),
                 ]),
               ),
+              const TonightCard(),
               Expanded(
                 child: s.messages.isEmpty
                     ? _Empty(onPick: _send)
@@ -110,7 +118,15 @@ class _ChatScreenState extends State<ChatScreen> {
                             : _Bubble(s.messages[i]),
                       ),
               ),
-              _Composer(controller: _input, sending: s.sending, onSend: _send),
+              _Composer(
+                controller: _input,
+                sending: s.sending,
+                onSend: _send,
+                onSave: () async {
+                  final tonight = context.read<TonightCubit>();
+                  if (await openPasteSave(context)) tonight.load();
+                },
+              ),
             ]);
           },
         ),
@@ -256,7 +272,9 @@ class _Composer extends StatelessWidget {
   final TextEditingController controller;
   final bool sending;
   final void Function([String?]) onSend;
-  const _Composer({required this.controller, required this.sending, required this.onSend});
+  final VoidCallback onSave;
+  const _Composer(
+      {required this.controller, required this.sending, required this.onSend, required this.onSave});
 
   @override
   Widget build(BuildContext context) {
@@ -264,6 +282,11 @@ class _Composer extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(12, 8, 8, 96),
       color: G.bg,
       child: Row(children: [
+        IconButton(
+          tooltip: 'Turn a saved video into an action',
+          onPressed: onSave,
+          icon: const Icon(Icons.link_rounded, color: G.muted),
+        ),
         Expanded(
           child: TextField(
             controller: controller,
