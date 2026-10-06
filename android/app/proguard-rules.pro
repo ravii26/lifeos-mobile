@@ -19,3 +19,11 @@
 }
 -keep,allowobfuscation,allowshrinking class com.google.gson.reflect.TypeToken
 -keep,allowobfuscation,allowshrinking class * extends com.google.gson.reflect.TypeToken
+
+# WorkManager (used for the background widget/nudge refresh) creates its Room
+# database by reflection; R8 removed the no-arg constructor and the app
+# crashed at startup ("NoSuchMethodException: WorkDatabase_Impl.<init>").
+-keep class * extends androidx.room.RoomDatabase { <init>(); }
+-keep class androidx.work.impl.WorkDatabase_Impl { *; }
+-keep class androidx.work.** { *; }
+-keep class androidx.startup.** { *; }
