@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:intl/intl.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
@@ -134,39 +135,64 @@ class NotificationService {
 
   static int _reminderNotifId(String id) => 0x40000000 | (id.hashCode & 0x3fffffff);
 
-  Future<void> scheduleReminder(String id, String text, DateTime at) async {
-    if (!_ready || kIsWeb || at.isBefore(DateTime.now())) return;
-    await _plugin.zonedSchedule(
-      _reminderNotifId(id),
-      'Reminder',
-      text,
-      tz.TZDateTime.from(at, tz.local),
-      const NotificationDetails(
-        android: AndroidNotificationDetails('reminders', 'Reminders',
-            channelDescription: 'Reminders you asked for',
-            importance: Importance.high,
-            priority: Priority.high),
-        iOS: DarwinNotificationDetails(),
-      ),
-      androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
-      uiLocalNotificationDateInterpretation:
-          UILocalNotificationDateInterpretation.absoluteTime,
-    );
+  // The closing nudge of a time window ("between 5 and 7" → again at 6:45).
+  static int _windowNotifId(String id) => 0x40000000 | ((id.hashCode ^ 0x2a5a5a5) & 0x3fffffff);
+
+  static const _windowWarnBefore = Duration(minutes: 15);
+
+  static const _reminderDetails = NotificationDetails(
+    android: AndroidNotificationDetails('reminders', 'Reminders',
+        channelDescription: 'Reminders you asked for',
+        importance: Importance.high,
+        priority: Priority.high),
+    iOS: DarwinNotificationDetails(),
+  );
+
+  Future<void> _schedule(int id, String title, String text, DateTime at) => _plugin.zonedSchedule(
+        id,
+        title,
+        text,
+        tz.TZDateTime.from(at, tz.local),
+        _reminderDetails,
+        androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
+        uiLocalNotificationDateInterpretation: UILocalNotificationDateInterpretation.absoluteTime,
+      );
+
+  /// A reminder notifies at [at]. With a [windowEnd] ("sometime between 5 and
+  /// 7") it also notifies shortly before the window closes. Repeating
+  /// reminders need nothing extra: the server creates the next occurrence
+  /// when one is done, and [syncReminders] schedules it.
+  Future<void> scheduleReminder(String id, String text, DateTime at, {DateTime? windowEnd}) async {
+    if (!_ready || kIsWeb) return;
+    final now = DateTime.now();
+    if (at.isAfter(now)) await _schedule(_reminderNotifId(id), 'Reminder', text, at);
+    if (windowEnd != null) {
+      final warn = windowEnd.subtract(_windowWarnBefore);
+      final when = warn.isAfter(at) ? warn : windowEnd;
+      if (when.isAfter(now)) {
+        await _schedule(_windowNotifId(id), 'Still open until ${DateFormat('h:mm a').format(windowEnd)}', text, when);
+      }
+    }
   }
 
-  Future<void> cancelReminder(String id) => _plugin.cancel(_reminderNotifId(id));
+  Future<void> cancelReminder(String id) async {
+    await _plugin.cancel(_reminderNotifId(id));
+    await _plugin.cancel(_windowNotifId(id));
+  }
 
   /// Makes the phone match the server: schedules every upcoming reminder
   /// (same id → same notification) and cancels ones that no longer exist
   /// (done, undone, or deleted on another device).
   Future<void> syncReminders(List<Reminder> reminders) async {
     if (!_ready || kIsWeb) return;
-    final keep = {for (final r in reminders) _reminderNotifId(r.id)};
+    final keep = {
+      for (final r in reminders) ...[_reminderNotifId(r.id), _windowNotifId(r.id)],
+    };
     for (final p in await _plugin.pendingNotificationRequests()) {
       if ((p.id & 0x40000000) != 0 && !keep.contains(p.id)) await _plugin.cancel(p.id);
     }
     for (final r in reminders) {
-      await scheduleReminder(r.id, r.text, r.remindAt);
+      await scheduleReminder(r.id, r.text, r.remindAt, windowEnd: r.windowEnd);
     }
   }
 

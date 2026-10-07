@@ -161,6 +161,10 @@ class LifeCubit extends Cubit<LifeState> {
         await _repo.updateTask(id, status: 'PENDING');
       } else {
         await _repo.completeTask(id);
+        // A done reminder must stop notifying; a repeating one gets its next date.
+        try {
+          await NotificationService.instance.syncReminders(await _repo.reminders());
+        } catch (_) {}
       }
       final tasks = await _repo.tasks();
       emit(state.copyWith(tasks: tasks));

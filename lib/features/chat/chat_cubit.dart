@@ -91,7 +91,7 @@ class ChatCubit extends Cubit<ChatState> {
       final reply = await _repo.chat(message, history);
       for (final a in reply.actions) {
         if (a.type == 'REMINDER_SET' && a.id != null && a.remindAt != null) {
-          await NotificationService.instance.scheduleReminder(a.id!, a.text, a.remindAt!);
+          await NotificationService.instance.scheduleReminder(a.id!, a.text, a.remindAt!, windowEnd: a.windowEnd);
         } else if (a.type == 'NUDGE_SET') {
           // The Tonight screen reloads after any action and reschedules from these.
           a.kind == 'MORNING'
@@ -107,6 +107,7 @@ class ChatCubit extends Cubit<ChatState> {
           text: reply.reply,
           role: reply.role,
           actions: reply.actions.where((a) => a.type != 'OPEN_SAVE').toList(),
+          suggestions: reply.suggestions,
         ),
       ];
       emit(state.copyWith(messages: list, sending: false, openSave: save?.text));
@@ -152,17 +153,51 @@ class ChatCubit extends Cubit<ChatState> {
     if (a.activityId == null || a.undone) return;
     try {
       await _repo.undo(a.activityId!);
-      if (a.type == 'REMINDER_SET' && a.id != null) {
+      if ((a.type == 'REMINDER_SET' || a.type == 'TASK_ADDED') && a.id != null) {
         await NotificationService.instance.cancelReminder(a.id!);
       }
       final actions = [...m.actions]..[actionIndex] = a.markUndone();
-      final msgs = [...state.messages]
-        ..[messageIndex] = ChatMessage(fromUser: m.fromUser, text: m.text, actions: actions, role: m.role);
+      final msgs = [...state.messages]..[messageIndex] = m.copyWith(actions: actions);
       emit(state.copyWith(messages: msgs));
       await _persist(msgs);
     } on ApiException catch (e) {
       emit(state.copyWith(error: e.message));
     }
+  }
+
+  /// "Undo all" on the Saved-N-things card.
+  Future<void> undoAll(int messageIndex) async {
+    final count = state.messages[messageIndex].actions.length;
+    for (var i = 0; i < count; i++) {
+      final a = state.messages[messageIndex].actions[i];
+      if (a.isCreation && !a.undone) await undoAction(messageIndex, i);
+    }
+  }
+
+  /// "Edit" on the card: fix the title of one saved thing.
+  Future<void> rename(int messageIndex, int actionIndex, String title) async {
+    final t = title.trim();
+    final m = state.messages[messageIndex];
+    final a = m.actions[actionIndex];
+    if (t.isEmpty || a.id == null || a.itemType == null || t == a.text) return;
+    try {
+      await _repo.renameCaptured(a.itemType!, a.id!, t);
+      final actions = [...m.actions]..[actionIndex] = a.copyWith(text: t);
+      final msgs = [...state.messages]..[messageIndex] = m.copyWith(actions: actions);
+      emit(state.copyWith(messages: msgs));
+      await _persist(msgs);
+    } on ApiException catch (e) {
+      emit(state.copyWith(error: e.message));
+    }
+  }
+
+  /// Ally offered a habit; it is only added on this tap.
+  Future<void> acceptSuggestion(int messageIndex, String title) async {
+    final m = state.messages[messageIndex];
+    final msgs = [...state.messages]
+      ..[messageIndex] = m.copyWith(suggestions: m.suggestions.where((s) => s != title).toList());
+    emit(state.copyWith(messages: msgs));
+    await send('Yes, add the habit: $title');
   }
 
   void saveHandled() => emit(state.copyWith());

@@ -932,6 +932,11 @@ class LifeRepository {
     return ChatReply.fromJson(data as Json);
   }
 
+  /// Fix the title of something Ally just captured ("edit" on the confirm card).
+  /// [type] is task | habit | project | note.
+  Future<void> renameCaptured(String type, String id, String title) =>
+      _api.patch('/assistant/items/$type/$id', body: {'title': title});
+
   Future<List<MemoryItem>> memories() async {
     final data = await _api.get('/assistant/memories');
     return (data as List).whereType<Json>().map(MemoryItem.fromJson).toList();
