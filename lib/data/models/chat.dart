@@ -4,13 +4,47 @@ import 'json.dart';
 class AskOption {
   final String id;
   final String title;
-  const AskOption(this.id, this.title);
+  final int minutes; // NOW_PICK: how long it takes now
+  final bool smaller;
+  const AskOption(this.id, this.title, [this.minutes = 0, this.smaller = false]);
+}
+
+/// More planned for today than there is free time: what could move to later.
+class ChatCapacity {
+  final String message;
+  final List<String> moveIds;
+  final int keepCount;
+  final bool moved;
+  final String? moveActivityId; // Undo for the move
+  final bool undone;
+  const ChatCapacity(this.message, this.moveIds, this.keepCount, {this.moved = false, this.moveActivityId, this.undone = false});
+
+  ChatCapacity copyWith({bool? moved, String? moveActivityId, bool? undone}) => ChatCapacity(message, moveIds, keepCount,
+      moved: moved ?? this.moved, moveActivityId: moveActivityId ?? this.moveActivityId, undone: undone ?? this.undone);
+
+  factory ChatCapacity.fromJson(Json j) => ChatCapacity(
+        asString(j['message'] ?? j['text']),
+        ((j['moveIds'] as List?) ?? ((j['move'] as List?) ?? const []).whereType<Json>().map((m) => m['id'])).map((e) => e.toString()).toList(),
+        (j['keepCount'] as num?)?.toInt() ?? ((j['keep'] as List?)?.length ?? 0),
+        moved: asBool(j['moved']),
+        moveActivityId: asStringOrNull(j['moveActivityId']),
+        undone: asBool(j['undone']),
+      );
+
+  Json toJson() => {
+        'message': message,
+        'moveIds': moveIds,
+        'keepCount': keepCount,
+        if (moved) 'moved': true,
+        if (moveActivityId != null) 'moveActivityId': moveActivityId,
+        if (undone) 'undone': true,
+      };
 }
 
 /// Something the assistant actually did during a chat turn.
 class ChatAction {
   // TASK_ADDED | TASK_COMPLETED | HABIT_LOGGED | REMINDER_SET | HABIT_ADDED | PROJECT_ADDED | NOTE_ADDED
-  // | NUDGE_SET | REMEMBERED | FORGOT | OPEN_SAVE | ASK
+  // | NUDGE_SET | REMEMBERED | FORGOT | OPEN_SAVE | ASK | NOW_PICK | MODE_SET | SCHEDULE_SET
   final String type;
   final String? id;
   final String text; // title / reminder text / shared text / the question (ASK)
@@ -80,16 +114,16 @@ class ChatAction {
         remindAt: asDate(j['remindAt'])?.toLocal(),
         windowEnd: asDate(j['windowEnd'])?.toLocal(),
         repeatRule: asStringOrNull(j['repeatRule']),
-        kind: asStringOrNull(j['kind']),
+        kind: asStringOrNull(j['kind'] ?? j['mode']),
         time: asStringOrNull(j['time']),
         activityId: asStringOrNull(j['activityId']),
         undone: asBool(j['undone']),
-        items: ((j['items'] as List?) ?? const []).map((e) => e.toString()).toList(),
+        items: ((j['items'] ?? j['days']) as List? ?? const []).map((e) => e.toString()).toList(),
         tasks: (j['tasks'] as num?)?.toInt() ?? 0,
-        detail: asStringOrNull(j['deadline'] ?? j['timeBlock']),
+        detail: asStringOrNull(j['deadline'] ?? j['timeBlock'] ?? j['until']),
         options: ((j['options'] as List?) ?? const [])
             .whereType<Json>()
-            .map((o) => AskOption(asString(o['id']), asString(o['title'])))
+            .map((o) => AskOption(asString(o['id']), asString(o['title']), (o['minutes'] as num?)?.toInt() ?? 0, asBool(o['smaller'])))
             .toList(),
       );
 
@@ -107,7 +141,8 @@ class ChatAction {
         if (items.isNotEmpty) 'items': items,
         if (tasks > 0) 'tasks': tasks,
         if (detail != null) 'deadline': detail,
-        if (options.isNotEmpty) 'options': [for (final o in options) {'id': o.id, 'title': o.title}],
+        if (options.isNotEmpty)
+          'options': [for (final o in options) {'id': o.id, 'title': o.title, 'minutes': o.minutes, 'smaller': o.smaller}],
       };
 }
 
@@ -117,15 +152,22 @@ class ChatMessage {
   final List<ChatAction> actions;
   final String? role; // FRIEND | ASSISTANT | MENTOR | COACH | GUIDE (assistant replies)
   final List<String> suggestions; // habits Ally offers, added only on a tap
+  final ChatCapacity? capacity;
   const ChatMessage(
-      {required this.fromUser, required this.text, this.actions = const [], this.role, this.suggestions = const []});
+      {required this.fromUser,
+      required this.text,
+      this.actions = const [],
+      this.role,
+      this.suggestions = const [],
+      this.capacity});
 
-  ChatMessage copyWith({List<ChatAction>? actions, List<String>? suggestions}) => ChatMessage(
+  ChatMessage copyWith({List<ChatAction>? actions, List<String>? suggestions, ChatCapacity? capacity}) => ChatMessage(
       fromUser: fromUser,
       text: text,
       actions: actions ?? this.actions,
       role: role,
-      suggestions: suggestions ?? this.suggestions);
+      suggestions: suggestions ?? this.suggestions,
+      capacity: capacity ?? this.capacity);
 
   Json toJson() => {
         'u': fromUser,
@@ -133,6 +175,7 @@ class ChatMessage {
         'a': [for (final a in actions) a.toJson()],
         if (role != null) 'r': role,
         if (suggestions.isNotEmpty) 's': suggestions,
+        if (capacity != null) 'c': capacity!.toJson(),
       };
 
   factory ChatMessage.fromJson(Json j) => ChatMessage(
@@ -144,6 +187,7 @@ class ChatMessage {
             .toList(),
         role: asStringOrNull(j['r']),
         suggestions: ((j['s'] as List?) ?? const []).map((e) => e.toString()).toList(),
+        capacity: j['c'] is Json ? ChatCapacity.fromJson(j['c'] as Json) : null,
       );
 }
 
@@ -152,7 +196,8 @@ class ChatReply {
   final List<ChatAction> actions;
   final String role;
   final List<String> suggestions;
-  const ChatReply(this.reply, this.actions, this.role, [this.suggestions = const []]);
+  final ChatCapacity? capacity;
+  const ChatReply(this.reply, this.actions, this.role, [this.suggestions = const [], this.capacity]);
 
   factory ChatReply.fromJson(Json j) => ChatReply(
         asString(j['reply']),
@@ -163,6 +208,7 @@ class ChatReply {
             .map((s) => asString(s['title']))
             .where((t) => t.isNotEmpty)
             .toList(),
+        j['capacity'] is Json ? ChatCapacity.fromJson(j['capacity'] as Json) : null,
       );
 }
 

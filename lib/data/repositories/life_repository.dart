@@ -932,6 +932,18 @@ class LifeRepository {
     return ChatReply.fromJson(data as Json);
   }
 
+  /// Take these to-dos off today (they stay on the list, undated). Returns the Undo id.
+  Future<String?> moveToLater(List<String> taskIds) async {
+    final data = await _api.post('/now/move', body: {'taskIds': taskIds});
+    return asStringOrNull((data as Json)['activityId']);
+  }
+
+  /// NORMAL | BUSY | SICK | TRAVEL | HOLIDAY
+  Future<String> mode() async {
+    final data = await _api.get('/now/mode');
+    return asString((data as Json)['mode'], 'NORMAL');
+  }
+
   /// Fix the title of something Ally just captured ("edit" on the confirm card).
   /// [type] is task | habit | project | note.
   Future<void> renameCaptured(String type, String id, String title) =>

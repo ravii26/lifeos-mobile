@@ -50,6 +50,7 @@ class ChatCubit extends Cubit<ChatState> {
   ChatCubit(this._repo) : super(const ChatState()) {
     _restore();
     _syncReminders();
+    _applyMode();
   }
 
   Future<void> _restore() async {
@@ -75,6 +76,17 @@ class ChatCubit extends Cubit<ChatState> {
   }
 
   // Reminders set on another device, or before a reinstall, still fire here.
+  // Sick, travel and holiday mode pause everything Ally starts on its own.
+  // The server holds the mode; the phone follows it.
+  Future<void> _applyMode() async {
+    try {
+      final mode = await _repo.mode();
+      final paused = mode == 'SICK' || mode == 'TRAVEL' || mode == 'HOLIDAY';
+      await NotificationService.instance.setPaused(paused);
+      await NotificationService.instance.syncHabitReminders(await _repo.habits());
+    } catch (_) {}
+  }
+
   Future<void> _syncReminders() async {
     try {
       await NotificationService.instance.syncReminders(await _repo.reminders());
@@ -92,6 +104,8 @@ class ChatCubit extends Cubit<ChatState> {
       for (final a in reply.actions) {
         if (a.type == 'REMINDER_SET' && a.id != null && a.remindAt != null) {
           await NotificationService.instance.scheduleReminder(a.id!, a.text, a.remindAt!, windowEnd: a.windowEnd);
+        } else if (a.type == 'MODE_SET') {
+          await _applyMode();
         } else if (a.type == 'NUDGE_SET') {
           // The Tonight screen reloads after any action and reschedules from these.
           a.kind == 'MORNING'
@@ -108,6 +122,7 @@ class ChatCubit extends Cubit<ChatState> {
           role: reply.role,
           actions: reply.actions.where((a) => a.type != 'OPEN_SAVE').toList(),
           suggestions: reply.suggestions,
+          capacity: reply.capacity,
         ),
       ];
       emit(state.copyWith(messages: list, sending: false, openSave: save?.text));
@@ -156,6 +171,7 @@ class ChatCubit extends Cubit<ChatState> {
       if ((a.type == 'REMINDER_SET' || a.type == 'TASK_ADDED') && a.id != null) {
         await NotificationService.instance.cancelReminder(a.id!);
       }
+      if (a.type == 'MODE_SET') await _applyMode();
       final actions = [...m.actions]..[actionIndex] = a.markUndone();
       final msgs = [...state.messages]..[messageIndex] = m.copyWith(actions: actions);
       emit(state.copyWith(messages: msgs));
@@ -184,6 +200,36 @@ class ChatCubit extends Cubit<ChatState> {
       await _repo.renameCaptured(a.itemType!, a.id!, t);
       final actions = [...m.actions]..[actionIndex] = a.copyWith(text: t);
       final msgs = [...state.messages]..[messageIndex] = m.copyWith(actions: actions);
+      emit(state.copyWith(messages: msgs));
+      await _persist(msgs);
+    } on ApiException catch (e) {
+      emit(state.copyWith(error: e.message));
+    }
+  }
+
+  /// "Move to later" on the too-much-today card.
+  Future<void> moveToLater(int messageIndex) async {
+    final m = state.messages[messageIndex];
+    final c = m.capacity;
+    if (c == null || c.moved) return;
+    try {
+      final undoId = await _repo.moveToLater(c.moveIds);
+      final msgs = [...state.messages]
+        ..[messageIndex] = m.copyWith(capacity: c.copyWith(moved: true, moveActivityId: undoId));
+      emit(state.copyWith(messages: msgs));
+      await _persist(msgs);
+    } on ApiException catch (e) {
+      emit(state.copyWith(error: e.message));
+    }
+  }
+
+  Future<void> undoMove(int messageIndex) async {
+    final m = state.messages[messageIndex];
+    final c = m.capacity;
+    if (c?.moveActivityId == null || c!.undone) return;
+    try {
+      await _repo.undo(c.moveActivityId!);
+      final msgs = [...state.messages]..[messageIndex] = m.copyWith(capacity: c.copyWith(undone: true));
       emit(state.copyWith(messages: msgs));
       await _persist(msgs);
     } on ApiException catch (e) {

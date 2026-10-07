@@ -99,14 +99,16 @@ class _ChatScreenState extends State<ChatScreen> {
     _dictBase = _input.text.isEmpty ? '' : '${_input.text.trimRight()} ';
     setState(() => _listening = true);
     await _speech.listen(
-      localeId: _lang,
       onResult: (r) {
         _input.text = '$_dictBase${r.recognizedWords}';
         _input.selection = TextSelection.collapsed(offset: _input.text.length);
       },
-      listenFor: const Duration(minutes: 3),
-      pauseFor: const Duration(seconds: 8),
-      listenOptions: SpeechListenOptions(partialResults: true),
+      listenOptions: SpeechListenOptions(
+        partialResults: true,
+        localeId: _lang,
+        listenFor: const Duration(minutes: 3),
+        pauseFor: const Duration(seconds: 8),
+      ),
     );
   }
 
@@ -208,7 +210,9 @@ class _ChatScreenState extends State<ChatScreen> {
                                 onUndoAll: () => context.read<ChatCubit>().undoAll(i),
                                 onEdit: (ai, current) => _edit(i, ai, current),
                                 onPick: (title) => _send('Done: $title'),
-                                onSuggest: (t) => context.read<ChatCubit>().acceptSuggestion(i, t)),
+                                onSuggest: (t) => context.read<ChatCubit>().acceptSuggestion(i, t),
+                                onMove: () => context.read<ChatCubit>().moveToLater(i),
+                                onUndoMove: () => context.read<ChatCubit>().undoMove(i)),
                       ),
               ),
               _Composer(
@@ -276,12 +280,16 @@ class _Bubble extends StatelessWidget {
   final void Function(int actionIndex, String current) onEdit;
   final void Function(String title) onPick;
   final void Function(String title) onSuggest;
+  final VoidCallback onMove;
+  final VoidCallback onUndoMove;
   const _Bubble(this.m,
       {required this.onUndo,
       required this.onUndoAll,
       required this.onEdit,
       required this.onPick,
-      required this.onSuggest});
+      required this.onSuggest,
+      required this.onMove,
+      required this.onUndoMove});
 
   @override
   Widget build(BuildContext context) {
@@ -290,6 +298,7 @@ class _Bubble extends StatelessWidget {
     final created = [for (var i = 0; i < m.actions.length; i++) if (m.actions[i].isCreation) i];
     final grouped = created.length >= 2;
     final ask = m.actions.where((a) => a.type == 'ASK').firstOrNull;
+    final now = m.actions.where((a) => a.type == 'NOW_PICK').firstOrNull;
     return Align(
       alignment: m.fromUser ? Alignment.centerRight : Alignment.centerLeft,
       child: ConstrainedBox(
@@ -329,7 +338,7 @@ class _Bubble extends StatelessWidget {
                 onEdit: onEdit,
               ),
             for (var ai = 0; ai < m.actions.length; ai++)
-              if (m.actions[ai].type != 'ASK' && !(grouped && m.actions[ai].isCreation))
+              if (m.actions[ai].type != 'ASK' && m.actions[ai].type != 'NOW_PICK' && !(grouped && m.actions[ai].isCreation))
                 _Receipt(m.actions[ai], onUndo: () => onUndo(ai)),
             if (ask != null)
               Padding(
@@ -345,6 +354,24 @@ class _Bubble extends StatelessWidget {
                     ),
                 ]),
               ),
+            // The right-now answer: tap one to say you did it (Ally logs it, with Undo).
+            if (now != null && now.options.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.only(top: 8),
+                child: Wrap(spacing: 8, runSpacing: 8, children: [
+                  for (final o in now.options)
+                    ActionChip(
+                      avatar: const Icon(Icons.check_rounded, size: 18, color: G.ink),
+                      label: Text('${o.title}${o.minutes > 0 ? ' · ${o.minutes} min' : ''}', style: G.text(14, w: FontWeight.w600)),
+                      backgroundColor: G.card,
+                      side: const BorderSide(color: G.line),
+                      shape: const StadiumBorder(),
+                      onPressed: () => onPick(o.title),
+                    ),
+                ]),
+              ),
+            if (m.capacity != null)
+              _CapacityCard(c: m.capacity!, onMove: onMove, onUndo: onUndoMove),
             if (m.suggestions.isNotEmpty)
               Padding(
                 padding: const EdgeInsets.only(top: 8),
@@ -418,8 +445,63 @@ String _repeatLabel(String rule) {
             '${a.windowEnd == null ? '' : ' to ${time(a.windowEnd!)}'}'
             '${a.repeatRule == null ? '' : ', ${_repeatLabel(a.repeatRule!)}'}: ${a.text}'
       ),
+    'MODE_SET' => (
+        Icons.bedtime_outlined,
+        switch (a.kind) {
+          'SICK' => 'Sick mode on',
+          'BUSY' => 'Busy mode on${a.detail == null ? '' : ' until ${a.detail}'}',
+          'TRAVEL' => 'Travel mode on',
+          'HOLIDAY' => 'Holiday mode on',
+          _ => 'Back to normal',
+        }
+      ),
+    'SCHEDULE_SET' => (Icons.schedule_rounded, 'Day updated for ${a.items.join(', ')}'),
     _ => (Icons.bolt_rounded, a.text),
   };
+}
+
+/// "5 h planned for 1.5 h": offers to move the extra to later instead of
+/// letting today be overloaded. Nothing moves until you tap.
+class _CapacityCard extends StatelessWidget {
+  final ChatCapacity c;
+  final VoidCallback onMove;
+  final VoidCallback onUndo;
+  const _CapacityCard({required this.c, required this.onMove, required this.onUndo});
+
+  @override
+  Widget build(BuildContext context) {
+    final moved = c.moved && !c.undone;
+    return Container(
+      margin: const EdgeInsets.only(top: 8),
+      padding: const EdgeInsets.fromLTRB(14, 12, 10, 8),
+      decoration: BoxDecoration(
+        color: G.card,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: G.line),
+      ),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text(moved ? 'Moved ${c.moveIds.length} to later. Today keeps ${c.keepCount}.' : c.message,
+            style: G.text(14, w: FontWeight.w600)),
+        const SizedBox(height: 4),
+        if (c.moveIds.isNotEmpty && !c.moved)
+          Align(
+            alignment: Alignment.centerRight,
+            child: TextButton(
+              onPressed: onMove,
+              child: Text('Move ${c.moveIds.length} to later', style: G.text(13, w: FontWeight.w700, color: G.ink)),
+            ),
+          ),
+        if (moved && c.moveActivityId != null)
+          Align(
+            alignment: Alignment.centerRight,
+            child: TextButton(
+              onPressed: onUndo,
+              child: Text('Undo', style: G.text(13, w: FontWeight.w700, color: G.muted)),
+            ),
+          ),
+      ]),
+    );
+  }
 }
 
 /// One card for everything Ally saved from a single message, with a way to

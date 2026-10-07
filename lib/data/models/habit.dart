@@ -8,6 +8,8 @@ class Habit {
   final int targetMinutes;
   final String frequency;
   final String? reminderTime; // "HH:mm" or null
+  final String? prepareAhead; // "soak the oats": done the evening before
+  final String? prepTime; // "HH:mm" when the prep step is due
   final String? areaId;
   final bool isActive;
 
@@ -27,6 +29,8 @@ class Habit {
     required this.targetMinutes,
     required this.frequency,
     this.reminderTime,
+    this.prepareAhead,
+    this.prepTime,
     this.areaId,
     required this.isActive,
     required this.currentStreak,
@@ -56,6 +60,8 @@ class Habit {
       targetMinutes: asInt(j['targetMinutes']),
       frequency: asString(j['frequency'], 'DAILY'),
       reminderTime: asStringOrNull(j['reminderTime']),
+      prepareAhead: asStringOrNull(j['prepareAhead']),
+      prepTime: asStringOrNull(j['prepTime']),
       areaId: asStringOrNull(j['areaId']),
       isActive: asBool(j['isActive'], true),
       currentStreak: asInt(j['currentStreak']),

@@ -33,6 +33,8 @@ class NotificationService {
 
   static const nightlyId = 9000;
   static const morningId = 9001;
+  static const prepId = 9002;
+  static const _prefsPaused = 'ally_paused';
   static const _nightlyCategory = 'tonight';
   static const _prefsTime = 'guide_nightly_time';
   static const _prefsMorning = 'guide_morning_time';
@@ -116,8 +118,12 @@ class NotificationService {
     if (!_ready || kIsWeb) return;
     for (final p in await _plugin.pendingNotificationRequests()) {
       final isReminder = (p.id & 0x40000000) != 0;
-      if (p.id != nightlyId && p.id != morningId && !isReminder) await _plugin.cancel(p.id);
+      if (p.id != nightlyId && p.id != morningId && p.id != prepId && !isReminder) await _plugin.cancel(p.id);
     }
+    await _plugin.cancel(prepId);
+    // Sick / travelling / on holiday: no habit or prep prompts at all.
+    if (await isPaused()) return;
+    await _schedulePrep(habits);
     for (final h in habits) {
       final t = _parseTime(h.reminderTime);
       if (t == null || !h.isActive) continue;
@@ -129,6 +135,47 @@ class NotificationService {
         minute: t.$2,
       );
     }
+  }
+
+  /// Sick, travel and holiday mode: Ally sends nothing it started itself.
+  Future<bool> isPaused() async => (await _readPref(_prefsPaused)) == '1';
+
+  Future<void> setPaused(bool paused) async {
+    await _writePref(_prefsPaused, paused ? '1' : null);
+    if (paused) {
+      await _plugin.cancel(prepId);
+      await _plugin.cancel(nightlyId);
+      await _plugin.cancel(morningId);
+    }
+  }
+
+  // Quiet hours: nothing Ally starts lands between 22:30 and 07:00.
+  static bool _quiet(int hour, int minute) {
+    final m = hour * 60 + minute;
+    return m >= 22 * 60 + 30 || m < 7 * 60;
+  }
+
+  /// One combined evening prep notification ("soak the oats; pack the gym
+  /// bag") at the earliest prep time. One notification for all preps is the
+  /// notification budget (nightly + morning + prep = at most 3 a day that
+  /// Ally starts). Reminders you asked for are not part of that budget.
+  Future<void> _schedulePrep(List<Habit> habits) async {
+    final due = <(int, int, String)>[];
+    for (final h in habits) {
+      final t = _parseTime(h.prepTime);
+      final what = h.prepareAhead?.trim();
+      if (t == null || !h.isActive || what == null || what.isEmpty || _quiet(t.$1, t.$2)) continue;
+      due.add((t.$1, t.$2, what));
+    }
+    if (due.isEmpty) return;
+    due.sort((a, b) => (a.$1 * 60 + a.$2).compareTo(b.$1 * 60 + b.$2));
+    await _scheduleDaily(
+      id: prepId,
+      title: 'Prep for tomorrow',
+      body: due.map((d) => d.$3).toSet().join('; '),
+      hour: due.first.$1,
+      minute: due.first.$2,
+    );
   }
 
   // ---- Reminders the person asked for in chat ----
