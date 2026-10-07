@@ -938,6 +938,12 @@ class LifeRepository {
     return asStringOrNull((data as Json)['activityId']);
   }
 
+  /// The day schedule for each weekday (0 = Sunday), custom or Ally's default.
+  Future<List<Map<String, dynamic>>> daySchedule() async {
+    final data = await _api.get('/now/schedule');
+    return (data as List).whereType<Map<String, dynamic>>().toList();
+  }
+
   /// NORMAL | BUSY | SICK | TRAVEL | HOLIDAY
   Future<String> mode() async {
     final data = await _api.get('/now/mode');
