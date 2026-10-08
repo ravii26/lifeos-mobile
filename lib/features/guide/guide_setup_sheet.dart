@@ -225,7 +225,7 @@ class _GuideSetupState extends State<_GuideSetup> {
           decoration: BoxDecoration(color: G.card, borderRadius: BorderRadius.circular(14)),
           child: Row(children: [
             Expanded(child: Text(text, style: G.text(16))),
-            trailing ?? const Icon(Icons.schedule_rounded, color: G.muted),
+            trailing ?? Icon(Icons.schedule_rounded, color: G.muted),
           ]),
         ),
       );
@@ -233,7 +233,7 @@ class _GuideSetupState extends State<_GuideSetup> {
   @override
   Widget build(BuildContext context) {
     if (_loading) {
-      return const Center(child: CircularProgressIndicator(color: G.ink, strokeWidth: 2));
+      return Center(child: CircularProgressIndicator(color: G.ink, strokeWidth: 2));
     }
     final taken = _rows.map((r) => r.name.toLowerCase()).toSet();
     final presets = _presets.where((p) => !taken.contains(p.$1.toLowerCase())).toList();
@@ -283,7 +283,7 @@ class _GuideSetupState extends State<_GuideSetup> {
                         tooltip: 'Remove',
                         visualDensity: VisualDensity.compact,
                         onPressed: () => setState(() => _rows.remove(r)),
-                        icon: const Icon(Icons.close_rounded, size: 18, color: G.muted),
+                        icon: Icon(Icons.close_rounded, size: 18, color: G.muted),
                       ),
                   ]),
                   const SizedBox(height: 10),
@@ -317,7 +317,7 @@ class _GuideSetupState extends State<_GuideSetup> {
                 ActionChip(
                   label: Text('+ $name', style: G.text(15, w: FontWeight.w500)),
                   backgroundColor: G.card,
-                  side: const BorderSide(color: G.line),
+                  side: BorderSide(color: G.line),
                   shape: const StadiumBorder(),
                   onPressed: () => _addPreset(name, color),
                 ),

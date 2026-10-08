@@ -14,6 +14,7 @@ import 'data/repositories/life_repository.dart';
 import 'features/appearance/appearance_cubit.dart';
 import 'features/auth/bloc/auth_bloc.dart';
 import 'features/auth/login_screen.dart';
+import 'features/guide/guide_style.dart';
 import 'features/now/decisions_cubit.dart';
 import 'features/shell/home_shell.dart';
 import 'features/splash/splash_screen.dart';
@@ -88,18 +89,21 @@ class LifeOSApp extends StatelessWidget {
                   font: appearance.font,
                   light: appearance.light),
               builder: (context, child) {
-                // Status bar icons follow the theme; density scales text app-wide.
+                // Ally's palette follows the phone's light/dark setting (ADR 0021);
+                // status bar icons follow it, and the tree rebuilds when it flips.
+                final dark = MediaQuery.platformBrightnessOf(context) == Brightness.dark;
+                G.dark = dark;
                 SystemChrome.setSystemUIOverlayStyle(SystemUiOverlayStyle(
                   statusBarColor: Colors.transparent,
-                  statusBarIconBrightness: appearance.light
-                      ? Brightness.dark
-                      : Brightness.light,
+                  statusBarIconBrightness: dark ? Brightness.light : Brightness.dark,
+                  systemNavigationBarColor: G.bg,
+                  systemNavigationBarIconBrightness: dark ? Brightness.light : Brightness.dark,
                 ));
                 final mq = MediaQuery.of(context);
                 return MediaQuery(
                   data: mq.copyWith(
                       textScaler: TextScaler.linear(appearance.textScale)),
-                  child: child!,
+                  child: KeyedSubtree(key: ValueKey(dark), child: child!),
                 );
               },
               home: const _Root(),

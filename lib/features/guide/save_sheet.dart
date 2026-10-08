@@ -282,7 +282,7 @@ class _SaveSheetState extends State<_SaveSheet> {
       return Padding(
         padding: const EdgeInsets.only(bottom: 14),
         child: Row(children: [
-          const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: G.ink)),
+          SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: G.ink)),
           const SizedBox(width: 10),
           Expanded(child: Text('Watching the video for you…', style: G.text(14, color: G.muted))),
         ]),
@@ -335,7 +335,7 @@ class _SaveSheetState extends State<_SaveSheet> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: _error == null
               ? [
-                  const CircularProgressIndicator(color: G.ink, strokeWidth: 2),
+                  CircularProgressIndicator(color: G.ink, strokeWidth: 2),
                   const SizedBox(height: 20),
                   Text('Reading what you saved…', style: G.display(26)),
                   const SizedBox(height: 8),

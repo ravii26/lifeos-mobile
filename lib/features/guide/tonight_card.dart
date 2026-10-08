@@ -82,7 +82,7 @@ class _TonightCardState extends State<TonightCard> {
                   overflow: TextOverflow.ellipsis,
                   style: G.text(14, w: FontWeight.w700)),
             ),
-            const Icon(Icons.expand_more_rounded, color: G.muted),
+            Icon(Icons.expand_more_rounded, color: G.muted),
           ]),
         ),
       );
@@ -93,7 +93,7 @@ class _TonightCardState extends State<TonightCard> {
           Expanded(child: Text(label, style: G.label())),
           if (s.history != null) _Dots(history: s.history!),
           const SizedBox(width: 4),
-          const Icon(Icons.expand_less_rounded, size: 20, color: G.muted),
+          Icon(Icons.expand_less_rounded, size: 20, color: G.muted),
         ]),
       );
 
@@ -123,7 +123,7 @@ class _TonightCardState extends State<TonightCard> {
           ],
           PopupMenuButton<String>(
             tooltip: 'More',
-            icon: const Icon(Icons.more_horiz_rounded, color: G.muted),
+            icon: Icon(Icons.more_horiz_rounded, color: G.muted),
             color: G.card,
             onSelected: (v) => v == 'skip' ? _askSkip(context) : cubit.swap(),
             itemBuilder: (_) => [
@@ -295,7 +295,7 @@ class _SkipSheetState extends State<_SkipSheet> {
               ActionChip(
                 label: Text(r, style: G.text(15, w: FontWeight.w500)),
                 backgroundColor: G.card,
-                side: const BorderSide(color: G.line),
+                side: BorderSide(color: G.line),
                 shape: const StadiumBorder(),
                 onPressed: () => Navigator.pop(context, r),
               ),

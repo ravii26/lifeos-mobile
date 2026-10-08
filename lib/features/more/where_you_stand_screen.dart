@@ -59,7 +59,7 @@ class _WhereYouStandScreenState extends State<WhereYouStandScreen> {
           const SizedBox(height: 16),
           if (_error != null) Text(_error!, style: G.text(15, color: G.muted)),
           if (items == null && _error == null)
-            const Center(child: CircularProgressIndicator(color: G.ink, strokeWidth: 2)),
+            Center(child: CircularProgressIndicator(color: G.ink, strokeWidth: 2)),
           if (items != null && items.isEmpty)
             Text('No goals yet. Tell me one in chat and I will set it up with stages or a number to track.',
                 style: G.text(16, color: G.muted)),

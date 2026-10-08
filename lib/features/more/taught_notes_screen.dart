@@ -134,7 +134,7 @@ class _TaughtNotesScreenState extends State<TaughtNotesScreen> {
           const SizedBox(height: 16),
           if (_error != null) Text(_error!, style: G.text(15, color: G.muted)),
           if (notes == null && _error == null)
-            const Center(child: CircularProgressIndicator(color: G.ink, strokeWidth: 2)),
+            Center(child: CircularProgressIndicator(color: G.ink, strokeWidth: 2)),
           if (notes != null && notes.isEmpty)
             Text('Nothing yet. Teach me your breakfasts, a gym warm-up, or how a client likes things done.',
                 style: G.text(16, color: G.muted)),
@@ -163,11 +163,11 @@ class _TaughtNotesScreenState extends State<TaughtNotesScreen> {
                   IconButton(
                       tooltip: 'Edit',
                       onPressed: () => _edit(n),
-                      icon: const Icon(Icons.edit_outlined, size: 20, color: G.muted)),
+                      icon: Icon(Icons.edit_outlined, size: 20, color: G.muted)),
                   IconButton(
                       tooltip: 'Remove',
                       onPressed: () => _delete(n),
-                      icon: const Icon(Icons.close_rounded, color: G.muted)),
+                      icon: Icon(Icons.close_rounded, color: G.muted)),
                 ]),
               ),
           ],

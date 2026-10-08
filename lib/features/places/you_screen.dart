@@ -48,30 +48,16 @@ class YouScreen extends StatelessWidget {
     await showDialog<void>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: Text('Your week', style: G.text(18, w: FontWeight.w800)),
-        content: Text(text, style: G.text(16)),
+        title: Text('Your week', style: G.voice(24, color: G.ink)),
+        content: Text(text, style: G.text(15, height: 1.5)),
         actions: [TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Close'))],
       ),
     );
   }
 
-  Widget _row(String title, String sub, VoidCallback onTap) => InkWell(
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 12),
-          child: Row(children: [
-            Expanded(
-              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text(title, style: G.text(18, w: FontWeight.w700)),
-                if (sub.isNotEmpty) Text(sub, style: G.text(14, color: G.muted)),
-              ]),
-            ),
-            const Icon(Icons.chevron_right_rounded, color: G.muted),
-          ]),
-        ),
-      );
+  Widget _row(String title, String sub, VoidCallback onTap, {bool last = false}) => GRow(title, sub, onTap, last: last);
 
-  Widget _heading(String text) => Padding(padding: const EdgeInsets.only(top: 22, bottom: 2), child: Text(text, style: G.display(22)));
+  Widget _heading(String text) => GHeading(text);
 
   @override
   Widget build(BuildContext context) {
@@ -80,22 +66,22 @@ class YouScreen extends StatelessWidget {
       child: SafeArea(
         bottom: false,
         child: ListView(
-          padding: const EdgeInsets.fromLTRB(20, 16, 20, 40),
+          padding: const EdgeInsets.fromLTRB(24, 22, 24, 40),
           children: [
-            Text('You', style: G.display(34)),
-            Text(user.name.isNotEmpty ? user.name : user.email, style: G.text(14, color: G.muted)),
+            Text('You', style: G.display(36)),
+            Padding(padding: const EdgeInsets.only(top: 4), child: Text(user.name.isNotEmpty ? user.name : user.email, style: G.text(13, color: G.muted))),
             _heading('How you are doing'),
             _row('Where you stand', 'Stage, trend and pace on each goal', () => _push(context, const WhereYouStandScreen())),
-            _row('Your week', 'Only when you ask. Never on a schedule', () => _week(context)),
+            _row('Your week', 'Only when you ask. Never on a schedule', () => _week(context), last: true),
             _heading('What matters now'),
             _row('Areas', 'Main, Secondary, Maintain, Later', () => _push(context, AreasScreen(onOpenMore: () {}), title: 'Areas')),
             _row('Goals', 'What you are aiming at', () => _push(context, const GoalsScreen())),
-            _row('Goals and nudges', 'Set up what Ally may remind you about', () => openGuideSetup(context)),
+            _row('Goals and nudges', 'Set up what Ally may remind you about', () => openGuideSetup(context), last: true),
             _heading('Settings'),
-            _row('Settings', 'Profile and preferences', () => _push(context, SettingsScreen(user: user))),
+            _row('Settings', 'Profile and preferences', () => _push(context, SettingsScreen(user: user)), last: true),
             InkWell(
               onTap: () => context.read<AuthBloc>().add(const AuthLogoutRequested()),
-              child: Padding(padding: const EdgeInsets.symmetric(vertical: 14), child: Text('Sign out', style: G.text(17, w: FontWeight.w700, color: G.muted))),
+              child: Padding(padding: const EdgeInsets.symmetric(vertical: 18), child: Text('Sign out', style: G.text(14, color: G.muted))),
             ),
           ],
         ),

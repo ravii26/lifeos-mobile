@@ -174,7 +174,8 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
   }
 }
 
-/// Four words at the bottom, in the thumb zone. The current place is bold.
+/// Four words at the bottom, in the thumb zone. The current place is bold with
+/// a short accent mark above it; no icons, no pills (ADR 0021).
 class _BottomNav extends StatelessWidget {
   final int index;
   final ValueChanged<int> onTap;
@@ -183,23 +184,23 @@ class _BottomNav extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      decoration: const BoxDecoration(color: G.bg, border: Border(top: BorderSide(color: G.line))),
+      decoration: BoxDecoration(color: G.bg, border: Border(top: BorderSide(color: G.line))),
       child: SafeArea(
         top: false,
         child: SizedBox(
-          height: 58,
+          height: 56,
           child: Row(
             children: [
               for (var i = 0; i < _tabLabels.length; i++)
                 Expanded(
                   child: InkWell(
                     onTap: () => onTap(i),
-                    child: Center(
-                      child: Text(
-                        _tabLabels[i],
-                        style: G.text(16, w: index == i ? FontWeight.w800 : FontWeight.w500, color: index == i ? G.ink : G.muted),
-                      ),
-                    ),
+                    child: Column(children: [
+                      Container(width: 24, height: 2, color: index == i ? G.accent : Colors.transparent),
+                      const SizedBox(height: 14),
+                      Text(_tabLabels[i],
+                          style: G.text(14, w: index == i ? FontWeight.w700 : FontWeight.w400, color: index == i ? G.ink : G.muted)),
+                    ]),
                   ),
                 ),
             ],

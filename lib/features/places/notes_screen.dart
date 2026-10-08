@@ -66,23 +66,10 @@ class _NotesScreenState extends State<NotesScreen> {
     _load();
   }
 
-  Widget _row(String title, String sub, VoidCallback onTap) => InkWell(
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 12),
-          child: Row(children: [
-            Expanded(
-              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text(title, style: G.text(18, w: FontWeight.w700)),
-                if (sub.isNotEmpty) Text(sub, style: G.text(14, color: G.muted)),
-              ]),
-            ),
-            const Icon(Icons.chevron_right_rounded, color: G.muted),
-          ]),
-        ),
-      );
+  Widget _row(String title, String sub, VoidCallback onTap, {String action = 'Open', bool last = false}) =>
+      GRow(title, sub, onTap, action: action, last: last);
 
-  Widget _heading(String text) => Padding(padding: const EdgeInsets.only(top: 22, bottom: 2), child: Text(text, style: G.display(22)));
+  Widget _heading(String text) => GHeading(text);
 
   @override
   Widget build(BuildContext context) {
@@ -95,21 +82,21 @@ class _NotesScreenState extends State<NotesScreen> {
         child: RefreshIndicator(
           onRefresh: _load,
           child: ListView(
-            padding: const EdgeInsets.fromLTRB(20, 16, 20, 40),
+            padding: const EdgeInsets.fromLTRB(24, 22, 24, 40),
             children: [
-              Text('Notes', style: G.display(34)),
-              const SizedBox(height: 4),
-              Text('What you taught me, what you saved, and what I know about you.', style: G.voice(16)),
+              Text('Notes', style: G.display(36)),
+              const SizedBox(height: 6),
+              Text('What you taught me, what you saved, and what I know about you.', style: G.voice(17)),
               if (_error != null) Padding(padding: const EdgeInsets.only(top: 10), child: Text(_error!, style: G.text(14, color: G.muted))),
               _heading('Taught to Ally'),
-              _row('Notes you taught', _taught == 0 ? 'Lists, routines and info I answer from' : '$_taught saved', () => _push(const TaughtNotesScreen())),
+              _row('Notes you taught', _taught == 0 ? 'Lists, routines and info I answer from' : '$_taught saved', () => _push(const TaughtNotesScreen()), last: true),
               _heading('Saves'),
-              if (waiting.isEmpty) Padding(padding: const EdgeInsets.symmetric(vertical: 8), child: Text('Nothing waiting. Share a video or reel to Ally and I will work out what it is for.', style: G.text(15, color: G.muted))),
-              for (final s in waiting) _row('${s['title']}', 'To learn · tap to choose what to do with it', () => _openSave(s)),
-              _row('Kept for hard days', shelf == 0 ? 'Videos and quotes that help when a day is heavy' : '$shelf waiting for the day you need them', () => _push(const VaultScreen())),
+              if (waiting.isEmpty) Padding(padding: const EdgeInsets.symmetric(vertical: 8), child: Text('Nothing waiting. Share a video or reel to Ally and I will work out what it is for.', style: G.text(14, color: G.muted, height: 1.5))),
+              for (final s in waiting) _row('${s['title']}', 'To learn. Tap to choose what to do with it.', () => _openSave(s)),
+              _row('Kept for hard days', shelf == 0 ? 'Videos and quotes that help when a day is heavy' : '$shelf waiting for the day you need them', () => _push(const VaultScreen()), last: true),
               _heading('About you'),
               _row('Your day', 'How I think your days run, and your mode', () => _push(const YourDayScreen())),
-              _row('What Ally remembers', 'See, mark private, or forget anything', () => _push(const MemoriesScreen())),
+              _row('What Ally remembers', 'See, mark private, or forget anything', () => _push(const MemoriesScreen()), last: true),
             ],
           ),
         ),

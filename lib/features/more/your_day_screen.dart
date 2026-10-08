@@ -84,7 +84,7 @@ class _YourDayScreenState extends State<YourDayScreen> {
             padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(color: G.card, borderRadius: BorderRadius.circular(16)),
             child: Row(children: [
-              const Icon(Icons.tune_rounded, size: 18, color: G.ink),
+              Icon(Icons.tune_rounded, size: 18, color: G.ink),
               const SizedBox(width: 10),
               Expanded(child: Text('Mode: ${_modeText[_mode] ?? _mode}', style: G.text(15, w: FontWeight.w600))),
             ]),
@@ -92,7 +92,7 @@ class _YourDayScreenState extends State<YourDayScreen> {
           const SizedBox(height: 16),
           if (_error != null) Text(_error!, style: G.text(15, color: G.muted)),
           if (days == null && _error == null)
-            const Center(child: CircularProgressIndicator(color: G.ink, strokeWidth: 2)),
+            Center(child: CircularProgressIndicator(color: G.ink, strokeWidth: 2)),
           for (final d in order)
             Container(
               margin: const EdgeInsets.only(bottom: 10),

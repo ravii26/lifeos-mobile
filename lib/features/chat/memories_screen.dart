@@ -92,7 +92,7 @@ class _MemoriesScreenState extends State<MemoriesScreen> {
           const SizedBox(height: 20),
           if (_error != null) Text(_error!, style: G.text(15, color: G.muted)),
           if (items == null && _error == null)
-            const Center(child: CircularProgressIndicator(color: G.ink, strokeWidth: 2)),
+            Center(child: CircularProgressIndicator(color: G.ink, strokeWidth: 2)),
           if (items != null && items.isEmpty)
             Text('Nothing yet. Tell me about your day, your goals, or your schedule in chat.',
                 style: G.text(16, color: G.muted)),
@@ -124,7 +124,7 @@ class _MemoriesScreenState extends State<MemoriesScreen> {
                     IconButton(
                       tooltip: 'Forget this',
                       onPressed: () => _forget(m),
-                      icon: const Icon(Icons.close_rounded, color: G.muted),
+                      icon: Icon(Icons.close_rounded, color: G.muted),
                     ),
                   ]),
                 ),

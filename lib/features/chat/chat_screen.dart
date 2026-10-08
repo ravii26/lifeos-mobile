@@ -42,12 +42,6 @@ class _ChatScreenState extends State<ChatScreen> {
     }).catchError((_) {});
   }
 
-  static const _starters = [
-    'What should I do now?',
-    'Remind me to …',
-    "I'm feeling stuck today",
-  ];
-
   @override
   void dispose() {
     _speech.cancel();
@@ -173,39 +167,38 @@ class _ChatScreenState extends State<ChatScreen> {
             }
           },
           builder: (context, s) {
+            final talking = s.messages.isNotEmpty;
             return Column(children: [
-              Padding(
-                padding: const EdgeInsets.fromLTRB(20, 12, 8, 4),
-                child: Row(children: [
-                  Expanded(child: Text('Ally', style: G.display(26))),
-                  if (s.messages.isNotEmpty)
-                    IconButton(
-                      tooltip: 'Clear chat',
-                      onPressed: () => context.read<ChatCubit>().clear(),
-                      icon: const Icon(Icons.delete_outline_rounded, color: G.muted),
-                    ),
-                ]),
-              ),
-              const NowCard(),
-              Expanded(
-                child: s.messages.isEmpty
-                    ? _Empty(onPick: _send)
-                    : ListView.builder(
-                        controller: _scroll,
-                        padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-                        itemCount: s.messages.length + (s.sending ? 1 : 0),
-                        itemBuilder: (_, i) => i == s.messages.length
+              // Before you say anything, Now is the whole screen. Once you talk, it
+              // folds to one line and the conversation takes the space.
+              NowCard(compact: talking),
+              if (talking)
+                Expanded(
+                  child: ListView.builder(
+                    controller: _scroll,
+                    padding: const EdgeInsets.fromLTRB(24, 22, 24, 16),
+                    itemCount: s.messages.length + 1,
+                    itemBuilder: (_, i) => i == s.messages.length
+                        ? (s.sending
                             ? const _Typing()
-                            : _Bubble(s.messages[i],
-                                onUndo: (ai) => context.read<ChatCubit>().undoAction(i, ai),
-                                onUndoAll: () => context.read<ChatCubit>().undoAll(i),
-                                onEdit: (ai, current) => _edit(i, ai, current),
-                                onPick: (title) => _send('Done: $title'),
-                                onSuggest: (t) => context.read<ChatCubit>().acceptSuggestion(i, t),
-                                onMove: () => context.read<ChatCubit>().moveToLater(i),
-                                onUndoMove: () => context.read<ChatCubit>().undoMove(i)),
-                      ),
-              ),
+                            : Align(
+                                alignment: Alignment.centerLeft,
+                                child: TextButton(
+                                  onPressed: () => context.read<ChatCubit>().clear(),
+                                  style: TextButton.styleFrom(padding: EdgeInsets.zero, foregroundColor: G.muted),
+                                  child: Text('Clear this chat', style: G.text(13, color: G.muted)),
+                                ),
+                              ))
+                        : _Bubble(s.messages[i],
+                            onUndo: (ai) => context.read<ChatCubit>().undoAction(i, ai),
+                            onUndoAll: () => context.read<ChatCubit>().undoAll(i),
+                            onEdit: (ai, current) => _edit(i, ai, current),
+                            onPick: (title) => _send('Done: $title'),
+                            onSuggest: (t) => context.read<ChatCubit>().acceptSuggestion(i, t),
+                            onMove: () => context.read<ChatCubit>().moveToLater(i),
+                            onUndoMove: () => context.read<ChatCubit>().undoMove(i)),
+                  ),
+                ),
               _Composer(
                 controller: _input,
                 sending: s.sending,
@@ -227,41 +220,12 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 }
 
-class _Empty extends StatelessWidget {
-  final void Function(String) onPick;
-  const _Empty({required this.onPick});
-
-  @override
-  Widget build(BuildContext context) {
-    return ListView(
-      padding: const EdgeInsets.fromLTRB(20, 40, 20, 20),
-      children: [
-        Text('Talk to me like a friend who knows your plans.', style: G.display(28)),
-        const SizedBox(height: 10),
-        Text('Ask what to do, tell me what you finished, ask for a reminder, or just vent.',
-            style: G.voice(17)),
-        const SizedBox(height: 22),
-        Wrap(spacing: 8, runSpacing: 8, children: [
-          for (final s in _ChatScreenState._starters)
-            ActionChip(
-              label: Text(s, style: G.text(15, w: FontWeight.w500)),
-              backgroundColor: G.card,
-              side: const BorderSide(color: G.line),
-              shape: const StadiumBorder(),
-              onPressed: () => onPick(s),
-            ),
-        ]),
-      ],
-    );
-  }
-}
-
 const _roleLabel = {
-  'FRIEND': 'AS A FRIEND',
-  'ASSISTANT': 'ASSISTANT',
-  'MENTOR': 'MENTOR',
-  'COACH': 'COACH',
-  'GUIDE': 'GUIDE',
+  'FRIEND': 'As a friend',
+  'ASSISTANT': 'Assistant',
+  'MENTOR': 'Mentor',
+  'COACH': 'Coach',
+  'GUIDE': 'Guide',
 };
 
 class _Bubble extends StatelessWidget {
@@ -293,32 +257,22 @@ class _Bubble extends StatelessWidget {
     return Align(
       alignment: m.fromUser ? Alignment.centerRight : Alignment.centerLeft,
       child: ConstrainedBox(
-        constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.82),
+        constraints: BoxConstraints(maxWidth: m.fromUser ? 300 : double.infinity),
         child: Column(
           crossAxisAlignment: m.fromUser ? CrossAxisAlignment.end : CrossAxisAlignment.start,
           children: [
             if (!m.fromUser && m.role != null)
               Padding(
-                padding: const EdgeInsets.only(top: 10, left: 4),
-                child: Text(_roleLabel[m.role] ?? 'ALLY', style: G.label()),
+                padding: const EdgeInsets.only(top: 14),
+                child: Text(_roleLabel[m.role] ?? 'Ally', style: G.text(11, color: G.muted)),
               ),
             Container(
-              margin: EdgeInsets.only(top: !m.fromUser && m.role != null ? 4 : 8),
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              decoration: BoxDecoration(
-                color: m.fromUser ? G.ink : G.card,
-                borderRadius: BorderRadius.only(
-                  topLeft: const Radius.circular(20),
-                  topRight: const Radius.circular(20),
-                  bottomLeft: Radius.circular(m.fromUser ? 20 : 6),
-                  bottomRight: Radius.circular(m.fromUser ? 6 : 20),
-                ),
-              ),
+              margin: EdgeInsets.only(top: m.fromUser ? 12 : 4),
+              padding: m.fromUser ? const EdgeInsets.symmetric(horizontal: 14, vertical: 11) : EdgeInsets.zero,
+              decoration: m.fromUser ? BoxDecoration(color: G.card, borderRadius: BorderRadius.circular(4)) : null,
               child: Text(
                 m.text,
-                style: m.fromUser
-                    ? G.text(16, color: Colors.white, w: FontWeight.w500)
-                    : G.voice(17, color: G.ink),
+                style: m.fromUser ? G.text(15, height: 1.45) : G.voice(21, color: G.ink),
               ),
             ),
             if (grouped)
@@ -338,9 +292,9 @@ class _Bubble extends StatelessWidget {
                   for (final o in ask.options)
                     ActionChip(
                       label: Text(o.title, style: G.text(14, w: FontWeight.w600)),
-                      backgroundColor: G.card,
-                      side: const BorderSide(color: G.line),
-                      shape: const StadiumBorder(),
+                      backgroundColor: Colors.transparent,
+                      side: BorderSide(color: G.line),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
                       onPressed: () => onPick(o.title),
                     ),
                 ]),
@@ -352,11 +306,11 @@ class _Bubble extends StatelessWidget {
                 child: Wrap(spacing: 8, runSpacing: 8, children: [
                   for (final o in now.options)
                     ActionChip(
-                      avatar: const Icon(Icons.check_rounded, size: 18, color: G.ink),
+                      avatar: Icon(Icons.check_rounded, size: 18, color: G.ink),
                       label: Text('${o.title}${o.minutes > 0 ? ' · ${o.minutes} min' : ''}', style: G.text(14, w: FontWeight.w600)),
-                      backgroundColor: G.card,
-                      side: const BorderSide(color: G.line),
-                      shape: const StadiumBorder(),
+                      backgroundColor: Colors.transparent,
+                      side: BorderSide(color: G.line),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
                       onPressed: () => onPick(o.title),
                     ),
                 ]),
@@ -369,11 +323,11 @@ class _Bubble extends StatelessWidget {
                 child: Wrap(spacing: 8, runSpacing: 8, children: [
                   for (final t in m.suggestions)
                     ActionChip(
-                      avatar: const Icon(Icons.add_rounded, size: 18, color: G.ink),
+                      avatar: Icon(Icons.add_rounded, size: 18, color: G.ink),
                       label: Text('Habit: $t', style: G.text(14, w: FontWeight.w600)),
-                      backgroundColor: G.card,
-                      side: const BorderSide(color: G.line),
-                      shape: const StadiumBorder(),
+                      backgroundColor: Colors.transparent,
+                      side: BorderSide(color: G.line),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
                       onPressed: () => onSuggest(t),
                     ),
                 ]),
@@ -474,23 +428,18 @@ class _CapacityCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final moved = c.moved && !c.undone;
     return Container(
-      margin: const EdgeInsets.only(top: 8),
-      padding: const EdgeInsets.fromLTRB(14, 12, 10, 8),
-      decoration: BoxDecoration(
-        color: G.card,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: G.line),
-      ),
+      margin: const EdgeInsets.only(top: 12),
+      padding: const EdgeInsets.only(top: 10),
+      decoration: BoxDecoration(border: Border(top: BorderSide(color: G.ink, width: 2))),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Text(moved ? 'Moved ${c.moveIds.length} to later. Today keeps ${c.keepCount}.' : c.message,
-            style: G.text(14, w: FontWeight.w600)),
-        const SizedBox(height: 4),
+            style: G.text(15, w: FontWeight.w500, height: 1.45)),
         if (c.moveIds.isNotEmpty && !c.moved)
           Align(
             alignment: Alignment.centerRight,
             child: TextButton(
               onPressed: onMove,
-              child: Text('Move ${c.moveIds.length} to later', style: G.text(13, w: FontWeight.w700, color: G.ink)),
+              child: Text('Move ${c.moveIds.length} to later', style: G.text(14, w: FontWeight.w700, color: G.ink)),
             ),
           ),
         if (moved && c.moveActivityId != null)
@@ -498,7 +447,7 @@ class _CapacityCard extends StatelessWidget {
             alignment: Alignment.centerRight,
             child: TextButton(
               onPressed: onUndo,
-              child: Text('Undo', style: G.text(13, w: FontWeight.w700, color: G.muted)),
+              child: Text('Undo', style: G.text(13, w: FontWeight.w500, color: G.muted)),
             ),
           ),
       ]),
@@ -506,7 +455,7 @@ class _CapacityCard extends StatelessWidget {
   }
 }
 
-/// One card for everything Ally saved from a single message, with a way to
+/// One list for everything Ally saved from a single message, with a way to
 /// rename each thing, undo it, or undo the whole message.
 class _SavedCard extends StatelessWidget {
   final List<(int, ChatAction)> items;
@@ -519,45 +468,39 @@ class _SavedCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final live = items.where((e) => !e.$2.undone).length;
     return Container(
-      margin: const EdgeInsets.only(top: 8),
-      padding: const EdgeInsets.fromLTRB(14, 12, 6, 6),
-      decoration: BoxDecoration(
-        color: G.card,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: G.line),
-      ),
+      margin: const EdgeInsets.only(top: 16),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Text(live == 0 ? 'All undone' : 'Saved $live thing${live == 1 ? '' : 's'}. Check?',
-            style: G.text(15, w: FontWeight.w700)),
-        const SizedBox(height: 6),
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.only(bottom: 9),
+          decoration: BoxDecoration(border: Border(bottom: BorderSide(color: G.ink, width: 2))),
+          child: Text(live == 0 ? 'All undone' : 'Saved $live thing${live == 1 ? '' : 's'}. Check?',
+              style: G.text(15, w: FontWeight.w700)),
+        ),
         for (final (ai, a) in items)
-          Padding(
-            padding: const EdgeInsets.symmetric(vertical: 4),
-            child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Padding(
-                padding: const EdgeInsets.only(top: 2),
-                child: Icon(_describe(a).$1, size: 16, color: a.undone ? G.muted : G.good),
-              ),
-              const SizedBox(width: 8),
+          Container(
+            padding: const EdgeInsets.symmetric(vertical: 11),
+            decoration: BoxDecoration(border: Border(bottom: BorderSide(color: G.line))),
+            child: Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
               Expanded(
                 child: Text(_describe(a).$2,
-                    style: G.text(14, color: a.undone ? G.muted : G.ink, w: FontWeight.w500)
+                    style: G.text(15, color: a.undone ? G.muted : G.ink, w: FontWeight.w500, height: 1.35)
                         .copyWith(decoration: a.undone ? TextDecoration.lineThrough : null)),
               ),
               if (!a.undone && a.id != null && a.itemType != null)
                 InkWell(
                   onTap: () => onEdit(ai, a.text),
                   child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                    child: Text('Edit', style: G.text(13, w: FontWeight.w700, color: G.ink)),
+                    padding: const EdgeInsets.only(left: 14, top: 4, bottom: 4),
+                    child: Text('Edit', style: G.text(13, color: G.muted)),
                   ),
                 ),
               if (!a.undone && a.activityId != null)
                 InkWell(
                   onTap: () => onUndo(ai),
                   child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                    child: Text('Undo', style: G.text(13, w: FontWeight.w700, color: G.muted)),
+                    padding: const EdgeInsets.only(left: 14, top: 4, bottom: 4),
+                    child: Text('Undo', style: G.text(13, color: G.muted)),
                   ),
                 ),
             ]),
@@ -567,7 +510,7 @@ class _SavedCard extends StatelessWidget {
             alignment: Alignment.centerRight,
             child: TextButton(
               onPressed: onUndoAll,
-              child: Text('Undo all', style: G.text(13, w: FontWeight.w700, color: G.muted)),
+              child: Text('Undo all', style: G.text(13, color: G.muted)),
             ),
           )
         else
@@ -589,7 +532,7 @@ class _Receipt extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.only(top: 6, left: 4),
       child: Row(mainAxisSize: MainAxisSize.min, children: [
-        Icon(icon, size: 16, color: G.good),
+        Icon(icon, size: 15, color: G.good),
         const SizedBox(width: 6),
         Flexible(
           child: Text(a.undone ? 'Undone: $text' : text,
@@ -638,9 +581,7 @@ class _TypingState extends State<_Typing> {
   Widget build(BuildContext context) => Align(
         alignment: Alignment.centerLeft,
         child: Container(
-          margin: const EdgeInsets.only(top: 8),
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-          decoration: BoxDecoration(color: G.card, borderRadius: BorderRadius.circular(20)),
+          margin: const EdgeInsets.only(top: 12),
           child: Text(_slow ? 'Waking up the server… a few more seconds.' : 'Thinking…', style: G.voice(16)),
         ),
       );
@@ -667,67 +608,83 @@ class _Composer extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.fromLTRB(12, 8, 8, 12),
-      color: G.bg,
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 10),
       child: Column(mainAxisSize: MainAxisSize.min, children: [
         if (listening)
           Padding(
-            padding: const EdgeInsets.only(bottom: 6),
-            child: Text(
-              lang == 'hi_IN'
-                  ? 'Listening in Hindi. Say it all, then tap the mic to stop.'
-                  : 'Listening. Say it all, then tap the mic to stop.',
-              style: G.text(13, color: G.muted, w: FontWeight.w600),
-            ),
-          ),
-        Row(children: [
-          IconButton(
-            tooltip: 'Turn a saved video into an action',
-            onPressed: onSave,
-            icon: const Icon(Icons.link_rounded, color: G.muted),
-          ),
-          Expanded(
-            child: TextField(
-              controller: controller,
-              minLines: 1,
-              maxLines: 5,
-              textInputAction: TextInputAction.send,
-              onSubmitted: (_) => onSend(),
-              style: G.text(16),
-              decoration: InputDecoration(
-                hintText: listening ? 'Listening…' : 'Message',
-                hintStyle: G.text(16, color: G.muted),
-                filled: true,
-                fillColor: G.card,
-                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(22), borderSide: BorderSide.none),
+            padding: const EdgeInsets.only(bottom: 8),
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: Text(
+                lang == 'hi_IN'
+                    ? 'Listening in Hindi. Say it all, then tap the mic. You can fix the words before sending.'
+                    : 'Listening. Say it all, then tap the mic. You can fix the words before sending.',
+                style: G.text(13, color: G.muted, height: 1.45),
               ),
             ),
           ),
-          const SizedBox(width: 2),
-          // Tap the label to switch the speaking language.
-          InkWell(
-            onTap: onLang,
-            borderRadius: BorderRadius.circular(12),
-            child: Padding(
-              padding: const EdgeInsets.all(6),
-              child: Text(lang == 'hi_IN' ? 'हिं' : 'EN', style: G.text(13, w: FontWeight.w700, color: G.muted)),
+        Container(
+          decoration: BoxDecoration(
+            color: G.dark ? Colors.transparent : G.card,
+            border: Border.all(color: listening ? G.accent : G.line),
+            borderRadius: BorderRadius.circular(4),
+          ),
+          child: Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
+            Expanded(
+              child: TextField(
+                controller: controller,
+                minLines: 1,
+                maxLines: 5,
+                textInputAction: TextInputAction.send,
+                onSubmitted: (_) => onSend(),
+                style: G.text(15),
+                cursorColor: G.accent,
+                decoration: InputDecoration(
+                  hintText: listening ? 'Listening…' : 'Tell Ally anything',
+                  hintStyle: G.text(15, color: G.muted),
+                  isDense: true,
+                  filled: false,
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+                  border: InputBorder.none,
+                  enabledBorder: InputBorder.none,
+                  focusedBorder: InputBorder.none,
+                ),
+              ),
             ),
-          ),
-          IconButton(
-            tooltip: listening ? 'Stop' : 'Speak',
-            onPressed: onMic,
-            icon: Icon(listening ? Icons.stop_circle_rounded : Icons.mic_none_rounded,
-                color: listening ? G.ink : G.muted),
-          ),
-          IconButton.filled(
-            onPressed: sending ? null : () => onSend(),
-            style: IconButton.styleFrom(backgroundColor: G.ink),
-            icon: const Icon(Icons.arrow_upward_rounded, color: Colors.white),
-          ),
-        ]),
+            // Tap the label to switch the speaking language.
+            InkWell(
+              onTap: onLang,
+              child: SizedBox(
+                height: 48,
+                width: 40,
+                child: Center(child: Text(lang == 'hi_IN' ? 'हिं' : 'EN', style: G.text(12, w: FontWeight.w700, color: G.muted))),
+              ),
+            ),
+            InkWell(
+              onTap: onSave,
+              child: SizedBox(height: 48, width: 40, child: Icon(Icons.link_rounded, size: 20, color: G.muted)),
+            ),
+            Container(
+              decoration: BoxDecoration(border: Border(left: BorderSide(color: G.line))),
+              child: ValueListenableBuilder<TextEditingValue>(
+                valueListenable: controller,
+                builder: (_, v, _) {
+                  final send = v.text.trim().isNotEmpty && !listening;
+                  return InkWell(
+                    onTap: send ? (sending ? null : () => onSend()) : onMic,
+                    child: SizedBox(
+                      height: 48,
+                      width: 48,
+                      child: Icon(send ? Icons.arrow_upward_rounded : (listening ? Icons.stop_rounded : Icons.mic_none_rounded),
+                          size: 22, color: G.ink),
+                    ),
+                  );
+                },
+              ),
+            ),
+          ]),
+        ),
       ]),
     );
   }
