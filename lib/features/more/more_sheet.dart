@@ -13,6 +13,7 @@ import '../shell/life_cubit.dart';
 import '../vault/vault_screen.dart';
 import '../chat/memories_screen.dart';
 import 'settings_screen.dart';
+import 'taught_notes_screen.dart';
 import 'where_you_stand_screen.dart';
 import 'your_day_screen.dart';
 
@@ -98,6 +99,8 @@ class MoreSheet extends StatelessWidget {
                           Icons.flag_outlined, () => const GoalsScreen()),
                       _row(context, 'What Ally remembers', 'See or delete what Ally knows about you',
                           Icons.psychology_alt_outlined, () => const MemoriesScreen()),
+                      _row(context, 'Notes you taught Ally', 'Lists, routines and info Ally answers from',
+                          Icons.sticky_note_2_outlined, () => const TaughtNotesScreen()),
                       _row(context, 'Where you stand', 'Stage, trend and pace on each goal',
                           Icons.trending_up_rounded, () => const WhereYouStandScreen()),
                       _row(context, 'Your day', 'How Ally thinks your days run',

@@ -938,6 +938,31 @@ class LifeRepository {
     return asStringOrNull((data as Json)['activityId']);
   }
 
+  /// Everything you taught Ally (lists, routines, playbooks, info).
+  Future<List<Map<String, dynamic>>> allyNotes() async {
+    final data = await _api.get('/ally-notes');
+    return (data as List).whereType<Map<String, dynamic>>().toList();
+  }
+
+  /// Replace a taught note's title / items / text. Returns the Undo id.
+  Future<String?> updateAllyNote(String id, {String? title, List<String>? items, String? text}) async {
+    final data = await _api.patch('/ally-notes/$id', body: {
+      if (title != null) 'title': title,
+      if (items != null) 'items': items,
+      if (text != null) 'text': text,
+    });
+    return asStringOrNull((data as Json)['activityId']);
+  }
+
+  /// Delete a taught note (asked first in the app). Returns the Undo id.
+  Future<String?> deleteAllyNote(String id) async {
+    final data = await _api.delete('/ally-notes/$id');
+    return asStringOrNull((data as Json)['activityId']);
+  }
+
+  Future<void> setMemoryPrivate(String id, bool sensitive) =>
+      _api.patch('/assistant/memories/$id', body: {'sensitive': sensitive});
+
   /// Where you stand on each project (stage / trend / this week), computed by the server.
   Future<List<Map<String, dynamic>>> progress() async {
     final data = await _api.get('/progress/projects', query: {'all': 'true'});

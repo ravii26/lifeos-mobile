@@ -57,6 +57,16 @@ class _MemoriesScreenState extends State<MemoriesScreen> {
     }
   }
 
+  Future<void> _togglePrivate(MemoryItem m) async {
+    try {
+      await _repo.setMemoryPrivate(m.id, !m.sensitive);
+      await _load();
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final items = _items;
@@ -101,9 +111,15 @@ class _MemoriesScreenState extends State<MemoriesScreen> {
                       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                         Text(m.content, style: G.text(16, w: FontWeight.w500)),
                         const SizedBox(height: 2),
-                        Text(DateFormat('d MMM').format(m.createdAt),
+                        Text(
+                            '${DateFormat('d MMM').format(m.createdAt)} · ${m.saidByYou ? 'You told me' : 'I guessed this'}${m.sensitive ? ' · Private' : ''}',
                             style: G.text(12, color: G.muted)),
                       ]),
+                    ),
+                    IconButton(
+                      tooltip: m.sensitive ? 'Private: I only bring it up if you do. Tap to make it normal' : 'Make private: I only bring it up if you do',
+                      onPressed: () => _togglePrivate(m),
+                      icon: Icon(m.sensitive ? Icons.lock_rounded : Icons.lock_open_rounded, size: 20, color: G.muted),
                     ),
                     IconButton(
                       tooltip: 'Forget this',

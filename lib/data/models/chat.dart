@@ -44,7 +44,7 @@ class ChatCapacity {
 /// Something the assistant actually did during a chat turn.
 class ChatAction {
   // TASK_ADDED | TASK_COMPLETED | HABIT_LOGGED | REMINDER_SET | HABIT_ADDED | PROJECT_ADDED | NOTE_ADDED
-  // | NUDGE_SET | REMEMBERED | FORGOT | OPEN_SAVE | ASK | NOW_PICK | MODE_SET | SCHEDULE_SET | STAND | PROGRESS_LOGGED | PROJECT_STATUS | WEEK_CARD
+  // | NUDGE_SET | REMEMBERED | FORGOT | OPEN_SAVE | ASK | NOW_PICK | MODE_SET | SCHEDULE_SET | STAND | PROGRESS_LOGGED | PROJECT_STATUS | WEEK_CARD | NOTES_USED | NOTE_UPDATED | SEARCH_RESULTS
   final String type;
   final String? id;
   final String text; // title / reminder text / shared text / the question (ASK)
@@ -229,12 +229,16 @@ class MemoryItem {
   final String content;
   final String kind;
   final DateTime createdAt;
-  const MemoryItem(this.id, this.content, this.kind, this.createdAt);
+  final bool saidByYou; // true = you told Ally, false = Ally guessed
+  final bool sensitive; // private: never brought up unless you raise it
+  const MemoryItem(this.id, this.content, this.kind, this.createdAt, {this.saidByYou = false, this.sensitive = false});
 
   factory MemoryItem.fromJson(Json j) => MemoryItem(
         asString(j['id']),
         asString(j['content']),
         asString(j['kind'], 'FACT'),
         asDate(j['createdAt'])?.toLocal() ?? DateTime.now(),
+        saidByYou: asString(j['source']) == 'SAID',
+        sensitive: asBool(j['sensitive']),
       );
 }

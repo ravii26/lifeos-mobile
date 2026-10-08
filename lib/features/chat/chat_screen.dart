@@ -338,7 +338,7 @@ class _Bubble extends StatelessWidget {
                 onEdit: onEdit,
               ),
             for (var ai = 0; ai < m.actions.length; ai++)
-              if (m.actions[ai].type != 'ASK' && m.actions[ai].type != 'NOW_PICK' && m.actions[ai].type != 'STAND' && m.actions[ai].type != 'WEEK_CARD' && !(grouped && m.actions[ai].isCreation))
+              if (m.actions[ai].type != 'ASK' && m.actions[ai].type != 'NOW_PICK' && m.actions[ai].type != 'STAND' && m.actions[ai].type != 'WEEK_CARD' && m.actions[ai].type != 'NOTES_USED' && m.actions[ai].type != 'SEARCH_RESULTS' && !(grouped && m.actions[ai].isCreation))
                 _Receipt(m.actions[ai], onUndo: () => onUndo(ai)),
             if (ask != null)
               Padding(
@@ -455,6 +455,7 @@ String _repeatLabel(String rule) {
           _ => 'Back to normal',
         }
       ),
+    'NOTE_UPDATED' => (Icons.sticky_note_2_outlined, 'Updated note: ${a.text}'),
     'PROGRESS_LOGGED' => (Icons.trending_up_rounded, 'Logged: ${a.detail ?? a.text}'),
     'PROJECT_STATUS' => (
         Icons.flag_outlined,
