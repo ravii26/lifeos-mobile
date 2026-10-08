@@ -893,20 +893,31 @@ class LifeRepository {
     return SaveProposal.fromJson(data as Json);
   }
 
-  /// [choice] is ACTION | SHELF | DROP. Returns true when the action became
-  /// tonight's one thing.
+  /// The save as it is now: a watched video's summary arrives a few seconds later.
+  Future<SaveProposal> getSave(String id) async =>
+      SaveProposal.fromJson(await _api.get('/guide/saves/$id') as Json);
+
+  /// One tap to correct Ally's guess: LEARN or FEELING.
+  Future<SaveProposal> setSavePurpose(String id, String purpose) async =>
+      SaveProposal.fromJson(await _api.post('/guide/saves/$id/purpose', body: {'purpose': purpose}) as Json);
+
+  /// [choice] is ACTION | SHELF | DROP. For ACTION pass [actions] (one to three
+  /// steps, each `as` TODO or HABIT) or a single [action]. Returns true when an
+  /// action became tonight's one thing.
   Future<bool> decideSave(String id,
       {required String choice,
       String? action,
       String? minimum,
       String? areaId,
-      String? when}) async {
+      String? when,
+      List<Map<String, String>>? actions}) async {
     final data = await _api.post('/guide/saves/$id/decide', body: {
       'choice': choice,
       if (action != null) 'action': action,
       if (minimum != null) 'minimum': minimum,
       if (areaId != null) 'areaId': areaId,
       if (when != null) 'when': when,
+      if (actions != null) 'actions': actions,
     });
     return asBool((data as Json)['setAsTonight']);
   }

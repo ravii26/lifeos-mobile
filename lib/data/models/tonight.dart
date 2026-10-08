@@ -132,6 +132,22 @@ class GuideHistory {
       );
 }
 
+/// One step proposed from a save: a to-do, or a habit if it is worth repeating.
+class SaveActionDraft {
+  final String action;
+  final String minimum;
+  final String as; // TODO | HABIT
+  final String when; // TONIGHT | THIS_WEEK | LATER
+  const SaveActionDraft(this.action, this.minimum, this.as, this.when);
+
+  factory SaveActionDraft.fromJson(Json j) => SaveActionDraft(
+        asString(j['action']),
+        asString(j['minimum']),
+        asString(j['as'], 'TODO'),
+        asString(j['when'], 'THIS_WEEK'),
+      );
+}
+
 /// What the guide drafted for something the person saved (POST /guide/saves).
 class SaveProposal {
   final String id;
@@ -145,6 +161,12 @@ class SaveProposal {
   final String? areaId;
   final String when; // TONIGHT | THIS_WEEK | LATER
   final String reason;
+  final String purpose; // LEARN | FEELING (Ally's guess, one tap to correct)
+  final List<String> feelings; // for a FEELING save: lazy, low, anxious…
+  final List<SaveActionDraft> actions; // 1 to 3 steps
+  final String summaryState; // NONE | PENDING | READY | UNAVAILABLE
+  final List<String> summaryLines; // what the video says, when it was watched
+  final bool shelved; // feeling saves wait on the shelf for that feeling
 
   const SaveProposal({
     required this.id,
@@ -158,6 +180,12 @@ class SaveProposal {
     this.areaId,
     required this.when,
     required this.reason,
+    this.purpose = 'LEARN',
+    this.feelings = const [],
+    this.actions = const [],
+    this.summaryState = 'NONE',
+    this.summaryLines = const [],
+    this.shelved = false,
   });
 
   bool get looksLikeMotivation => kind == 'MOTIVATION';
@@ -176,6 +204,12 @@ class SaveProposal {
       areaId: asStringOrNull(p['areaId']),
       when: asString(p['when'], 'THIS_WEEK'),
       reason: asString(p['reason']),
+      purpose: asString(p['purpose'], 'LEARN'),
+      feelings: ((p['feelings'] as List?) ?? const []).map((e) => e.toString()).toList(),
+      actions: ((p['actions'] as List?) ?? const []).whereType<Json>().map(SaveActionDraft.fromJson).toList(),
+      summaryState: asString((j['summary'] as Json?)?['state'], 'NONE'),
+      summaryLines: (((j['summary'] as Json?)?['lines'] as List?) ?? const []).map((e) => e.toString()).toList(),
+      shelved: asBool(j['shelved']),
     );
   }
 }

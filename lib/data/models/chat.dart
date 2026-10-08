@@ -44,7 +44,7 @@ class ChatCapacity {
 /// Something the assistant actually did during a chat turn.
 class ChatAction {
   // TASK_ADDED | TASK_COMPLETED | HABIT_LOGGED | REMINDER_SET | HABIT_ADDED | PROJECT_ADDED | NOTE_ADDED
-  // | NUDGE_SET | REMEMBERED | FORGOT | OPEN_SAVE | ASK | NOW_PICK | MODE_SET | SCHEDULE_SET | STAND | PROGRESS_LOGGED | PROJECT_STATUS | WEEK_CARD | NOTES_USED | NOTE_UPDATED | SEARCH_RESULTS
+  // | NUDGE_SET | REMEMBERED | FORGOT | OPEN_SAVE | ASK | NOW_PICK | MODE_SET | SCHEDULE_SET | STAND | PROGRESS_LOGGED | PROJECT_STATUS | WEEK_CARD | NOTES_USED | NOTE_UPDATED | SEARCH_RESULTS | COMFORT_SHOWN
   final String type;
   final String? id;
   final String text; // title / reminder text / shared text / the question (ASK)

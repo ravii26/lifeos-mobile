@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../../core/api/api_exception.dart';
@@ -77,6 +79,22 @@ Future<bool> openPasteSave(BuildContext context) async {
 
 const _whens = [('TONIGHT', 'Tonight'), ('THIS_WEEK', 'This week'), ('LATER', 'Later')];
 
+/// One editable step proposed from the save.
+class _Step {
+  final TextEditingController action;
+  final TextEditingController minimum;
+  bool selected = true;
+  bool habit;
+  _Step(SaveActionDraft d)
+      : action = TextEditingController(text: d.action),
+        minimum = TextEditingController(text: d.minimum),
+        habit = d.as == 'HABIT';
+  void dispose() {
+    action.dispose();
+    minimum.dispose();
+  }
+}
+
 class _SaveSheet extends StatefulWidget {
   final SaveSource source;
   const _SaveSheet(this.source);
@@ -87,21 +105,34 @@ class _SaveSheet extends StatefulWidget {
 
 class _SaveSheetState extends State<_SaveSheet> {
   final _repo = getIt<LifeRepository>();
-  final _action = TextEditingController();
-  final _minimum = TextEditingController();
 
   SaveProposal? _p;
+  List<_Step> _steps = [];
+  bool _edited = false; // once you edit a step, a late video summary won't overwrite it
   List<Area> _areas = const [];
   String? _areaId;
   String _when = 'THIS_WEEK';
   bool _busy = false;
   String? _error;
   String? _done; // confirmation text once decided
+  Timer? _poll;
+  int _polls = 0;
 
   @override
   void initState() {
     super.initState();
     _read();
+  }
+
+  void _setSteps(SaveProposal p) {
+    for (final s in _steps) {
+      s.dispose();
+    }
+    _steps = [for (final a in p.actions) _Step(a)];
+    if (_steps.isEmpty && p.action.isNotEmpty) {
+      _steps = [_Step(SaveActionDraft(p.action, p.minimum, 'TODO', p.when))];
+    }
+    _edited = false;
   }
 
   Future<void> _read() async {
@@ -116,44 +147,109 @@ class _SaveSheetState extends State<_SaveSheet> {
         _repo.areas(),
       ]);
       final p = results[0] as SaveProposal;
+      if (!mounted) return;
       setState(() {
         _p = p;
         _areas = (results[1] as List<Area>).where((a) => a.isActive).toList();
-        _action.text = p.action;
-        _minimum.text = p.minimum;
+        _setSteps(p);
         _areaId = _areas.any((a) => a.id == p.areaId) ? p.areaId : null;
         _when = p.when;
       });
+      _startPolling();
     } on ApiException catch (e) {
-      setState(() => _error = e.message);
+      if (mounted) setState(() => _error = e.message);
     }
+  }
+
+  // A YouTube link is watched in the background: check back until it is read.
+  void _startPolling() {
+    _poll?.cancel();
+    if (_p?.summaryState != 'PENDING') return;
+    _polls = 0;
+    _poll = Timer.periodic(const Duration(seconds: 4), (t) async {
+      _polls++;
+      final id = _p?.id;
+      if (id == null || !mounted || _polls > 30) {
+        t.cancel();
+        return;
+      }
+      try {
+        final fresh = await _repo.getSave(id);
+        if (!mounted) return;
+        setState(() {
+          final changedPurpose = fresh.purpose != _p!.purpose;
+          _p = fresh;
+          if (!_edited || changedPurpose) _setSteps(fresh);
+        });
+        if (fresh.summaryState != 'PENDING') t.cancel();
+      } on ApiException {
+        // keep waiting; the next check may work
+      }
+    });
   }
 
   @override
   void dispose() {
-    _action.dispose();
-    _minimum.dispose();
+    _poll?.cancel();
+    for (final s in _steps) {
+      s.dispose();
+    }
     super.dispose();
+  }
+
+  Future<void> _correct(String purpose) async {
+    final p = _p;
+    if (p == null) return;
+    setState(() => _busy = true);
+    try {
+      final fresh = await _repo.setSavePurpose(p.id, purpose);
+      if (!mounted) return;
+      setState(() {
+        _p = fresh;
+        _setSteps(fresh);
+        _when = fresh.when;
+        _busy = false;
+      });
+    } on ApiException catch (e) {
+      if (mounted) {
+        setState(() {
+          _error = e.message;
+          _busy = false;
+        });
+      }
+    }
   }
 
   Future<void> _decide(String choice) async {
     final p = _p;
     if (p == null) return;
+    final picked = [
+      for (final s in _steps)
+        if (s.selected && s.action.text.trim().isNotEmpty)
+          {
+            'action': s.action.text.trim(),
+            'minimum': s.minimum.text.trim(),
+            'as': s.habit ? 'HABIT' : 'TODO',
+            'when': _when,
+            if (_areaId != null) 'areaId': _areaId!,
+          },
+    ];
+    if (choice == 'ACTION' && picked.isEmpty) {
+      setState(() => _error = 'Pick at least one step.');
+      return;
+    }
     setState(() => _busy = true);
     try {
       final tonight = await _repo.decideSave(
         p.id,
         choice: choice,
-        action: choice == 'ACTION' ? _action.text.trim() : null,
-        minimum: choice == 'ACTION' ? _minimum.text.trim() : null,
-        areaId: choice == 'ACTION' ? _areaId : null,
-        when: choice == 'ACTION' ? _when : null,
+        actions: choice == 'ACTION' ? picked : null,
       );
       setState(() => _done = switch (choice) {
             'ACTION' when tonight => "It's tonight's one thing now. I'll remind you.",
             'ACTION' => _when == 'LATER'
                 ? "Saved with a date. I'll bring it back when it's time."
-                : "It's on your list for this week. I'll pick it on a good night.",
+                : "On your list for this week. I'll pick it on a good night.",
             'SHELF' => "On your hard-days shelf. It'll be there when you need a lift.",
             _ => 'Let go. One less thing to carry.',
           });
@@ -176,6 +272,39 @@ class _SaveSheetState extends State<_SaveSheet> {
         border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(14), borderSide: BorderSide.none),
       );
+
+  Widget _summary(SaveProposal p) {
+    if (p.summaryState == 'PENDING') {
+      return Padding(
+        padding: const EdgeInsets.only(bottom: 14),
+        child: Row(children: [
+          const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: G.ink)),
+          const SizedBox(width: 10),
+          Expanded(child: Text('Watching the video for you…', style: G.text(14, color: G.muted))),
+        ]),
+      );
+    }
+    if (p.summaryState == 'UNAVAILABLE') {
+      return Padding(
+        padding: const EdgeInsets.only(bottom: 14),
+        child: Text("I couldn't watch this one, so these steps come from its title.", style: G.text(14, color: G.muted)),
+      );
+    }
+    if (p.summaryState == 'READY' && p.summaryLines.isNotEmpty) {
+      return Container(
+        margin: const EdgeInsets.only(bottom: 14),
+        padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+        decoration: BoxDecoration(color: G.card, borderRadius: BorderRadius.circular(18)),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text('What it says', style: G.text(15, w: FontWeight.w700)),
+          const SizedBox(height: 6),
+          for (final l in p.summaryLines)
+            Padding(padding: const EdgeInsets.only(bottom: 4), child: Text('· $l', style: G.text(15))),
+        ]),
+      );
+    }
+    return const SizedBox.shrink();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -206,7 +335,7 @@ class _SaveSheetState extends State<_SaveSheet> {
                   const SizedBox(height: 20),
                   Text('Reading what you saved…', style: G.display(26)),
                   const SizedBox(height: 8),
-                  Text('Finding the one thing it could change for you.', style: G.voice(17)),
+                  Text('Working out what it is for.', style: G.voice(17)),
                 ]
               : [
                   Text("Couldn't read it.", style: G.display(28)),
@@ -219,56 +348,103 @@ class _SaveSheetState extends State<_SaveSheet> {
       );
     }
 
+    final header = [
+      Text(p.platform ?? 'You saved', style: G.text(13, color: G.muted, w: FontWeight.w700)),
+      const SizedBox(height: 4),
+      Text(p.contentTitle, style: G.display(24, w: FontWeight.w800)),
+      if (p.author != null) ...[
+        const SizedBox(height: 4),
+        Text(p.author!, style: G.text(14, color: G.muted)),
+      ],
+      const SizedBox(height: 14),
+    ];
+
+    // A feeling save is already on the shelf. One tap if Ally guessed wrong.
+    if (p.shelved) {
+      return ListView(
+        padding: const EdgeInsets.fromLTRB(20, 24, 20, 28),
+        children: [
+          ...header,
+          Text(
+              p.feelings.isEmpty
+                  ? "Kept for hard days. I'll bring it back when you need a lift."
+                  : "Kept for days you feel ${p.feelings.join(', ')}. I'll bring it back then.",
+              style: G.voice(19)),
+          const SizedBox(height: 16),
+          _summary(p),
+          if (_error != null) Text(_error!, style: G.text(14, color: const Color(0xFFB3261E))),
+          const SizedBox(height: 10),
+          GButton('Done', onTap: () => Navigator.pop(context, true)),
+          const SizedBox(height: 8),
+          GButton('Not for hard days: I want to learn from it', primary: false, onTap: _busy ? null : () => _correct('LEARN')),
+        ],
+      );
+    }
+
     return Padding(
       padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
       child: ListView(
         padding: const EdgeInsets.fromLTRB(20, 24, 20, 28),
         children: [
-          Text(
-            [if (p.platform != null) p.platform!.toUpperCase(), 'YOU SAVED'].join(' · '),
-            style: G.label(),
-          ),
-          const SizedBox(height: 6),
-          Text(p.contentTitle, style: G.display(24, w: FontWeight.w800)),
-          if (p.author != null) ...[
-            const SizedBox(height: 4),
-            Text(p.author!, style: G.text(14, color: G.muted)),
-          ],
-          const SizedBox(height: 18),
+          ...header,
+          _summary(p),
           Text('Saving it changes nothing. Doing one thing with it does.', style: G.voice(18)),
-          const SizedBox(height: 18),
-
+          const SizedBox(height: 14),
           Container(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
+            padding: const EdgeInsets.fromLTRB(14, 14, 14, 14),
             decoration: BoxDecoration(color: G.tint, borderRadius: BorderRadius.circular(22)),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('YOUR ACTION', style: G.label(color: G.tintInk)),
+                Text(_steps.length > 1 ? 'Pick what you will do' : 'Your step', style: G.text(15, color: G.tintInk, w: FontWeight.w700)),
                 const SizedBox(height: 8),
-                TextField(
-                  controller: _action,
-                  minLines: 1,
-                  maxLines: 3,
-                  style: G.text(17, w: FontWeight.w700),
-                  decoration: _field('What will you do with it?'),
-                ),
-                const SizedBox(height: 8),
-                TextField(
-                  controller: _minimum,
-                  style: G.text(15),
-                  decoration: _field('2-minute version'),
-                ),
-                if (p.reason.isNotEmpty) ...[
-                  const SizedBox(height: 10),
-                  Text(p.reason, style: G.text(14, color: G.tintInk)),
-                ],
+                for (final s in _steps)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 12),
+                    child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                      Checkbox(
+                        value: s.selected,
+                        activeColor: G.ink,
+                        onChanged: (v) => setState(() => s.selected = v ?? false),
+                      ),
+                      Expanded(
+                        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                          TextField(
+                            controller: s.action,
+                            minLines: 1,
+                            maxLines: 3,
+                            onChanged: (_) => _edited = true,
+                            style: G.text(16, w: FontWeight.w700),
+                            decoration: _field('What will you do with it?'),
+                          ),
+                          const SizedBox(height: 6),
+                          TextField(
+                            controller: s.minimum,
+                            onChanged: (_) => _edited = true,
+                            style: G.text(14),
+                            decoration: _field('2-minute version'),
+                          ),
+                          Row(children: [
+                            Switch(
+                              value: s.habit,
+                              activeThumbColor: G.ink,
+                              onChanged: (v) => setState(() {
+                                s.habit = v;
+                                _edited = true;
+                              }),
+                            ),
+                            Text('Repeat it as a habit', style: G.text(14, color: G.tintInk)),
+                          ]),
+                        ]),
+                      ),
+                    ]),
+                  ),
+                if (p.reason.isNotEmpty) Text(p.reason, style: G.text(14, color: G.tintInk)),
               ],
             ),
           ),
           const SizedBox(height: 14),
-
-          Text('WHEN', style: G.label()),
+          Text('When', style: G.text(14, color: G.muted, w: FontWeight.w700)),
           const SizedBox(height: 8),
           Wrap(spacing: 6, children: [
             for (final (value, label) in _whens)
@@ -276,8 +452,7 @@ class _SaveSheetState extends State<_SaveSheet> {
                 label: Text(label),
                 selected: _when == value,
                 onSelected: (_) => setState(() => _when = value),
-                labelStyle: G.text(14,
-                    w: FontWeight.w700, color: _when == value ? Colors.white : G.ink),
+                labelStyle: G.text(14, w: FontWeight.w700, color: _when == value ? Colors.white : G.ink),
                 selectedColor: G.ink,
                 backgroundColor: G.soft,
                 showCheckmark: false,
@@ -292,9 +467,7 @@ class _SaveSheetState extends State<_SaveSheet> {
               decoration: _field('Which area?'),
               style: G.text(16),
               dropdownColor: G.card,
-              items: [
-                for (final a in _areas) DropdownMenuItem(value: a.id, child: Text(a.name)),
-              ],
+              items: [for (final a in _areas) DropdownMenuItem(value: a.id, child: Text(a.name))],
               onChanged: (v) => setState(() => _areaId = v),
             ),
           ],
@@ -303,17 +476,15 @@ class _SaveSheetState extends State<_SaveSheet> {
             Text(_error!, style: G.text(14, color: const Color(0xFFB3261E))),
           ],
           const SizedBox(height: 22),
-          GButton('Make it my action', onTap: _busy ? null : () => _decide('ACTION')),
-          const SizedBox(height: 8),
           GButton(
-            p.looksLikeMotivation ? 'Keep it for hard days (good fit)' : 'Keep it for hard days',
-            primary: false,
-            onTap: _busy ? null : () => _decide('SHELF'),
+            _steps.where((s) => s.selected).length > 1 ? 'Make these my actions' : 'Make it my action',
+            onTap: _busy ? null : () => _decide('ACTION'),
           ),
+          const SizedBox(height: 8),
+          GButton('This is for hard days', primary: false, onTap: _busy ? null : () => _correct('FEELING')),
           TextButton(
             onPressed: _busy ? null : () => _decide('DROP'),
-            child: Text("Let it go, I won't use it",
-                style: G.text(15, color: G.muted, w: FontWeight.w700)),
+            child: Text("Let it go, I won't use it", style: G.text(15, color: G.muted, w: FontWeight.w700)),
           ),
         ],
       ),
