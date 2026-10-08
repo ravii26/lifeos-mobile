@@ -14,7 +14,9 @@ class SaveSource {
   final String? text;
   final String? imagePath;
   final String? imageMime;
-  const SaveSource({this.text, this.imagePath, this.imageMime});
+  // Reopen a save that already exists (from the Saves list) instead of reading a new one.
+  final String? existingId;
+  const SaveSource({this.text, this.imagePath, this.imageMime, this.existingId});
 }
 
 /// Saved something → one action. Opens from the share sheet or the Tonight
@@ -140,10 +142,12 @@ class _SaveSheetState extends State<_SaveSheet> {
     try {
       final s = widget.source;
       final results = await Future.wait([
-        s.imagePath != null
-            ? _repo.createSaveFromImage(s.imagePath!,
-                mimeType: s.imageMime ?? 'image/jpeg', caption: s.text)
-            : _repo.createSave(s.text ?? ''),
+        s.existingId != null
+            ? _repo.getSave(s.existingId!)
+            : s.imagePath != null
+                ? _repo.createSaveFromImage(s.imagePath!,
+                    mimeType: s.imageMime ?? 'image/jpeg', caption: s.text)
+                : _repo.createSave(s.text ?? ''),
         _repo.areas(),
       ]);
       final p = results[0] as SaveProposal;

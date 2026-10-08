@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:ui';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -7,30 +6,23 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../core/di/service_locator.dart';
 import '../../core/intents/capture_intent_bus.dart';
 import '../../core/notifications/notification_service.dart';
-import '../../core/theme/app_colors.dart';
 import '../../data/models/user.dart';
 import '../../data/repositories/life_repository.dart';
-import '../appearance/appearance_cubit.dart';
-import '../areas/areas_screen.dart';
 import '../capture/capture_sheet.dart';
 import '../chat/chat_cubit.dart';
 import '../chat/chat_screen.dart';
+import '../guide/guide_style.dart';
 import '../guide/save_sheet.dart';
 import '../guide/tonight_cubit.dart';
-import '../habits/habits_screen.dart';
-import '../more/more_sheet.dart';
-import '../tasks/tasks_screen.dart';
+import '../places/notes_screen.dart';
+import '../places/now_cubit.dart';
+import '../places/plan_screen.dart';
+import '../places/you_screen.dart';
 import 'life_cubit.dart';
 
-/// A bottom-nav destination. Built dynamically so optional modules (Habits)
-/// drop out when the user disables them.
-class _TabDef {
-  final String label;
-  final IconData icon;
-  final IconData iconActive;
-  final Widget screen;
-  const _TabDef(this.label, this.icon, this.iconActive, this.screen);
-}
+/// The four places Ally lives in (plan §5). Plain text labels on purpose:
+/// the look is decided in the design step, the structure is decided here.
+const _tabLabels = ['Now', 'Plan', 'Notes', 'You'];
 
 class HomeShell extends StatefulWidget {
   final AppUser user;
@@ -73,7 +65,7 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
     super.dispose();
   }
 
-  /// Back in the app: send anything done offline, then refresh today and
+  /// Back in the app: send anything done offline, then refresh the card and
   /// answer chat messages written without a connection.
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
@@ -82,7 +74,9 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
     getIt<LifeRepository>().syncOffline().then((_) {
       if (context == null || !context.mounted) return;
       context.read<TonightCubit>().load();
+      context.read<NowCubit>().load();
       context.read<ChatCubit>().retryPending();
+      placesRefresh.value++;
     }).ignore();
   }
 
@@ -97,6 +91,7 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
             RegExp(r'https?://').hasMatch(intent.text ?? ''));
     if (isSave) {
       final tonight = context.read<TonightCubit>();
+      final now = context.read<NowCubit>();
       openSaveSheet(
         context,
         SaveSource(
@@ -104,7 +99,11 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
             imagePath: intent.imagePath,
             imageMime: intent.imageMime),
       ).then((changed) {
-        if (changed) tonight.load();
+        if (changed) {
+          tonight.load();
+          now.load();
+          placesRefresh.value++;
+        }
       });
       return;
     }
@@ -116,77 +115,44 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
     return MultiBlocProvider(
       providers: [
         BlocProvider(create: (_) => LifeCubit(getIt<LifeRepository>())..load()),
+        // Still loaded: it schedules the nightly nudge and answers it from the notification.
         BlocProvider(create: (_) => TonightCubit(getIt<LifeRepository>())..load()),
+        BlocProvider(create: (_) => NowCubit(getIt<LifeRepository>())..load()),
         BlocProvider(create: (_) => ChatCubit(getIt<LifeRepository>())),
       ],
       child: Builder(builder: (context) {
         _cubitContext = context;
-        return BlocBuilder<AppearanceCubit, AppearanceState>(
-          buildWhen: (a, b) => a.rawModules != b.rawModules,
-          builder: (context, appearance) {
-            final tabs = _buildTabs(context, appearance);
-            final index = _index.clamp(0, tabs.length - 1);
-            return Scaffold(
-              backgroundColor: AppColors.bg,
-              extendBody: true,
-              body: BlocListener<LifeCubit, LifeState>(
-                listenWhen: (prev, curr) =>
-                    curr.error != null && curr.error != prev.error,
-                listener: (context, state) {
-                  ScaffoldMessenger.of(context)
-                    ..hideCurrentSnackBar()
-                    ..showSnackBar(SnackBar(
-                      content: Text(state.error!),
-                      backgroundColor: AppColors.surface2,
-                      behavior: SnackBarBehavior.floating,
-                      margin: const EdgeInsets.fromLTRB(14, 0, 14, 90),
-                    ));
-                  context.read<LifeCubit>().clearError();
-                },
-                child: Container(
-                  decoration: const BoxDecoration(
-                    gradient: RadialGradient(
-                      center: Alignment(0.85, -1),
-                      radius: 1.1,
-                      colors: [Color(0x22C5F23F), Colors.transparent],
-                      stops: [0, 0.55],
-                    ),
-                  ),
-                  child: IndexedStack(
-                      index: index,
-                      children: [for (final t in tabs) t.screen]),
-                ),
-              ),
-              bottomNavigationBar: _BottomNav(
-                tabs: tabs,
-                index: index,
-                onTap: (i) => tabs[i].label == _moreLabel
-                    ? _openMore(context)
-                    : setState(() => _index = i),
-              ),
-            );
-          },
+        return Scaffold(
+          backgroundColor: G.bg,
+          body: BlocListener<LifeCubit, LifeState>(
+            listenWhen: (prev, curr) => curr.error != null && curr.error != prev.error,
+            listener: (context, state) {
+              ScaffoldMessenger.of(context)
+                ..hideCurrentSnackBar()
+                ..showSnackBar(SnackBar(content: Text(state.error!)));
+              context.read<LifeCubit>().clearError();
+            },
+            child: IndexedStack(
+              index: _index,
+              children: [
+                const ChatScreen(),
+                const PlanScreen(),
+                const NotesScreen(),
+                YouScreen(user: widget.user),
+              ],
+            ),
+          ),
+          bottomNavigationBar: _BottomNav(
+            index: _index,
+            onTap: (i) {
+              setState(() => _index = i);
+              // Looking at a place again always shows what is true now.
+              placesRefresh.value++;
+            },
+          ),
         );
       }),
     );
-  }
-
-  /// Bottom-nav tabs. Ally is chat-first: Chat (with today's one thing
-  /// pinned) is home; Tasks, Habits and Life are the lists behind it. "More"
-  /// isn't a screen, it opens the sheet.
-  List<_TabDef> _buildTabs(BuildContext context, AppearanceState appearance) {
-    void openMore() => _openMore(context);
-    return [
-      const _TabDef('Chat', Icons.chat_bubble_outline_rounded, Icons.chat_bubble_rounded,
-          ChatScreen()),
-      _TabDef('Tasks', Icons.check_circle_outline, Icons.check_circle,
-          TasksScreen(onOpenMore: openMore)),
-      _TabDef('Habits', Icons.repeat_rounded, Icons.repeat_rounded,
-          HabitsScreen(onOpenMore: openMore)),
-      _TabDef('Life', Icons.grid_view_outlined, Icons.grid_view_rounded,
-          AreasScreen(onOpenMore: openMore)),
-      const _TabDef(_moreLabel, Icons.menu_rounded, Icons.menu_rounded, SizedBox.shrink()),
-    ];
   }
 
   void _openCapture(BuildContext context, {PendingCaptureIntent? pending}) {
@@ -206,108 +172,38 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
       ),
     );
   }
-
-  void _openMore(BuildContext context) {
-    final cubit = context.read<LifeCubit>();
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (_) => BlocProvider.value(
-        value: cubit,
-        child: MoreSheet(user: widget.user),
-      ),
-    );
-  }
 }
 
-const _moreLabel = 'More';
-
+/// Four words at the bottom, in the thumb zone. The current place is bold.
 class _BottomNav extends StatelessWidget {
-  final List<_TabDef> tabs;
   final int index;
   final ValueChanged<int> onTap;
-  const _BottomNav(
-      {required this.tabs, required this.index, required this.onTap});
+  const _BottomNav({required this.index, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
-    final todo = context.select<LifeCubit, int>((c) => c.state.todayTasks.length);
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(14, 0, 14, 18),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(26),
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 24, sigmaY: 24),
-          child: Container(
-            height: 64,
-            decoration: BoxDecoration(
-              color: AppColors.glassBg2,
-              borderRadius: BorderRadius.circular(26),
-              border: Border.all(color: AppColors.glassBorder),
-              boxShadow: const [
-                BoxShadow(color: Colors.black45, blurRadius: 30, offset: Offset(0, 14)),
-              ],
-            ),
-            child: Row(
-              children: [
-                for (int i = 0; i < tabs.length; i++) _tab(i, todo),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _tab(int i, int todo) {
-    final t = tabs[i];
-    final active = index == i;
-    final badge = t.label == 'Tasks' ? todo : 0;
-    return Expanded(
-      child: InkWell(
-        onTap: () => onTap(i),
-        borderRadius: BorderRadius.circular(16),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Stack(
-              clipBehavior: Clip.none,
-              children: [
-                Icon(active ? t.iconActive : t.icon,
-                    size: 22,
-                    color: active ? AppColors.accent : AppColors.tx4),
-                if (badge > 0)
-                  Positioned(
-                    top: -4,
-                    right: -7,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 4),
-                      constraints: const BoxConstraints(minWidth: 15),
-                      height: 15,
-                      decoration: BoxDecoration(
-                        color: AppColors.accent,
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: AppColors.bg, width: 2),
-                      ),
-                      child: Center(
-                        child: Text('$badge',
-                            style: TextStyle(
-                                fontSize: 8.5,
-                                fontWeight: FontWeight.w800,
-                                color: AppColors.accentInk)),
+    return Container(
+      decoration: const BoxDecoration(color: G.bg, border: Border(top: BorderSide(color: G.line))),
+      child: SafeArea(
+        top: false,
+        child: SizedBox(
+          height: 58,
+          child: Row(
+            children: [
+              for (var i = 0; i < _tabLabels.length; i++)
+                Expanded(
+                  child: InkWell(
+                    onTap: () => onTap(i),
+                    child: Center(
+                      child: Text(
+                        _tabLabels[i],
+                        style: G.text(16, w: index == i ? FontWeight.w800 : FontWeight.w500, color: index == i ? G.ink : G.muted),
                       ),
                     ),
                   ),
-              ],
-            ),
-            const SizedBox(height: 3),
-            Text(t.label,
-                style: TextStyle(
-                    fontSize: 9.5,
-                    fontWeight: FontWeight.w600,
-                    color: active ? AppColors.tx : AppColors.tx4)),
-          ],
+                ),
+            ],
+          ),
         ),
       ),
     );

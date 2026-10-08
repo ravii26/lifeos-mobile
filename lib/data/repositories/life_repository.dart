@@ -949,6 +949,48 @@ class LifeRepository {
     return asStringOrNull((data as Json)['activityId']);
   }
 
+  // ---- Places: Now, Plan, Notes, You ----
+
+  /// The right thing for right now (rules engine). [smallest] asks for the smallest version.
+  Future<Map<String, dynamic>> now({bool smallest = false, int? minutes}) async {
+    final data = await _api.get('/now', query: {
+      if (smallest) 'smallest': 'true',
+      if (minutes != null) 'minutes': '$minutes',
+    });
+    return data as Map<String, dynamic>;
+  }
+
+  /// Done / Smaller (MINIMUM) / Not now (SKIP) on the Now card. Queues offline. Returns the Undo id.
+  Future<String?> respondNow(String sourceType, String sourceId, String action) async {
+    final data = await _api.post('/now/respond', queueOffline: true, body: {
+      'sourceType': sourceType,
+      'sourceId': sourceId,
+      'action': action,
+    });
+    return asStringOrNull((data as Json)['activityId']);
+  }
+
+  /// Today by part of the day, this week, goals, habits.
+  Future<Map<String, dynamic>> plan() async => (await _api.get('/now/plan')) as Map<String, dynamic>;
+
+  /// "Still want these?": to-dos untouched for a month (at most 5, plus the total).
+  Future<Map<String, dynamic>> staleTodos() async => (await _api.get('/now/stale')) as Map<String, dynamic>;
+
+  /// Keep (asks again in a month) or let go (archived, undoable). Returns the Undo id for letting go.
+  Future<String?> resolveStale({required List<String> keepIds, required List<String> letGoIds}) async {
+    final data = await _api.post('/now/stale/resolve', body: {'keepIds': keepIds, 'letGoIds': letGoIds});
+    return asStringOrNull((data as Json)['activityId']);
+  }
+
+  /// Saves waiting for a decision, and those kept on the shelf.
+  Future<List<Map<String, dynamic>>> saves() async {
+    final data = await _api.get('/guide/saves');
+    return (data as List).whereType<Map<String, dynamic>>().toList();
+  }
+
+  /// The weekly card, only when asked.
+  Future<String> weekCard() async => asString(((await _api.get('/progress/week')) as Json)['message']);
+
   /// Everything you taught Ally (lists, routines, playbooks, info).
   Future<List<Map<String, dynamic>>> allyNotes() async {
     final data = await _api.get('/ally-notes');

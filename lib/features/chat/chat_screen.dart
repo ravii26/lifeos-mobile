@@ -8,12 +8,11 @@ import 'package:speech_to_text/speech_to_text.dart';
 
 import '../../data/models/chat.dart';
 import '../guide/guide_style.dart';
-import '../guide/guide_setup_sheet.dart';
 import '../guide/save_sheet.dart';
-import '../guide/tonight_card.dart';
+import '../places/now_card.dart';
+import '../places/now_cubit.dart';
 import '../guide/tonight_cubit.dart';
 import 'chat_cubit.dart';
-import 'memories_screen.dart';
 
 /// Home tab: one chat. Talk normally; it answers in the right role and does
 /// things (adds/completes tasks, logs habits, sets reminders) as it goes.
@@ -161,6 +160,9 @@ class _ChatScreenState extends State<ChatScreen> {
             final last = s.messages.lastOrNull;
             if (!s.sending && last != null && !last.fromUser && last.actions.isNotEmpty) {
               context.read<TonightCubit>().load();
+              // Chat just changed something: the card, Plan and Notes should look again.
+              context.read<NowCubit>().load();
+              placesRefresh.value++;
             }
             final save = s.openSave;
             if (save != null) {
@@ -176,17 +178,6 @@ class _ChatScreenState extends State<ChatScreen> {
                 padding: const EdgeInsets.fromLTRB(20, 12, 8, 4),
                 child: Row(children: [
                   Expanded(child: Text('Ally', style: G.display(26))),
-                  IconButton(
-                    tooltip: 'Set up your goals and nudges',
-                    onPressed: () => openGuideSetup(context),
-                    icon: const Icon(Icons.tune_rounded, color: G.ink),
-                  ),
-                  IconButton(
-                    tooltip: 'What I remember about you',
-                    onPressed: () => Navigator.of(context).push(
-                        MaterialPageRoute<void>(builder: (_) => const MemoriesScreen())),
-                    icon: const Icon(Icons.psychology_alt_outlined, color: G.ink),
-                  ),
                   if (s.messages.isNotEmpty)
                     IconButton(
                       tooltip: 'Clear chat',
@@ -195,7 +186,7 @@ class _ChatScreenState extends State<ChatScreen> {
                     ),
                 ]),
               ),
-              const TonightCard(),
+              const NowCard(),
               Expanded(
                 child: s.messages.isEmpty
                     ? _Empty(onPick: _send)
@@ -677,7 +668,7 @@ class _Composer extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.fromLTRB(12, 8, 8, 96),
+      padding: const EdgeInsets.fromLTRB(12, 8, 8, 12),
       color: G.bg,
       child: Column(mainAxisSize: MainAxisSize.min, children: [
         if (listening)

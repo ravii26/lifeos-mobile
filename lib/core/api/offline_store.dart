@@ -14,6 +14,14 @@ class OfflineStore {
   /// Reads worth caching. Chat and AI calls are never cached.
   static const cachedPaths = [
     '/guide/tonight',
+    '/now',
+    '/now/plan',
+    '/now/stale',
+    '/now/schedule',
+    '/now/mode',
+    '/guide/saves',
+    '/progress/projects',
+    '/ally-notes',
     '/guide/history',
     '/tasks',
     '/habits',
