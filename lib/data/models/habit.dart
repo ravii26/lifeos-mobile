@@ -12,6 +12,7 @@ class Habit {
   final String? prepTime; // "HH:mm" when the prep step is due
   final String? areaId;
   final bool isActive;
+  final String stage; // NEW | BUILDING | AUTOMATIC (automatic = no more reminders)
 
   // Stats block (from GET /habits)
   final int currentStreak;
@@ -33,6 +34,7 @@ class Habit {
     this.prepTime,
     this.areaId,
     required this.isActive,
+    this.stage = 'NEW',
     required this.currentStreak,
     required this.longestStreak,
     required this.todayDone,
@@ -64,6 +66,7 @@ class Habit {
       prepTime: asStringOrNull(j['prepTime']),
       areaId: asStringOrNull(j['areaId']),
       isActive: asBool(j['isActive'], true),
+      stage: asString(j['stage'], 'NEW'),
       currentStreak: asInt(j['currentStreak']),
       longestStreak: asInt(j['longestStreak']),
       todayDone: asBool(j['todayDone']),

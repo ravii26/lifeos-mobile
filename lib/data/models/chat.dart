@@ -44,7 +44,7 @@ class ChatCapacity {
 /// Something the assistant actually did during a chat turn.
 class ChatAction {
   // TASK_ADDED | TASK_COMPLETED | HABIT_LOGGED | REMINDER_SET | HABIT_ADDED | PROJECT_ADDED | NOTE_ADDED
-  // | NUDGE_SET | REMEMBERED | FORGOT | OPEN_SAVE | ASK | NOW_PICK | MODE_SET | SCHEDULE_SET
+  // | NUDGE_SET | REMEMBERED | FORGOT | OPEN_SAVE | ASK | NOW_PICK | MODE_SET | SCHEDULE_SET | STAND | PROGRESS_LOGGED | PROJECT_STATUS | WEEK_CARD
   final String type;
   final String? id;
   final String text; // title / reminder text / shared text / the question (ASK)
@@ -114,13 +114,13 @@ class ChatAction {
         remindAt: asDate(j['remindAt'])?.toLocal(),
         windowEnd: asDate(j['windowEnd'])?.toLocal(),
         repeatRule: asStringOrNull(j['repeatRule']),
-        kind: asStringOrNull(j['kind'] ?? j['mode']),
+        kind: asStringOrNull(j['kind'] ?? j['mode'] ?? j['status']),
         time: asStringOrNull(j['time']),
         activityId: asStringOrNull(j['activityId']),
         undone: asBool(j['undone']),
         items: ((j['items'] ?? j['days']) as List? ?? const []).map((e) => e.toString()).toList(),
         tasks: (j['tasks'] as num?)?.toInt() ?? 0,
-        detail: asStringOrNull(j['deadline'] ?? j['timeBlock'] ?? j['until']),
+        detail: asStringOrNull(j['deadline'] ?? j['timeBlock'] ?? j['until'] ?? j['what']),
         options: ((j['options'] as List?) ?? const [])
             .whereType<Json>()
             .map((o) => AskOption(asString(o['id']), asString(o['title']), (o['minutes'] as num?)?.toInt() ?? 0, asBool(o['smaller'])))

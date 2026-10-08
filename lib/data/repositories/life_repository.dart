@@ -938,6 +938,12 @@ class LifeRepository {
     return asStringOrNull((data as Json)['activityId']);
   }
 
+  /// Where you stand on each project (stage / trend / this week), computed by the server.
+  Future<List<Map<String, dynamic>>> progress() async {
+    final data = await _api.get('/progress/projects', query: {'all': 'true'});
+    return (data as List).whereType<Map<String, dynamic>>().toList();
+  }
+
   /// The day schedule for each weekday (0 = Sunday), custom or Ally's default.
   Future<List<Map<String, dynamic>>> daySchedule() async {
     final data = await _api.get('/now/schedule');

@@ -338,7 +338,7 @@ class _Bubble extends StatelessWidget {
                 onEdit: onEdit,
               ),
             for (var ai = 0; ai < m.actions.length; ai++)
-              if (m.actions[ai].type != 'ASK' && m.actions[ai].type != 'NOW_PICK' && !(grouped && m.actions[ai].isCreation))
+              if (m.actions[ai].type != 'ASK' && m.actions[ai].type != 'NOW_PICK' && m.actions[ai].type != 'STAND' && m.actions[ai].type != 'WEEK_CARD' && !(grouped && m.actions[ai].isCreation))
                 _Receipt(m.actions[ai], onUndo: () => onUndo(ai)),
             if (ask != null)
               Padding(
@@ -453,6 +453,16 @@ String _repeatLabel(String rule) {
           'TRAVEL' => 'Travel mode on',
           'HOLIDAY' => 'Holiday mode on',
           _ => 'Back to normal',
+        }
+      ),
+    'PROGRESS_LOGGED' => (Icons.trending_up_rounded, 'Logged: ${a.detail ?? a.text}'),
+    'PROJECT_STATUS' => (
+        Icons.flag_outlined,
+        switch (a.kind) {
+          'PAUSED' => '${a.text} paused',
+          'ABANDONED' => '${a.text} let go',
+          'COMPLETED' => '${a.text} finished',
+          _ => '${a.text} back on',
         }
       ),
     'SCHEDULE_SET' => (Icons.schedule_rounded, 'Day updated for ${a.items.join(', ')}'),

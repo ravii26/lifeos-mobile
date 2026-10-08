@@ -126,7 +126,8 @@ class NotificationService {
     await _schedulePrep(habits);
     for (final h in habits) {
       final t = _parseTime(h.reminderTime);
-      if (t == null || !h.isActive) continue;
+      // A habit that has become automatic no longer gets reminders.
+      if (t == null || !h.isActive || h.stage == 'AUTOMATIC') continue;
       await _scheduleDaily(
         id: h.id.hashCode & 0x3fffffff, // below the reminder id range
         title: h.title,
@@ -164,7 +165,7 @@ class NotificationService {
     for (final h in habits) {
       final t = _parseTime(h.prepTime);
       final what = h.prepareAhead?.trim();
-      if (t == null || !h.isActive || what == null || what.isEmpty || _quiet(t.$1, t.$2)) continue;
+      if (t == null || !h.isActive || h.stage == 'AUTOMATIC' || what == null || what.isEmpty || _quiet(t.$1, t.$2)) continue;
       due.add((t.$1, t.$2, what));
     }
     if (due.isEmpty) return;
