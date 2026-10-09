@@ -1,14 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
-import '../../core/theme/app_colors.dart';
 import '../auth/bloc/auth_bloc.dart';
+import '../guide/guide_style.dart';
 
 /// Branded launch screen shown while the app boots / resolves auth state.
 ///
-/// Mirrors the native splash (same logo on the same background) so the hand-off
-/// from the OS splash to Flutter is seamless, then animates the mark in with a
-/// soft accent glow and a quiet loading hint.
+/// Nocturne Sanctuary: calm bedtime threshold mark with subtle fade.
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
 
@@ -17,10 +15,8 @@ class SplashScreen extends StatefulWidget {
 }
 
 class _SplashScreenState extends State<SplashScreen>
-    with TickerProviderStateMixin {
+    with SingleTickerProviderStateMixin {
   late final AnimationController _intro;
-  late final AnimationController _pulse;
-
   late final Animation<double> _logoScale;
   late final Animation<double> _logoFade;
   late final Animation<double> _textFade;
@@ -31,26 +27,22 @@ class _SplashScreenState extends State<SplashScreen>
 
     _intro = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 900),
+      duration: const Duration(milliseconds: 700),
     );
-    _pulse = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 1800),
-    )..repeat(reverse: true);
 
     _logoFade = CurvedAnimation(
       parent: _intro,
-      curve: const Interval(0.0, 0.55, curve: Curves.easeOut),
+      curve: const Interval(0.0, 0.6, curve: Curves.easeOut),
     );
-    _logoScale = Tween<double>(begin: 0.82, end: 1.0).animate(
+    _logoScale = Tween<double>(begin: 0.92, end: 1.0).animate(
       CurvedAnimation(
         parent: _intro,
-        curve: const Interval(0.0, 0.7, curve: Curves.easeOutBack),
+        curve: const Interval(0.0, 0.8, curve: Curves.easeOutCubic),
       ),
     );
     _textFade = CurvedAnimation(
       parent: _intro,
-      curve: const Interval(0.45, 1.0, curve: Curves.easeOut),
+      curve: const Interval(0.4, 1.0, curve: Curves.easeOut),
     );
 
     _intro.forward();
@@ -59,79 +51,54 @@ class _SplashScreenState extends State<SplashScreen>
   @override
   void dispose() {
     _intro.dispose();
-    _pulse.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.bg,
+      backgroundColor: G.bg,
       body: Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             const Spacer(flex: 5),
-            // Logo with breathing accent glow.
-            AnimatedBuilder(
-              animation: Listenable.merge([_intro, _pulse]),
-              builder: (context, child) {
-                final glow = 0.45 + (_pulse.value * 0.55);
-                return FadeTransition(
-                  opacity: _logoFade,
-                  child: Transform.scale(
-                    scale: _logoScale.value,
-                    child: Container(
-                      width: 116,
-                      height: 116,
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(28),
-                        boxShadow: [
-                          BoxShadow(
-                            color: AppColors.accentGlow
-                                .withValues(alpha: AppColors.accentGlow.a * glow),
-                            blurRadius: 48 + (_pulse.value * 16),
-                            spreadRadius: 2,
-                          ),
-                        ],
-                      ),
-                      child: child,
+            FadeTransition(
+              opacity: _logoFade,
+              child: Transform.scale(
+                scale: _logoScale.value,
+                child: Container(
+                  width: 108,
+                  height: 108,
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(24),
+                    border: Border.all(color: G.lineSoft, width: 0.5),
+                  ),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(24),
+                    child: Image.asset(
+                      'assets/logo/app_icon.png',
+                      width: 108,
+                      height: 108,
+                      fit: BoxFit.cover,
                     ),
                   ),
-                );
-              },
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(28),
-                child: Image.asset(
-                  'assets/logo/app_icon.png',
-                  width: 116,
-                  height: 116,
-                  fit: BoxFit.cover,
                 ),
               ),
             ),
-            const SizedBox(height: 28),
+            const SizedBox(height: 24),
             FadeTransition(
               opacity: _textFade,
               child: Column(
                 children: [
                   Text(
                     'Ally',
-                    style: TextStyle(
-                      color: AppColors.tx,
-                      fontSize: 26,
-                      fontWeight: FontWeight.w700,
-                      letterSpacing: -0.5,
-                    ),
+                    style: G.voice(24, color: G.ink),
                   ),
-                  const SizedBox(height: 6),
+                  const SizedBox(height: 4),
                   Text(
                     'Always on your side.',
-                    style: TextStyle(
-                      color: AppColors.tx3,
-                      fontSize: 13,
-                      letterSpacing: 0.2,
-                    ),
+                    style: G.label(size: 11.5, color: G.muted),
                   ),
                 ],
               ),
@@ -148,14 +115,9 @@ class _SplashScreenState extends State<SplashScreen>
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           Text(
-                            "Having trouble reaching the server — this can "
-                            "take up to a minute if it's been asleep.",
+                            "Connecting to server…",
                             textAlign: TextAlign.center,
-                            style: TextStyle(
-                              color: AppColors.tx3,
-                              fontSize: 12.5,
-                              height: 1.4,
-                            ),
+                            style: G.voice(13.5, color: G.muted),
                           ),
                           const SizedBox(height: 14),
                           OutlinedButton(
@@ -163,23 +125,25 @@ class _SplashScreenState extends State<SplashScreen>
                                 .read<AuthBloc>()
                                 .add(const AuthStarted()),
                             style: OutlinedButton.styleFrom(
-                              foregroundColor: AppColors.tx,
-                              side: BorderSide(color: AppColors.line2),
+                              side: BorderSide(color: G.lineSoft, width: 0.5),
+                              shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(4)),
                               padding: const EdgeInsets.symmetric(
-                                  horizontal: 20, vertical: 10),
+                                  horizontal: 18, vertical: 8),
                             ),
-                            child: const Text('Retry'),
+                            child: Text('Retry',
+                                style: G.label(size: 11, color: G.accent)),
                           ),
                         ],
                       ),
                     );
                   }
                   return SizedBox(
-                    width: 22,
-                    height: 22,
+                    width: 20,
+                    height: 20,
                     child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      color: AppColors.accent,
+                      strokeWidth: 1.5,
+                      color: G.accent,
                     ),
                   );
                 },
