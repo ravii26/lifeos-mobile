@@ -63,9 +63,8 @@ class AppTheme {
         elevation: 0,
         centerTitle: false,
         iconTheme: IconThemeData(color: G.faint, size: 22),
-        titleTextStyle: GoogleFonts.instrumentSerif(
+        titleTextStyle: GoogleFonts.instrumentSans(
           fontSize: 16,
-          fontStyle: FontStyle.italic,
           color: G.ink,
         ),
       ),

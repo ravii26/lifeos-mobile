@@ -3,7 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 
 /// Ally's look (step 8, ADR 0021): the day as a shape, one thing as a sentence,
 /// nothing that counts against you. Paper in the day, near-black at night.
-/// Instrument Sans for everything you tap, Instrument Serif italic for Ally's voice.
+/// Instrument Sans for everything you tap, the same face, regular, for Ally's voice.
 ///
 /// Colours are getters because they follow the phone's light/dark setting;
 /// [dark] is set once at the app root (see main.dart) and the tree is rebuilt
@@ -89,13 +89,12 @@ class G {
 
   // — Typography helpers —
 
-  /// Instrument Serif (italic) — Ally's voice for headlines.
+  /// Instrument Sans — Ally's voice for headlines.
   static TextStyle display(double size,
           {Color? color, FontWeight w = FontWeight.w400}) =>
-      GoogleFonts.instrumentSerif(
-          fontSize: size * 1.12,
+      GoogleFonts.instrumentSans(
+          fontSize: size,
           fontWeight: FontWeight.w400,
-          fontStyle: FontStyle.italic,
           color: color ?? ink,
           height: size >= 28 ? 1.17 : 1.35,
           letterSpacing: size >= 28 ? -0.015 * size : 0);
@@ -113,11 +112,10 @@ class G {
           height: height,
           letterSpacing: letterSpacing);
 
-  /// Ally's own voice: italic serif, used for the one sentence that matters.
+  /// Ally's own voice: plain sans, used for the one sentence that matters.
   static TextStyle voice(double size, {Color? color}) =>
-      GoogleFonts.instrumentSerif(
-          fontSize: size * 1.12,
-          fontStyle: FontStyle.italic,
+      GoogleFonts.instrumentSans(
+          fontSize: size,
           color: color ?? muted,
           height: size >= 28 ? 1.17 : 1.4,
           letterSpacing: 0);
@@ -137,8 +135,8 @@ class G {
 
   /// Large numeral: light weight, tight tracking.
   static TextStyle numeral(double size, {Color? color}) =>
-      GoogleFonts.instrumentSerif(
-          fontSize: size * 1.1,
+      GoogleFonts.instrumentSans(
+          fontSize: size,
           fontWeight: FontWeight.w400,
           color: color ?? ink,
           height: 1.1,
@@ -204,7 +202,7 @@ class GLine extends StatelessWidget {
 }
 
 /// Top app bar — Nocturne editorial style.
-/// Bedtime icon or back arrow + title (italic serif) + subtitle, trailing slot.
+/// Bedtime icon or back arrow + title (plain sans) + subtitle, trailing slot.
 class GTopBar extends StatelessWidget implements PreferredSizeWidget {
   final String title;
   final String? subtitle;
@@ -315,7 +313,7 @@ class GStatusCapsule extends StatelessWidget {
   }
 }
 
-/// Ally's voice whisper — left accent bar, italic serif, no card boundary.
+/// Ally's voice whisper — left accent bar, plain sans, no card boundary.
 class GVoiceCard extends StatelessWidget {
   final String text;
   final String? meta;

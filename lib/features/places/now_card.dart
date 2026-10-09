@@ -80,7 +80,7 @@ class NowCard extends StatelessWidget {
     }
 
     final isLateNight = now.hour >= 21 || now.hour < 5;
-    final greeting = isLateNight ? "Today's last step." : "Today's next step.";
+    final greeting = isLateNight ? 'Last thing tonight' : 'Up next';
     final subtitle = isLateNight
         ? 'No catch-up. No penalty. Just winding down quietly.'
         : 'One thing at a time. The rest waits patiently.';
