@@ -1,18 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
-import '../../core/theme/app_colors.dart';
 import '../../data/models/task.dart';
-import '../../widgets/glass.dart';
-import '../../widgets/screen_header.dart';
+import '../guide/guide_style.dart';
 import '../shell/life_cubit.dart';
 import 'task_detail_screen.dart';
 import 'task_form.dart';
 import 'task_row.dart';
 
 class TasksScreen extends StatefulWidget {
-  final VoidCallback onOpenMore;
-  const TasksScreen({super.key, required this.onOpenMore});
+  final VoidCallback? onOpenMore;
+  const TasksScreen({super.key, this.onOpenMore});
 
   @override
   State<TasksScreen> createState() => _TasksScreenState();
@@ -65,100 +63,94 @@ class _TasksScreenState extends State<TasksScreen> {
           'done': s.doneTasks.length,
         };
 
-        return RefreshIndicator(
-          color: AppColors.accent,
-          backgroundColor: AppColors.surface2,
-          onRefresh: () => context.read<LifeCubit>().refresh(),
-          child: ListView(
-            padding: const EdgeInsets.only(bottom: 120),
-            children: [
-              ScreenHeader(
-                eyebrow: 'Execution',
-                title: 'Tasks',
-                avatarInitial: '·',
-                onMore: widget.onOpenMore,
-                subtitle: Text(
-                    '${counts['today']} due today · ${counts['backlog']} open'),
-              ),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: Column(
-                  children: [
-                    _segmented(counts),
-                    const SizedBox(height: 14),
-                    if (!_adding && _lane != 'done')
-                      OutlinedButton.icon(
-                        onPressed: () => setState(() => _adding = true),
-                        icon: const Icon(Icons.add, size: 16),
-                        label: const Text('Add task'),
-                        style: OutlinedButton.styleFrom(
-                          minimumSize: const Size.fromHeight(46),
-                          foregroundColor: AppColors.tx,
-                          side: BorderSide(color: AppColors.line2),
-                          shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(13)),
+        return Scaffold(
+          backgroundColor: G.bg,
+          appBar: GTopBar(
+            'Tasks',
+            subtitle:
+                '${counts['today']} due today · ${counts['backlog']} open',
+            showBack: true,
+            trailing: IconButton(
+              icon: Icon(Icons.add, size: 20, color: G.accent),
+              onPressed: () => setState(() => _adding = !_adding),
+            ),
+          ),
+          body: RefreshIndicator(
+            color: G.accent,
+            backgroundColor: G.card,
+            onRefresh: () => context.read<LifeCubit>().refresh(),
+            child: ListView(
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 80),
+              children: [
+                _segmented(counts),
+                const SizedBox(height: 14),
+                if (_adding) _addTaskCard(context, s),
+                const SizedBox(height: 6),
+                if (list.isEmpty)
+                  Container(
+                    padding: const EdgeInsets.all(28),
+                    decoration: BoxDecoration(
+                      color: G.card,
+                      border: Border.all(color: G.lineSoft, width: 0.5),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: Center(
+                      child: Text(
+                        _lane == 'done'
+                            ? 'Complete a task to see it here.'
+                            : _lane == 'backlog'
+                                ? 'Backlog is empty. Clear minds rest better.'
+                                : 'Nothing scheduled for today.',
+                        textAlign: TextAlign.center,
+                        style: G.voice(14, color: G.muted),
+                      ),
+                    ),
+                  )
+                else
+                  for (final t in list)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 6),
+                      child: GestureDetector(
+                        onTap: () {
+                          final cubit = context.read<LifeCubit>();
+                          Navigator.of(context).push(MaterialPageRoute(
+                            builder: (_) => BlocProvider.value(
+                              value: cubit,
+                              child: TaskDetailScreen(taskId: t.id),
+                            ),
+                          ));
+                        },
+                        onLongPress: () {
+                          final cubit = context.read<LifeCubit>();
+                          showModalBottomSheet(
+                            context: context,
+                            isScrollControlled: true,
+                            backgroundColor: Colors.transparent,
+                            builder: (_) => BlocProvider.value(
+                              value: cubit,
+                              child: TaskForm(task: t, areas: s.areas),
+                            ),
+                          );
+                        },
+                        child: TaskRow(
+                          task: t,
+                          area: s.areaById(t.areaId),
+                          onComplete: () =>
+                              context.read<LifeCubit>().completeTask(t.id),
+                          onDelete: () =>
+                              context.read<LifeCubit>().deleteTask(t.id),
                         ),
                       ),
-                    if (_adding) _addTaskCard(context, s),
-                    const SizedBox(height: 12),
-                    if (list.isEmpty)
-                      SurfaceCard(
-                        padding: const EdgeInsets.all(26),
-                        child: Center(
-                          child: Text(
-                            _lane == 'done'
-                                ? 'Complete a task to see it here.'
-                                : _lane == 'backlog'
-                                    ? 'Backlog is clear.'
-                                    : 'Nothing for today.',
-                            style: TextStyle(
-                                color: AppColors.tx4, fontSize: 13),
-                          ),
-                        ),
-                      )
-                    else
-                      for (final t in list)
-                        Padding(
-                          padding: const EdgeInsets.only(bottom: 9),
-                          child: GestureDetector(
-                            onTap: () {
-                              final cubit = context.read<LifeCubit>();
-                              Navigator.of(context).push(MaterialPageRoute(
-                                builder: (_) => BlocProvider.value(
-                                  value: cubit,
-                                  child: TaskDetailScreen(taskId: t.id),
-                                ),
-                              ));
-                            },
-                            onLongPress: () {
-                              final cubit = context.read<LifeCubit>();
-                              showModalBottomSheet(
-                                context: context,
-                                isScrollControlled: true,
-                                backgroundColor: Colors.transparent,
-                                builder: (_) => BlocProvider.value(
-                                  value: cubit,
-                                  child: TaskForm(task: t, areas: s.areas),
-                                ),
-                              );
-                            },
-                            child: TaskRow(
-                              task: t,
-                              area: s.areaById(t.areaId),
-                              onComplete: () =>
-                                  context.read<LifeCubit>().completeTask(t.id),
-                              onDelete: () =>
-                                  context.read<LifeCubit>().deleteTask(t.id),
-                            ),
-                          ),
-                        ),
-                    const SizedBox(height: 6),
-                    Text('Swipe right to complete · left to delete',
-                        style: TextStyle(color: AppColors.tx4, fontSize: 11)),
-                  ],
+                    ),
+                const SizedBox(height: 10),
+                Center(
+                  child: Text(
+                    'Swipe right to complete · left to remove',
+                    style: G.label(size: 10.5, color: G.faint),
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         );
       },
@@ -172,17 +164,20 @@ class _TasksScreenState extends State<TasksScreen> {
         child: GestureDetector(
           onTap: () => setState(() => _lane = id),
           child: Container(
-            padding: const EdgeInsets.symmetric(vertical: 9),
+            padding: const EdgeInsets.symmetric(vertical: 8),
             decoration: BoxDecoration(
-              color: on ? AppColors.surface4 : Colors.transparent,
-              borderRadius: BorderRadius.circular(11),
+              color: on ? G.accent.withValues(alpha: 0.15) : Colors.transparent,
+              borderRadius: BorderRadius.circular(3),
             ),
             child: Center(
-              child: Text('$label  ${counts[id]}',
-                  style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                      color: on ? AppColors.tx : AppColors.tx3)),
+              child: Text(
+                '$label (${counts[id]})',
+                style: G.text(
+                  12.5,
+                  w: on ? FontWeight.w600 : FontWeight.w400,
+                  color: on ? G.accent : G.muted,
+                ),
+              ),
             ),
           ),
         ),
@@ -190,11 +185,11 @@ class _TasksScreenState extends State<TasksScreen> {
     }
 
     return Container(
-      padding: const EdgeInsets.all(4),
+      padding: const EdgeInsets.all(3),
       decoration: BoxDecoration(
-        color: AppColors.surface2,
-        borderRadius: BorderRadius.circular(15),
-        border: Border.all(color: AppColors.line),
+        color: G.inset,
+        borderRadius: BorderRadius.circular(4),
+        border: Border.all(color: G.lineSoft, width: 0.5),
       ),
       child: Row(children: [
         seg('today', 'Today'),
@@ -205,281 +200,104 @@ class _TasksScreenState extends State<TasksScreen> {
   }
 
   Widget _addTaskCard(BuildContext context, LifeState s) {
-    final linkableGoals =
-        s.goals.where((g) => _areaId == null || g.areaId == _areaId).toList();
-    final linkableProjects = s.projects.where((p) {
-      if (_areaId == null) return false;
-      if (_goalId != null) {
-        return p.goalId == _goalId;
-      } else {
-        return p.areaId == _areaId;
-      }
-    }).toList();
-
-    return Padding(
-      padding: const EdgeInsets.only(top: 12),
-      child: GlassCard(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            TextField(
-              controller: _title,
-              autofocus: true,
-              style: TextStyle(fontSize: 15, color: AppColors.tx),
-              decoration: const InputDecoration(hintText: 'What needs doing?'),
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: G.card,
+        borderRadius: BorderRadius.circular(4),
+        border: Border.all(color: G.lineSoft, width: 0.5),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          TextField(
+            controller: _title,
+            autofocus: true,
+            style: G.text(14.5, color: G.ink),
+            decoration: InputDecoration(
+              hintText: 'What needs doing?',
+              hintStyle: G.text(14, color: G.faint),
+              filled: true,
+              fillColor: G.inset,
+              contentPadding:
+                  const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(4),
+                borderSide: BorderSide(color: G.lineSoft, width: 0.5),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(4),
+                borderSide: BorderSide(color: G.lineSoft, width: 0.5),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(4),
+                borderSide: BorderSide(color: G.accent, width: 0.8),
+              ),
             ),
-            const SizedBox(height: 11),
-            if (s.areas.isNotEmpty)
-              SizedBox(
-                height: 34,
-                child: ListView.separated(
-                  scrollDirection: Axis.horizontal,
-                  itemCount: s.areas.length + 1,
-                  separatorBuilder: (_, __) => const SizedBox(width: 8),
-                  itemBuilder: (_, i) {
-                    if (i == 0) {
-                      final on = _areaId == null;
-                      return GestureDetector(
-                        onTap: () => setState(() {
-                          _areaId = null;
-                          _goalId = null;
-                          _projectId = null;
-                        }),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 13, vertical: 7),
-                          decoration: BoxDecoration(
-                            color: on ? AppColors.accent : AppColors.surface2,
-                            borderRadius: BorderRadius.circular(20),
-                            border: Border.all(
-                                color:
-                                    on ? Colors.transparent : AppColors.line),
-                          ),
-                          child: Text('No Area',
-                              style: TextStyle(
-                                  fontSize: 12.5,
-                                  fontWeight: FontWeight.w600,
-                                  color: on
-                                      ? AppColors.accentInk
-                                      : AppColors.tx2)),
+          ),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              for (final p in ['P1', 'P2', 'P3'])
+                Padding(
+                  padding: const EdgeInsets.only(right: 6),
+                  child: GestureDetector(
+                    onTap: () => setState(() => _priority = p),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 10, vertical: 5),
+                      decoration: BoxDecoration(
+                        color: _priority == p
+                            ? G.accent.withValues(alpha: 0.15)
+                            : G.inset,
+                        borderRadius: BorderRadius.circular(3),
+                        border: Border.all(
+                          color: _priority == p ? G.accent : G.lineSoft,
+                          width: 0.5,
                         ),
-                      );
-                    }
-                    final a = s.areas[i - 1];
-                    final on = _areaId == a.id;
-                    return GestureDetector(
-                      onTap: () => setState(() {
-                        _areaId = a.id;
-                        if (_goalId != null) {
-                          final hasGoal = s.goals.any(
-                              (g) => g.id == _goalId && g.areaId == a.id);
-                          if (!hasGoal) {
-                            _goalId = null;
-                            _projectId = null;
-                          }
-                        }
-                      }),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 13, vertical: 7),
-                        decoration: BoxDecoration(
-                          color: on ? AppColors.accent : AppColors.surface2,
-                          borderRadius: BorderRadius.circular(20),
-                          border: Border.all(
-                              color: on ? Colors.transparent : AppColors.line),
-                        ),
-                        child: Text(a.name,
-                            style: TextStyle(
-                                fontSize: 12.5,
-                                fontWeight: FontWeight.w600,
-                                color: on
-                                    ? AppColors.accentInk
-                                    : AppColors.tx2)),
                       ),
-                    );
-                  },
-                ),
-              ),
-            if (_areaId != null && linkableGoals.isNotEmpty) ...[
-              const SizedBox(height: 11),
-              SizedBox(
-                height: 34,
-                child: ListView.separated(
-                  scrollDirection: Axis.horizontal,
-                  itemCount: linkableGoals.length + 1,
-                  separatorBuilder: (_, __) => const SizedBox(width: 8),
-                  itemBuilder: (_, i) {
-                    if (i == 0) {
-                      final on = _goalId == null;
-                      return GestureDetector(
-                        onTap: () => setState(() {
-                          _goalId = null;
-                          _projectId = null;
-                        }),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 13, vertical: 7),
-                          decoration: BoxDecoration(
-                            color: on ? AppColors.accent : AppColors.surface2,
-                            borderRadius: BorderRadius.circular(20),
-                            border: Border.all(
-                                color:
-                                    on ? Colors.transparent : AppColors.line),
-                          ),
-                          child: Text('No Goal',
-                              style: TextStyle(
-                                  fontSize: 12.5,
-                                  fontWeight: FontWeight.w600,
-                                  color: on
-                                      ? AppColors.accentInk
-                                      : AppColors.tx2)),
+                      child: Text(
+                        p,
+                        style: G.text(
+                          12,
+                          w: _priority == p ? FontWeight.w600 : FontWeight.w400,
+                          color: _priority == p ? G.accent : G.muted,
                         ),
-                      );
-                    }
-                    final g = linkableGoals[i - 1];
-                    final on = _goalId == g.id;
-                    return GestureDetector(
-                      onTap: () => setState(() {
-                        _goalId = g.id;
-                        if (_projectId != null) {
-                          final hasProj = s.projects.any(
-                              (p) => p.id == _projectId && p.goalId == g.id);
-                          if (!hasProj) _projectId = null;
-                        }
-                      }),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 13, vertical: 7),
-                        decoration: BoxDecoration(
-                          color: on ? AppColors.accent : AppColors.surface2,
-                          borderRadius: BorderRadius.circular(20),
-                          border: Border.all(
-                              color: on ? Colors.transparent : AppColors.line),
-                        ),
-                        child: Text(g.title,
-                            style: TextStyle(
-                                fontSize: 12.5,
-                                fontWeight: FontWeight.w600,
-                                color: on
-                                    ? AppColors.accentInk
-                                    : AppColors.tx2)),
-                      ),
-                    );
-                  },
-                ),
-              ),
-            ],
-            if (_areaId != null && linkableProjects.isNotEmpty) ...[
-              const SizedBox(height: 11),
-              SizedBox(
-                height: 34,
-                child: ListView.separated(
-                  scrollDirection: Axis.horizontal,
-                  itemCount: linkableProjects.length + 1,
-                  separatorBuilder: (_, __) => const SizedBox(width: 8),
-                  itemBuilder: (_, i) {
-                    if (i == 0) {
-                      final on = _projectId == null;
-                      return GestureDetector(
-                        onTap: () => setState(() => _projectId = null),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 13, vertical: 7),
-                          decoration: BoxDecoration(
-                            color: on ? AppColors.accent : AppColors.surface2,
-                            borderRadius: BorderRadius.circular(20),
-                            border: Border.all(
-                                color:
-                                    on ? Colors.transparent : AppColors.line),
-                          ),
-                          child: Text('No Project',
-                              style: TextStyle(
-                                  fontSize: 12.5,
-                                  fontWeight: FontWeight.w600,
-                                  color: on
-                                      ? AppColors.accentInk
-                                      : AppColors.tx2)),
-                        ),
-                      );
-                    }
-                    final p = linkableProjects[i - 1];
-                    final on = _projectId == p.id;
-                    return GestureDetector(
-                      onTap: () => setState(() => _projectId = p.id),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 13, vertical: 7),
-                        decoration: BoxDecoration(
-                          color: on ? AppColors.accent : AppColors.surface2,
-                          borderRadius: BorderRadius.circular(20),
-                          border: Border.all(
-                              color: on ? Colors.transparent : AppColors.line),
-                        ),
-                        child: Text(p.title,
-                            style: TextStyle(
-                                fontSize: 12.5,
-                                fontWeight: FontWeight.w600,
-                                color: on
-                                    ? AppColors.accentInk
-                                    : AppColors.tx2)),
-                      ),
-                    );
-                  },
-                ),
-              ),
-            ],
-            const SizedBox(height: 11),
-            Row(
-              children: [
-                for (final p in ['P1', 'P2', 'P3'])
-                  Padding(
-                    padding: const EdgeInsets.only(right: 8),
-                    child: GestureDetector(
-                      onTap: () => setState(() => _priority = p),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 12, vertical: 7),
-                        decoration: BoxDecoration(
-                          color: _priority == p
-                              ? AppColors.surface4
-                              : AppColors.surface2,
-                          borderRadius: BorderRadius.circular(10),
-                          border: Border.all(color: AppColors.line),
-                        ),
-                        child: Text(p,
-                            style: TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w600,
-                                color: _priority == p
-                                    ? AppColors.tx
-                                    : AppColors.tx3)),
                       ),
                     ),
                   ),
-                const Spacer(),
-                TextButton(
-                    onPressed: () => setState(() {
-                          _adding = false;
-                          _title.clear();
-                          _areaId = null;
-                          _goalId = null;
-                          _projectId = null;
-                        }),
-                    child: Text('Cancel',
-                        style: TextStyle(color: AppColors.tx3))),
-                const SizedBox(width: 4),
-                FilledButton(
-                  onPressed: () => _save(context),
-                  style: FilledButton.styleFrom(
-                    backgroundColor: AppColors.accent,
-                    foregroundColor: AppColors.accentInk,
-                  ),
-                  child: const Text('Add'),
                 ),
-              ],
-            ),
-          ],
-        ),
+              const Spacer(),
+              TextButton(
+                onPressed: () => setState(() {
+                  _adding = false;
+                  _title.clear();
+                  _areaId = null;
+                  _goalId = null;
+                  _projectId = null;
+                }),
+                child: Text('Cancel', style: G.label(size: 12, color: G.faint)),
+              ),
+              const SizedBox(width: 4),
+              OutlinedButton(
+                onPressed: () => _save(context),
+                style: OutlinedButton.styleFrom(
+                  backgroundColor: G.accent.withValues(alpha: 0.12),
+                  side: BorderSide(
+                      color: G.accent.withValues(alpha: 0.4), width: 0.5),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(4)),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                ),
+                child: Text('Add',
+                    style: G.text(13,
+                        w: FontWeight.w600, color: G.accent)),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }

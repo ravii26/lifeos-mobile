@@ -174,33 +174,76 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
   }
 }
 
-/// Four words at the bottom, in the thumb zone. The current place is bold with
-/// a short accent mark above it; no icons, no pills (ADR 0021).
+/// Bottom navigation — Nocturne design: icon + label, active tab in primary
+/// accent with a small dot indicator below, inactive in muted tone.
+/// Icons: nightlight (Now), calendar_today (Plan), edit_note (Notes), person (You).
 class _BottomNav extends StatelessWidget {
   final int index;
   final ValueChanged<int> onTap;
   const _BottomNav({required this.index, required this.onTap});
 
+  static const _icons = [
+    Icons.bedtime_outlined,        // Now  — matches reference "nightlight"
+    Icons.calendar_today_outlined, // Plan — calendar_today
+    Icons.edit_note_outlined,      // Notes — stylus_note
+    Icons.person_outline_rounded,  // You  — person
+  ];
+
+  static const _iconsFilled = [
+    Icons.bedtime_rounded,
+    Icons.calendar_today_rounded,
+    Icons.edit_note_rounded,
+    Icons.person_rounded,
+  ];
+
   @override
   Widget build(BuildContext context) {
     return Container(
-      decoration: BoxDecoration(color: G.bg, border: Border(top: BorderSide(color: G.line))),
+      decoration: BoxDecoration(
+        color: G.bg,
+        border: Border(top: BorderSide(color: G.lineSoft, width: 0.5)),
+      ),
       child: SafeArea(
         top: false,
         child: SizedBox(
-          height: 56,
+          height: 60,
           child: Row(
             children: [
               for (var i = 0; i < _tabLabels.length; i++)
                 Expanded(
-                  child: InkWell(
+                  child: GestureDetector(
+                    behavior: HitTestBehavior.opaque,
                     onTap: () => onTap(i),
-                    child: Column(children: [
-                      Container(width: 24, height: 2, color: index == i ? G.accent : Colors.transparent),
-                      const SizedBox(height: 14),
-                      Text(_tabLabels[i],
-                          style: G.text(14, w: index == i ? FontWeight.w700 : FontWeight.w400, color: index == i ? G.ink : G.muted)),
-                    ]),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          index == i ? _iconsFilled[i] : _icons[i],
+                          size: 22,
+                          color: index == i ? G.accent : G.faint,
+                        ),
+                        const SizedBox(height: 3),
+                        Text(
+                          _tabLabels[i],
+                          style: G.label(
+                            size: 11,
+                            color: index == i ? G.accent : G.faint,
+                            w: index == i ? FontWeight.w600 : FontWeight.w400,
+                          ),
+                        ),
+                        const SizedBox(height: 3),
+                        // Active dot indicator below the label
+                        AnimatedContainer(
+                          duration: const Duration(milliseconds: 180),
+                          width: index == i ? 4 : 0,
+                          height: index == i ? 4 : 0,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: G.accent,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
             ],

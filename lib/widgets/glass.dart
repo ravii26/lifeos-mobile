@@ -1,10 +1,8 @@
-import 'dart:ui';
-
 import 'package:flutter/material.dart';
 
-import '../core/theme/app_colors.dart';
+import '../features/guide/guide_style.dart';
 
-/// A frosted-glass container — the signature surface from m-ds.css `.glass`.
+/// Nocturne Sanctuary planar card (replaces frosted glass).
 class GlassCard extends StatelessWidget {
   final Widget child;
   final EdgeInsetsGeometry padding;
@@ -16,8 +14,8 @@ class GlassCard extends StatelessWidget {
   const GlassCard({
     super.key,
     required this.child,
-    this.padding = const EdgeInsets.all(16),
-    this.radius = 22,
+    this.padding = const EdgeInsets.all(14),
+    this.radius = 4,
     this.borderColor,
     this.gradient,
     this.onTap,
@@ -26,28 +24,22 @@ class GlassCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final r = BorderRadius.circular(radius);
-    final card = ClipRRect(
-      borderRadius: r,
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
-        child: Container(
-          padding: padding,
-          decoration: BoxDecoration(
-            color: gradient == null ? AppColors.glassBg : null,
-            gradient: gradient,
-            borderRadius: r,
-            border: Border.all(color: borderColor ?? AppColors.glassBorder),
-          ),
-          child: child,
-        ),
+    final card = Container(
+      padding: padding,
+      decoration: BoxDecoration(
+        color: gradient == null ? G.card : null,
+        gradient: gradient,
+        borderRadius: r,
+        border: Border.all(color: borderColor ?? G.lineSoft, width: 0.5),
       ),
+      child: child,
     );
     if (onTap == null) return card;
     return GestureDetector(onTap: onTap, child: card);
   }
 }
 
-/// A plain (non-glass) surface card — m-ds.css `.m-card`.
+/// A plain surface card — Nocturne planar container.
 class SurfaceCard extends StatelessWidget {
   final Widget child;
   final EdgeInsetsGeometry padding;
@@ -59,8 +51,8 @@ class SurfaceCard extends StatelessWidget {
   const SurfaceCard({
     super.key,
     required this.child,
-    this.padding = const EdgeInsets.all(16),
-    this.radius = 22,
+    this.padding = const EdgeInsets.all(14),
+    this.radius = 4,
     this.color,
     this.borderColor,
     this.gradient,
@@ -71,10 +63,10 @@ class SurfaceCard extends StatelessWidget {
     return Container(
       padding: padding,
       decoration: BoxDecoration(
-        color: gradient == null ? (color ?? AppColors.surface1) : null,
+        color: gradient == null ? (color ?? G.card) : null,
         gradient: gradient,
         borderRadius: BorderRadius.circular(radius),
-        border: Border.all(color: borderColor ?? AppColors.line),
+        border: Border.all(color: borderColor ?? G.lineSoft, width: 0.5),
       ),
       child: child,
     );

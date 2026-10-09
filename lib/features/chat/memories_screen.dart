@@ -18,7 +18,7 @@ const _kindLabel = {
 };
 
 /// Everything the assistant remembers from chat, grouped, each deletable.
-/// Trust needs this: nothing is remembered that you can't see or remove.
+/// Nocturne Sanctuary bedside pattern: trust through visible and erasable memory.
 class MemoriesScreen extends StatefulWidget {
   const MemoriesScreen({super.key});
 
@@ -52,7 +52,8 @@ class _MemoriesScreenState extends State<MemoriesScreen> {
       await _repo.deleteMemory(m.id);
     } on ApiException catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(e.message)));
       _load();
     }
   }
@@ -63,7 +64,8 @@ class _MemoriesScreenState extends State<MemoriesScreen> {
       await _load();
     } on ApiException catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(e.message)));
     }
   }
 
@@ -76,57 +78,163 @@ class _MemoriesScreenState extends State<MemoriesScreen> {
     }
     return Scaffold(
       backgroundColor: G.bg,
-      appBar: AppBar(
-        backgroundColor: G.bg,
-        surfaceTintColor: G.bg,
-        foregroundColor: G.ink,
-        elevation: 0,
+      appBar: const GTopBar(
+        'Memories',
+        subtitle: 'What Ally holds for you',
+        showBack: true,
       ),
       body: ListView(
-        padding: const EdgeInsets.fromLTRB(20, 0, 20, 40),
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 40),
         children: [
-          Text('What I remember about you', style: G.display(30)),
-          const SizedBox(height: 8),
-          Text("I keep these so you never have to repeat yourself. Remove anything you don't want me to know.",
-              style: G.voice(17)),
-          const SizedBox(height: 20),
-          if (_error != null) Text(_error!, style: G.text(15, color: G.muted)),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            decoration: BoxDecoration(
+              color: G.inset,
+              border: Border.all(color: G.lineSoft, width: 0.5),
+              borderRadius: BorderRadius.circular(4),
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(Icons.shield_outlined, size: 16, color: G.accent),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    'Kept so you never have to repeat yourself. Private items are never surfaced unless you bring them up first.',
+                    style: G.voice(13.5, color: G.muted),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 18),
+          if (_error != null)
+            Padding(
+              padding: const EdgeInsets.only(top: 20),
+              child: Text(_error!, style: G.text(14, color: G.carried)),
+            ),
           if (items == null && _error == null)
-            Center(child: CircularProgressIndicator(color: G.ink, strokeWidth: 2)),
+            Padding(
+              padding: const EdgeInsets.only(top: 40),
+              child: Center(
+                  child: CircularProgressIndicator(
+                      color: G.accent, strokeWidth: 1.5)),
+            ),
           if (items != null && items.isEmpty)
-            Text('Nothing yet. Tell me about your day, your goals, or your schedule in chat.',
-                style: G.text(16, color: G.muted)),
+            Padding(
+              padding: const EdgeInsets.only(top: 40),
+              child: Center(
+                child: Text(
+                  'Nothing stored yet.\nTalk to Ally in chat to teach your preferences and rhythms.',
+                  textAlign: TextAlign.center,
+                  style: G.voice(14.5, color: G.muted),
+                ),
+              ),
+            ),
           for (final kind in _kindLabel.keys)
-            if (groups[kind] != null) ...[
-              const SizedBox(height: 14),
-              Text(_kindLabel[kind]!.toUpperCase(), style: G.label()),
-              const SizedBox(height: 8),
+            if (groups[kind] != null && groups[kind]!.isNotEmpty) ...[
+              const SizedBox(height: 16),
+              Padding(
+                padding: const EdgeInsets.only(bottom: 8, left: 2),
+                child: Text(
+                  _kindLabel[kind]!.toUpperCase(),
+                  style: G.label(size: 11, color: G.faint),
+                ),
+              ),
               for (final m in groups[kind]!)
                 Container(
-                  margin: const EdgeInsets.only(bottom: 8),
-                  padding: const EdgeInsets.fromLTRB(16, 12, 4, 12),
-                  decoration: BoxDecoration(color: G.card, borderRadius: BorderRadius.circular(16)),
-                  child: Row(children: [
-                    Expanded(
-                      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                        Text(m.content, style: G.text(16, w: FontWeight.w500)),
-                        const SizedBox(height: 2),
-                        Text(
-                            '${DateFormat('d MMM').format(m.createdAt)} · ${m.saidByYou ? 'You told me' : 'I guessed this'}${m.sensitive ? ' · Private' : ''}',
-                            style: G.text(12, color: G.muted)),
-                      ]),
-                    ),
-                    IconButton(
-                      tooltip: m.sensitive ? 'Private: I only bring it up if you do. Tap to make it normal' : 'Make private: I only bring it up if you do',
-                      onPressed: () => _togglePrivate(m),
-                      icon: Icon(m.sensitive ? Icons.lock_rounded : Icons.lock_open_rounded, size: 20, color: G.muted),
-                    ),
-                    IconButton(
-                      tooltip: 'Forget this',
-                      onPressed: () => _forget(m),
-                      icon: Icon(Icons.close_rounded, color: G.muted),
-                    ),
-                  ]),
+                  margin: const EdgeInsets.only(bottom: 6),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                  decoration: BoxDecoration(
+                    color: G.card,
+                    border: Border.all(color: G.lineSoft, width: 0.5),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Container(
+                        width: 3,
+                        height: 36,
+                        margin: const EdgeInsets.only(top: 2, right: 12),
+                        decoration: BoxDecoration(
+                          color: m.sensitive
+                              ? G.carried
+                              : (m.saidByYou ? G.accent : G.good),
+                          borderRadius: BorderRadius.circular(1.5),
+                        ),
+                      ),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              m.content,
+                              style: G.text(14.5,
+                                  w: FontWeight.w400, color: G.ink),
+                            ),
+                            const SizedBox(height: 4),
+                            Row(
+                              children: [
+                                Text(
+                                  DateFormat('d MMM').format(m.createdAt),
+                                  style: G.label(size: 11, color: G.faint),
+                                ),
+                                Text(' · ',
+                                    style: G.label(size: 11, color: G.faint)),
+                                Text(
+                                  m.saidByYou ? 'Told by you' : 'Inferred',
+                                  style: G.label(size: 11, color: G.muted),
+                                ),
+                                if (m.sensitive) ...[
+                                  const SizedBox(width: 8),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 6, vertical: 2),
+                                    decoration: BoxDecoration(
+                                      color: G.carried.withValues(alpha: 0.15),
+                                      border: Border.all(
+                                          color:
+                                              G.carried.withValues(alpha: 0.4),
+                                          width: 0.5),
+                                      borderRadius: BorderRadius.circular(2),
+                                    ),
+                                    child: Text(
+                                      'Private',
+                                      style: G.label(
+                                          size: 10, color: G.carried),
+                                    ),
+                                  ),
+                                ],
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                      IconButton(
+                        tooltip: m.sensitive
+                            ? 'Private: Ally will not volunteer this'
+                            : 'Make private',
+                        onPressed: () => _togglePrivate(m),
+                        icon: Icon(
+                          m.sensitive
+                              ? Icons.lock_rounded
+                              : Icons.lock_open_rounded,
+                          size: 17,
+                          color: m.sensitive ? G.carried : G.faint,
+                        ),
+                        visualDensity: VisualDensity.compact,
+                      ),
+                      IconButton(
+                        tooltip: 'Forget this',
+                        onPressed: () => _forget(m),
+                        icon: Icon(Icons.close_rounded,
+                            size: 17, color: G.faint),
+                        visualDensity: VisualDensity.compact,
+                      ),
+                    ],
+                  ),
                 ),
             ],
         ],

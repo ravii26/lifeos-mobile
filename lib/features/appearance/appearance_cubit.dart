@@ -19,13 +19,14 @@ class AppearanceState extends Equatable {
   final List<String> rawModules;
 
   const AppearanceState({
-    this.accent = AppAccent.chartreuse,
-    this.font = 'inter',
+    this.accent = AppAccent.nocturne,
+    this.font = 'libre',
     this.vibe = 'focused',
     this.light = false,
     this.density = 'comfy',
     this.rawModules = const [],
   });
+
 
   /// Effective set of enabled module keys (core modules always included).
   Set<String> get enabled => resolveEnabled(rawModules);

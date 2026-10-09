@@ -15,10 +15,13 @@ Future<void> openGuideSetup(BuildContext context) async {
   await showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
-    backgroundColor: G.bg,
-    shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
-    builder: (_) => const FractionallySizedBox(heightFactor: 0.94, child: _GuideSetup()),
+    backgroundColor: G.card,
+    shape: RoundedRectangleBorder(
+      borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
+      side: BorderSide(color: G.lineSoft, width: 0.5),
+    ),
+    builder: (_) =>
+        const FractionallySizedBox(heightFactor: 0.94, child: _GuideSetup()),
   );
   await cubit.load();
 }
@@ -30,33 +33,32 @@ const _tiers = [
   ('LATER', 'Later'),
 ];
 
-/// Common life areas a new person can add in one tap. Name + colour only;
-/// anything else can be added from the Areas tab.
 const _presets = [
-  ('Career', '#4b55d6'),
-  ('Health & fitness', '#2e9e5b'),
-  ('Communication', '#12a39a'),
-  ('Learning', '#9b6bdf'),
-  ('Money', '#b7791f'),
-  ('Relationships', '#d65a5a'),
-  ('Hobbies', '#e08a2e'),
-  ('Mind', '#6b7280'),
+  ('Career', '#8FA2FF'),
+  ('Health & fitness', '#92D5A7'),
+  ('Communication', '#FFB780'),
+  ('Learning', '#B9C3FF'),
+  ('Money', '#D4B37F'),
+  ('Relationships', '#D68F9A'),
+  ('Hobbies', '#E0A37A'),
+  ('Mind', '#9B9EB5'),
 ];
 
-/// One row in the areas list: an existing area, or a new one created on save.
 class _AreaRow {
   final Area? existing;
   final String name;
   final String colorHex;
   String tier;
-  _AreaRow({this.existing, required this.name, required this.colorHex, required this.tier});
+  _AreaRow(
+      {this.existing,
+      required this.name,
+      required this.colorHex,
+      required this.tier});
 
-  Color get color => Color(int.parse('FF${colorHex.replaceFirst('#', '')}', radix: 16));
+  Color get color =>
+      Color(int.parse('FF${colorHex.replaceFirst('#', '')}', radix: 16));
 }
 
-/// Everything the guide needs to choose well, for anyone starting from zero:
-/// the big goal, which areas matter and how much, one small step, and when
-/// the guide should reach them.
 class _GuideSetup extends StatefulWidget {
   const _GuideSetup();
 
@@ -72,9 +74,9 @@ class _GuideSetupState extends State<_GuideSetup> {
 
   final List<_AreaRow> _rows = [];
   Identity _identity = Identity.empty;
-  String? _stepArea; // area name
-  String? _time; // nightly nudge, off unless the person turns it on
-  String? _morning; // optional heads-up
+  String? _stepArea;
+  String? _time;
+  String? _morning;
   bool _loading = true;
   bool _saving = false;
   String? _error;
@@ -93,12 +95,16 @@ class _GuideSetupState extends State<_GuideSetup> {
         NotificationService.instance.nightlyTime(),
         NotificationService.instance.morningTime(),
       ]);
-      final areas = (results[0] as List<Area>).where((a) => a.isActive).toList();
+      final areas =
+          (results[0] as List<Area>).where((a) => a.isActive).toList();
       setState(() {
         _identity = results[1] as Identity;
         _goal.text = _identity.thisYearGoal ?? '';
-        _rows.addAll(areas.map(
-            (a) => _AreaRow(existing: a, name: a.name, colorHex: a.colorHex, tier: a.tier)));
+        _rows.addAll(areas.map((a) => _AreaRow(
+            existing: a,
+            name: a.name,
+            colorHex: a.colorHex,
+            tier: a.tier)));
         _stepArea = _mainRow()?.name;
         _time = results[2] as String?;
         _morning = results[3] as String?;
@@ -119,14 +125,12 @@ class _GuideSetupState extends State<_GuideSetup> {
         _rows.add(_AreaRow(
           name: name,
           colorHex: color,
-          // The first area someone adds is usually the one they care about most.
           tier: _rows.any((r) => r.tier == 'MAIN') ? 'SECONDARY' : 'MAIN',
         ));
         _stepArea ??= name;
       });
 
   void _setTier(_AreaRow row, String tier) => setState(() {
-        // One Main at a time keeps "what matters most" honest.
         if (tier == 'MAIN') {
           for (final r in _rows) {
             if (r != row && r.tier == 'MAIN') r.tier = 'SECONDARY';
@@ -171,10 +175,13 @@ class _GuideSetupState extends State<_GuideSetup> {
       for (final r in _rows) {
         final existing = r.existing;
         if (existing == null) {
-          final created = await _repo.createArea(name: r.name, color: r.colorHex, tier: r.tier);
+          final created = await _repo.createArea(
+              name: r.name, color: r.colorHex, tier: r.tier);
           idByName[r.name] = created.id;
         } else {
-          if (existing.tier != r.tier) await _repo.updateArea(existing.id, tier: r.tier);
+          if (existing.tier != r.tier) {
+            await _repo.updateArea(existing.id, tier: r.tier);
+          }
           idByName[r.name] = existing.id;
         }
       }
@@ -201,7 +208,8 @@ class _GuideSetupState extends State<_GuideSetup> {
     final parts = (current ?? fallback).split(':');
     final picked = await showTimePicker(
       context: context,
-      initialTime: TimeOfDay(hour: int.parse(parts[0]), minute: int.parse(parts[1])),
+      initialTime:
+          TimeOfDay(hour: int.parse(parts[0]), minute: int.parse(parts[1])),
     );
     if (picked == null) return null;
     return '${picked.hour.toString().padLeft(2, '0')}:${picked.minute.toString().padLeft(2, '0')}';
@@ -209,23 +217,39 @@ class _GuideSetupState extends State<_GuideSetup> {
 
   InputDecoration _field(String hint) => InputDecoration(
         hintText: hint,
-        hintStyle: G.text(16, color: G.muted),
+        hintStyle: G.text(14, color: G.faint),
         filled: true,
-        fillColor: G.card,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        fillColor: G.inset,
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
         border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(14), borderSide: BorderSide.none),
+          borderRadius: BorderRadius.circular(4),
+          borderSide: BorderSide(color: G.lineSoft, width: 0.5),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(4),
+          borderSide: BorderSide(color: G.lineSoft, width: 0.5),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(4),
+          borderSide: BorderSide(color: G.accent, width: 0.8),
+        ),
       );
 
-  Widget _timeRow(String text, VoidCallback onTap, {Widget? trailing}) => InkWell(
+  Widget _timeRow(String text, VoidCallback onTap, {Widget? trailing}) =>
+      InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(4),
         child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-          decoration: BoxDecoration(color: G.card, borderRadius: BorderRadius.circular(14)),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          decoration: BoxDecoration(
+            color: G.card,
+            borderRadius: BorderRadius.circular(4),
+            border: Border.all(color: G.lineSoft, width: 0.5),
+          ),
           child: Row(children: [
-            Expanded(child: Text(text, style: G.text(16))),
-            trailing ?? Icon(Icons.schedule_rounded, color: G.muted),
+            Expanded(child: Text(text, style: G.text(14, color: G.ink))),
+            trailing ?? Icon(Icons.schedule_rounded, size: 18, color: G.faint),
           ]),
         ),
       );
@@ -233,162 +257,221 @@ class _GuideSetupState extends State<_GuideSetup> {
   @override
   Widget build(BuildContext context) {
     if (_loading) {
-      return Center(child: CircularProgressIndicator(color: G.ink, strokeWidth: 2));
+      return Center(
+          child: CircularProgressIndicator(
+              color: G.accent, strokeWidth: 1.5));
     }
     final taken = _rows.map((r) => r.name.toLowerCase()).toSet();
-    final presets = _presets.where((p) => !taken.contains(p.$1.toLowerCase())).toList();
+    final presets =
+        _presets.where((p) => !taken.contains(p.$1.toLowerCase())).toList();
 
     return Padding(
-      padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+      padding:
+          EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
       child: ListView(
-        padding: const EdgeInsets.fromLTRB(20, 24, 20, 32),
+        padding: const EdgeInsets.fromLTRB(16, 20, 16, 32),
         children: [
-          Text('Your guide', style: G.display(30)),
+          Row(
+            children: [
+              Icon(Icons.bedtime_outlined, size: 20, color: G.accent),
+              const SizedBox(width: 8),
+              Text('Guide Setup', style: G.voice(20, color: G.ink)),
+            ],
+          ),
           const SizedBox(height: 6),
-          Text('Tell me what matters. I pick one small thing each day, and you ask me for it whenever you like.',
-              style: G.voice(17)),
-          const SizedBox(height: 24),
+          Text(
+            'Tell Ally what matters. Ally will pick the right single thing each day.',
+            style: G.voice(13.5, color: G.muted),
+          ),
+          const SizedBox(height: 20),
 
-          Text('WHAT DO YOU MOST WANT THIS YEAR?', style: G.label()),
+          Text('WHAT DO YOU MOST WANT THIS YEAR?',
+              style: G.label(size: 10.5, color: G.faint)),
           const SizedBox(height: 8),
           TextField(
             controller: _goal,
-            style: G.text(16),
-            decoration: _field('e.g. A better job, getting fit, speaking confidently'),
+            style: G.text(14.5, color: G.ink),
+            decoration: _field(
+                'e.g. Master system design, get fit, speak with presence'),
           ),
-          const SizedBox(height: 24),
+          const SizedBox(height: 20),
 
-          Text('WHAT MATTERS IN YOUR LIFE', style: G.label()),
+          Text('WHAT MATTERS IN YOUR LIFE',
+              style: G.label(size: 10.5, color: G.faint)),
           const SizedBox(height: 4),
-          Text('Nothing is dropped, only ordered. One Main, the rest get smaller doses.',
-              style: G.text(14, color: G.muted)),
+          Text('One Main pillar at a time; others receive smaller doses.',
+              style: G.label(size: 11, color: G.muted)),
           const SizedBox(height: 10),
           for (final r in _rows) ...[
             Container(
-              padding: const EdgeInsets.fromLTRB(16, 12, 12, 12),
-              decoration:
-                  BoxDecoration(color: G.card, borderRadius: BorderRadius.circular(18)),
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: G.card,
+                borderRadius: BorderRadius.circular(4),
+                border: Border.all(color: G.lineSoft, width: 0.5),
+              ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Row(children: [
                     Container(
-                        width: 10,
-                        height: 10,
-                        decoration: BoxDecoration(color: r.color, shape: BoxShape.circle)),
+                        width: 8,
+                        height: 8,
+                        decoration: BoxDecoration(
+                            color: r.color, shape: BoxShape.circle)),
                     const SizedBox(width: 8),
-                    Expanded(child: Text(r.name, style: G.display(18, w: FontWeight.w800))),
+                    Expanded(
+                        child: Text(r.name,
+                            style:
+                                G.text(15, w: FontWeight.w600, color: G.ink))),
                     if (r.existing == null)
                       IconButton(
                         tooltip: 'Remove',
                         visualDensity: VisualDensity.compact,
                         onPressed: () => setState(() => _rows.remove(r)),
-                        icon: Icon(Icons.close_rounded, size: 18, color: G.muted),
+                        icon: Icon(Icons.close_rounded,
+                            size: 16, color: G.faint),
                       ),
                   ]),
-                  const SizedBox(height: 10),
+                  const SizedBox(height: 8),
                   Wrap(spacing: 6, runSpacing: 6, children: [
                     for (final (value, label) in _tiers)
-                      ChoiceChip(
-                        label: Text(label),
-                        selected: r.tier == value,
-                        onSelected: (_) => _setTier(r, value),
-                        labelStyle: G.text(14,
-                            w: FontWeight.w700, color: r.tier == value ? Colors.white : G.ink),
-                        selectedColor: G.ink,
-                        backgroundColor: G.soft,
-                        showCheckmark: false,
-                        side: BorderSide.none,
-                        shape: const StadiumBorder(),
+                      GestureDetector(
+                        onTap: () => _setTier(r, value),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 10, vertical: 5),
+                          decoration: BoxDecoration(
+                            color: r.tier == value
+                                ? G.accent.withValues(alpha: 0.15)
+                                : G.inset,
+                            borderRadius: BorderRadius.circular(3),
+                            border: Border.all(
+                              color: r.tier == value
+                                  ? G.accent
+                                  : G.lineSoft,
+                              width: 0.5,
+                            ),
+                          ),
+                          child: Text(
+                            label,
+                            style: G.text(
+                              12,
+                              w: r.tier == value
+                                  ? FontWeight.w600
+                                  : FontWeight.w400,
+                              color: r.tier == value ? G.accent : G.muted,
+                            ),
+                          ),
+                        ),
                       ),
                   ]),
                 ],
               ),
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 6),
           ],
           if (presets.isNotEmpty) ...[
-            const SizedBox(height: 4),
-            Text(_rows.isEmpty ? 'Tap the ones that matter to you' : 'Add more',
-                style: G.text(14, color: G.muted, w: FontWeight.w700)),
             const SizedBox(height: 8),
-            Wrap(spacing: 8, runSpacing: 8, children: [
+            Text(
+              _rows.isEmpty ? 'Tap presets that fit:' : 'Add other areas:',
+              style: G.label(size: 11, color: G.faint),
+            ),
+            const SizedBox(height: 8),
+            Wrap(spacing: 6, runSpacing: 6, children: [
               for (final (name, color) in presets)
-                ActionChip(
-                  label: Text('+ $name', style: G.text(15, w: FontWeight.w500)),
-                  backgroundColor: G.card,
-                  side: BorderSide(color: G.line),
-                  shape: const StadiumBorder(),
-                  onPressed: () => _addPreset(name, color),
+                GestureDetector(
+                  onTap: () => _addPreset(name, color),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 10, vertical: 5),
+                    decoration: BoxDecoration(
+                      color: G.inset,
+                      borderRadius: BorderRadius.circular(3),
+                      border: Border.all(color: G.lineSoft, width: 0.5),
+                    ),
+                    child: Text('+ $name',
+                        style: G.text(12, color: G.muted)),
+                  ),
                 ),
             ]),
           ],
-          const SizedBox(height: 24),
+          const SizedBox(height: 20),
 
-          Text('ONE SMALL STEP TO START', style: G.label()),
+          Text('ONE SMALL STEP TO START',
+              style: G.label(size: 10.5, color: G.faint)),
           const SizedBox(height: 4),
-          Text('Something that moves what matters most. Keep it small.',
-              style: G.text(14, color: G.muted)),
-          const SizedBox(height: 10),
+          Text('A small action that moves your Main pillar forward.',
+              style: G.label(size: 11, color: G.muted)),
+          const SizedBox(height: 8),
           TextField(
             controller: _step,
-            style: G.text(16),
-            decoration: _field('e.g. Solve one easy coding problem'),
+            style: G.text(14.5, color: G.ink),
+            decoration:
+                _field('e.g. Write 1 paragraph, solve 1 small problem'),
           ),
           const SizedBox(height: 8),
           TextField(
             controller: _minimum,
-            style: G.text(16),
-            decoration: _field('The 2-minute version, e.g. Just read the problem'),
+            style: G.text(14.5, color: G.ink),
+            decoration:
+                _field('2-minute minimum, e.g. Open doc and write title'),
           ),
           if (_rows.isNotEmpty) ...[
             const SizedBox(height: 8),
             DropdownButtonFormField<String>(
-              initialValue: _rows.any((r) => r.name == _stepArea) ? _stepArea : null,
-              decoration: _field('Which area?'),
-              style: G.text(16),
+              initialValue: _rows.any((r) => r.name == _stepArea)
+                  ? _stepArea
+                  : null,
+              decoration: _field('Area'),
+              style: G.text(14, color: G.ink),
               dropdownColor: G.card,
               items: [
-                for (final r in _rows) DropdownMenuItem(value: r.name, child: Text(r.name)),
+                for (final r in _rows)
+                  DropdownMenuItem(value: r.name, child: Text(r.name)),
               ],
               onChanged: (v) => setState(() => _stepArea = v),
             ),
           ],
-          const SizedBox(height: 24),
+          const SizedBox(height: 20),
 
-          Text('NUDGES (OPTIONAL)', style: G.label()),
+          Text('NUDGES (OPTIONAL)', style: G.label(size: 10.5, color: G.faint)),
           const SizedBox(height: 4),
-          Text(
-              "I never message you unless you turn this on. You can also just tell me in chat, "
-              "like \"nudge me every night at 9:30\".",
-              style: G.text(14, color: G.muted)),
+          Text("Ally only reaches out if scheduled or asked.",
+              style: G.label(size: 11, color: G.muted)),
           const SizedBox(height: 8),
           _timeRow(
-            _time == null ? 'Nightly one thing: off' : 'Nightly one thing at $_time',
+            _time == null
+                ? 'Nightly one thing: off'
+                : 'Nightly one thing at $_time',
             () async {
-              final t = await _pickTime(_time, NotificationService.suggestedNightlyTime);
+              final t = await _pickTime(
+                  _time, NotificationService.suggestedNightlyTime);
               if (t != null) setState(() => _time = t);
             },
             trailing: Switch(
               value: _time != null,
-              activeTrackColor: G.ink,
+              activeColor: G.accent,
               onChanged: (on) async {
                 if (!on) return setState(() => _time = null);
-                final t = await _pickTime(null, NotificationService.suggestedNightlyTime);
+                final t = await _pickTime(
+                    null, NotificationService.suggestedNightlyTime);
                 if (t != null) setState(() => _time = t);
               },
             ),
           ),
           const SizedBox(height: 8),
           _timeRow(
-            _morning == null ? 'Morning heads-up: off' : 'Morning heads-up at $_morning',
+            _morning == null
+                ? 'Morning heads-up: off'
+                : 'Morning heads-up at $_morning',
             () async {
               final t = await _pickTime(_morning, '08:30');
               if (t != null) setState(() => _morning = t);
             },
             trailing: Switch(
               value: _morning != null,
-              activeTrackColor: G.ink,
+              activeColor: G.accent,
               onChanged: (on) async {
                 if (!on) return setState(() => _morning = null);
                 final t = await _pickTime(null, '08:30');
@@ -398,11 +481,12 @@ class _GuideSetupState extends State<_GuideSetup> {
           ),
 
           if (_error != null) ...[
-            const SizedBox(height: 14),
-            Text(_error!, style: G.text(14, color: const Color(0xFFB3261E))),
+            const SizedBox(height: 12),
+            Text(_error!, style: G.text(13, color: G.carried)),
           ],
-          const SizedBox(height: 24),
-          GButton(_saving ? 'Saving…' : 'Save', onTap: _saving ? null : _save),
+          const SizedBox(height: 20),
+          GButton(_saving ? 'Saving…' : 'Save configuration',
+              onTap: _saving ? null : _save),
         ],
       ),
     );

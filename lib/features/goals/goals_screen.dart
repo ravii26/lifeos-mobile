@@ -1,18 +1,14 @@
 import 'package:equatable/equatable.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:google_fonts/google_fonts.dart';
 
 import '../../core/api/api_exception.dart';
 import '../../core/di/service_locator.dart';
-import '../../core/theme/app_colors.dart';
 import '../../data/models/area.dart';
 import '../../data/models/goal.dart';
 import '../../data/repositories/life_repository.dart';
-import '../../widgets/bits.dart';
 import '../../widgets/form_kit.dart';
-import '../../widgets/glass.dart';
-import '../../widgets/screen_header.dart';
+import '../guide/guide_style.dart';
 import '../shell/life_cubit.dart';
 
 /// Only this many goals may be ACTIVE at once (mirrors backend MAX_ACTIVE_GOALS).
@@ -33,7 +29,8 @@ class GoalsState extends Equatable {
   List<Goal> get active => goals.where((g) => g.isActive).toList();
   List<Goal> get parked => goals.where((g) => g.isParked).toList();
   List<Goal> get closed => goals.where((g) => g.isClosed).toList();
-  int get slotsRemaining => (kMaxActiveGoals - active.length).clamp(0, kMaxActiveGoals);
+  int get slotsRemaining =>
+      (kMaxActiveGoals - active.length).clamp(0, kMaxActiveGoals);
 
   GoalsState copyWith(
           {LoadStatus? status, List<Goal>? goals, String? error}) =>
@@ -104,7 +101,8 @@ class GoalsCubit extends Cubit<GoalsState> {
   }
 
   Future<void> remove(String id) async {
-    emit(state.copyWith(goals: state.goals.where((g) => g.id != id).toList()));
+    emit(state.copyWith(
+        goals: state.goals.where((g) => g.id != id).toList()));
     try {
       await _repo.deleteGoal(id);
     } on ApiException catch (_) {
@@ -151,71 +149,95 @@ class _GoalsView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.bg,
-      floatingActionButton: FloatingActionButton.extended(
-        backgroundColor: AppColors.accent,
-        foregroundColor: AppColors.accentInk,
-        onPressed: () => _openForm(context),
-        icon: const Icon(Icons.add, size: 20),
-        label: const Text('New goal'),
-      ),
-      body: BlocConsumer<GoalsCubit, GoalsState>(
-        listenWhen: (a, b) => b.error != null && a.error != b.error,
-        listener: (context, s) => ScaffoldMessenger.of(context)
-          ..hideCurrentSnackBar()
-          ..showSnackBar(SnackBar(
-              backgroundColor: AppColors.danger,
-              content: Text(s.error!))),
-        builder: (context, s) {
-          return RefreshIndicator(
-            color: AppColors.accent,
-            backgroundColor: AppColors.surface2,
+    return BlocConsumer<GoalsCubit, GoalsState>(
+      listenWhen: (a, b) => b.error != null && a.error != b.error,
+      listener: (context, s) => ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(SnackBar(
+          backgroundColor: G.card,
+          content: Text(s.error!, style: G.text(13, color: G.carried)),
+        )),
+      builder: (context, s) {
+        return Scaffold(
+          backgroundColor: G.bg,
+          appBar: GTopBar(
+            'Goals & Outcomes',
+            subtitle: '${s.active.length}/$kMaxActiveGoals active focus',
+            showBack: true,
+            trailing: IconButton(
+              icon: Icon(Icons.add, size: 20, color: G.accent),
+              onPressed: () => _openForm(context),
+            ),
+          ),
+          body: RefreshIndicator(
+            color: G.accent,
+            backgroundColor: G.card,
             onRefresh: () => context.read<GoalsCubit>().load(),
             child: ListView(
-              padding: const EdgeInsets.only(bottom: 120),
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 80),
               children: [
-                BackHeader(
-                    eyebrow: '${s.active.length}/$kMaxActiveGoals in focus',
-                    title: 'Goals'),
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                  decoration: BoxDecoration(
+                    color: G.inset,
+                    border: Border.all(color: G.lineSoft, width: 0.5),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Icon(Icons.flag_outlined, size: 16, color: G.accent),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          'Max $kMaxActiveGoals goals in active focus at once to prevent divided energy and overwhelmed days.',
+                          style: G.voice(13.5, color: G.muted),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 16),
                 if (s.status == LoadStatus.loading && s.goals.isEmpty)
                   Padding(
-                      padding: const EdgeInsets.only(top: 60),
-                      child: Center(
-                          child: CircularProgressIndicator(
-                              color: AppColors.accent)))
-                else if (s.goals.isEmpty)
-                  _empty()
-                else
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        _section(context, 'In focus', s.active,
-                            hint: '${s.slotsRemaining} slot(s) free'),
-                        _section(context, 'Parked', s.parked),
-                        _section(context, 'Closed', s.closed),
-                      ],
+                    padding: const EdgeInsets.only(top: 40),
+                    child: Center(
+                      child: CircularProgressIndicator(
+                        color: G.accent,
+                        strokeWidth: 1.5,
+                      ),
                     ),
-                  ),
+                  )
+                else if (s.goals.isEmpty)
+                  Container(
+                    padding: const EdgeInsets.all(28),
+                    decoration: BoxDecoration(
+                      color: G.card,
+                      border: Border.all(color: G.lineSoft, width: 0.5),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: Center(
+                      child: Text(
+                        'No outcomes set yet.\nDefine a project or goal to tie your daily actions together.',
+                        textAlign: TextAlign.center,
+                        style: G.voice(14, color: G.muted),
+                      ),
+                    ),
+                  )
+                else ...[
+                  _section(context, 'IN FOCUS', s.active,
+                      hint: '${s.slotsRemaining} slot(s) free'),
+                  _section(context, 'PARKED', s.parked),
+                  _section(context, 'CLOSED', s.closed),
+                ],
               ],
             ),
-          );
-        },
-      ),
+          ),
+        );
+      },
     );
   }
-
-  Widget _empty() => Padding(
-        padding: const EdgeInsets.fromLTRB(16, 40, 16, 0),
-        child: SurfaceCard(
-          padding: const EdgeInsets.all(26),
-          child: Center(
-              child: Text('No goals yet. Tap “New goal” to set one.',
-                  style: TextStyle(color: AppColors.tx4, fontSize: 13))),
-        ),
-      );
 
   Widget _section(BuildContext context, String title, List<Goal> goals,
       {String? hint}) {
@@ -223,12 +245,19 @@ class _GoalsView extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        const SizedBox(height: 12),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(title, style: G.label(size: 11, color: G.faint)),
+            if (hint != null)
+              Text(hint, style: G.label(size: 11, color: G.accent)),
+          ],
+        ),
         const SizedBox(height: 8),
-        SectionHeader(title, link: hint),
-        const SizedBox(height: 10),
         for (final g in goals)
           Padding(
-            padding: const EdgeInsets.only(bottom: 11),
+            padding: const EdgeInsets.only(bottom: 8),
             child: GestureDetector(
               onTap: () => _openForm(context, goal: g),
               child: _GoalCard(goal: g, area: _areaOf(g.areaId)),
@@ -260,13 +289,6 @@ class _GoalsView extends StatelessWidget {
 }
 
 // ----------------------------------------------------------------- card
-Color _confidenceColor(String? label) => switch (label) {
-      'ON_TRACK' => AppColors.health,
-      'AT_RISK' => AppColors.warn,
-      'OFF_TRACK' => AppColors.danger,
-      _ => AppColors.tx3,
-    };
-
 String _priorityTag(String p) => switch (p) {
       'CRITICAL' || 'HIGH' => 'P1',
       'MEDIUM' => 'P2',
@@ -280,54 +302,85 @@ class _GoalCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final accent = area?.color ?? AppColors.accent;
-    return GlassCard(
-      padding: const EdgeInsets.all(16),
+    final accent = area?.color ?? G.accent;
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: G.card,
+        borderRadius: BorderRadius.circular(4),
+        border: Border.all(color: G.lineSoft, width: 0.5),
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              AreaDot(accent, size: 9),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(goal.title,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                        fontSize: 16, fontWeight: FontWeight.w700)),
+              Container(
+                width: 6,
+                height: 6,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: accent,
+                ),
               ),
               const SizedBox(width: 8),
-              PriorityTag(_priorityTag(goal.priority)),
+              Expanded(
+                child: Text(
+                  goal.title,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: G.text(15, w: FontWeight.w600, color: G.ink),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                decoration: BoxDecoration(
+                  color: G.inset,
+                  borderRadius: BorderRadius.circular(2),
+                  border: Border.all(color: G.lineSoft, width: 0.5),
+                ),
+                child: Text(
+                  _priorityTag(goal.priority),
+                  style: G.label(size: 9.5, color: G.faint),
+                ),
+              ),
             ],
           ),
           if (goal.description != null && goal.description!.isNotEmpty) ...[
             const SizedBox(height: 6),
-            Text(goal.description!,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(fontSize: 12.5, color: AppColors.tx3)),
+            Text(
+              goal.description!,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: G.voice(13, color: G.muted),
+            ),
           ],
-          const SizedBox(height: 12),
+          const SizedBox(height: 10),
           Row(
             children: [
-              Chip3(area?.name ?? 'Area', color: accent),
-              const SizedBox(width: 8),
-              if (goal.deadline != null)
-                Chip3(_fmtDate(goal.deadline!),
-                    icon: Icons.flag_outlined),
+              Text(
+                area?.name ?? 'General',
+                style: G.label(size: 11, color: accent),
+              ),
+              if (goal.deadline != null) ...[
+                Text(' · ', style: G.label(size: 11, color: G.faint)),
+                Text(
+                  'Due ${_fmtDate(goal.deadline!)}',
+                  style: G.label(size: 11, color: G.muted),
+                ),
+              ],
               const Spacer(),
               if (goal.confidence != null)
-                Row(
-                  children: [
-                    Text('${goal.confidence}%',
-                        style: GoogleFonts.jetBrainsMono(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
-                            color: _confidenceColor(goal.confidenceLabel))),
-                    const SizedBox(width: 6),
-                    AreaDot(_confidenceColor(goal.confidenceLabel), size: 7),
-                  ],
+                Text(
+                  '${goal.confidence}% trajectory',
+                  style: G.label(
+                    size: 10.5,
+                    color: goal.confidence! >= 70
+                        ? G.good
+                        : (goal.confidence! >= 40 ? G.accent : G.carried),
+                  ),
                 ),
             ],
           ),
@@ -372,7 +425,8 @@ class _GoalFormState extends State<_GoalForm> {
     final g = widget.goal;
     _title = TextEditingController(text: g?.title ?? '');
     _desc = TextEditingController(text: g?.description ?? '');
-    _areaId = g?.areaId ?? (widget.areas.isNotEmpty ? widget.areas.first.id : null);
+    _areaId =
+        g?.areaId ?? (widget.areas.isNotEmpty ? widget.areas.first.id : null);
     _priority = g?.priority ?? 'MEDIUM';
     _status = g?.status ?? 'ACTIVE';
     _deadline = g?.deadline;
@@ -465,17 +519,26 @@ class _GoalFormState extends State<_GoalForm> {
                 );
                 if (picked != null) setState(() => _deadline = picked);
               },
-              icon: const Icon(Icons.calendar_today_outlined, size: 15),
+              icon: Icon(Icons.calendar_today_outlined,
+                  size: 14, color: G.faint),
               label: Text(
-                  _deadline == null ? 'Set date' : _fmtDate(_deadline!)),
+                _deadline == null ? 'Set date' : _fmtDate(_deadline!),
+                style: G.label(size: 11.5, color: G.muted),
+              ),
               style: OutlinedButton.styleFrom(
-                  foregroundColor: AppColors.tx2,
-                  side: BorderSide(color: AppColors.line2)),
+                side: BorderSide(color: G.lineSoft, width: 0.5),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(4)),
+              ),
             ),
-            if (_deadline != null)
+            if (_deadline != null) ...[
+              const SizedBox(width: 8),
               TextButton(
-                  onPressed: () => setState(() => _deadline = null),
-                  child: const Text('Clear')),
+                onPressed: () => setState(() => _deadline = null),
+                child:
+                    Text('Clear', style: G.label(size: 11, color: G.faint)),
+              ),
+            ],
           ],
         ),
         const SizedBox(height: 20),
@@ -494,14 +557,18 @@ class _GoalFormState extends State<_GoalForm> {
 
   Widget _focusButton(Goal g) => SizedBox(
         width: double.infinity,
+        height: 44,
         child: OutlinedButton.icon(
           onPressed: () => _activate(g),
-          icon: const Icon(Icons.center_focus_strong, size: 17),
-          label: const Text('Move into focus'),
+          icon: Icon(Icons.center_focus_strong, size: 16, color: G.accent),
+          label: Text('Move into focus',
+              style: G.text(13, w: FontWeight.w500, color: G.accent)),
           style: OutlinedButton.styleFrom(
-              foregroundColor: AppColors.accent,
-              side: BorderSide(color: AppColors.accentLine),
-              padding: const EdgeInsets.symmetric(vertical: 14)),
+            side: BorderSide(
+                color: G.accent.withValues(alpha: 0.4), width: 0.5),
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+          ),
         ),
       );
 
@@ -521,20 +588,24 @@ class _GoalFormState extends State<_GoalForm> {
     return showDialog<String>(
       context: context,
       builder: (_) => AlertDialog(
-        backgroundColor: AppColors.surface2,
-        title: const Text('Focus is full',
-            style: TextStyle(fontSize: 16)),
+        backgroundColor: G.card,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(4),
+          side: BorderSide(color: G.lineSoft, width: 0.5),
+        ),
+        title: Text('Focus is full', style: G.voice(16, color: G.ink)),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Pick a goal to park to make room:',
-                style: TextStyle(fontSize: 13, color: AppColors.tx3)),
-            const SizedBox(height: 8),
+            Text('Pick a goal to park to make room for this one:',
+                style: G.text(13, color: G.muted)),
+            const SizedBox(height: 12),
             for (final a in active)
               ListTile(
                 contentPadding: EdgeInsets.zero,
-                title: Text(a.title, style: const TextStyle(fontSize: 14)),
+                title: Text(a.title,
+                    style: G.text(14, w: FontWeight.w500, color: G.ink)),
                 onTap: () => Navigator.of(context).pop(a.id),
               ),
           ],

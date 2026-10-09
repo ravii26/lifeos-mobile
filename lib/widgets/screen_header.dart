@@ -1,10 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 
-import '../core/theme/app_colors.dart';
+import '../features/guide/guide_style.dart';
 import 'bits.dart';
 
-/// Sticky-style screen header — `MHeader`.
+/// Sticky-style screen header — Nocturne editorial header.
 class ScreenHeader extends StatelessWidget {
   final String? eyebrow;
   final String title;
@@ -25,7 +24,7 @@ class ScreenHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     return Padding(
       padding: EdgeInsets.fromLTRB(
-          18, MediaQuery.of(context).padding.top + 14, 18, 14),
+          16, MediaQuery.of(context).padding.top + 14, 16, 14),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
@@ -35,18 +34,14 @@ class ScreenHeader extends StatelessWidget {
               children: [
                 if (eyebrow != null) Eyebrow(eyebrow!),
                 const SizedBox(height: 3),
-                Text(title,
-                    style: GoogleFonts.hankenGrotesk(
-                        fontSize: 27,
-                        fontWeight: FontWeight.w700,
-                        letterSpacing: -0.8,
-                        height: 1.05,
-                        color: AppColors.tx)),
+                Text(
+                  title,
+                  style: G.voice(24, color: G.ink),
+                ),
                 if (subtitle != null) ...[
-                  const SizedBox(height: 5),
+                  const SizedBox(height: 4),
                   DefaultTextStyle.merge(
-                    style: TextStyle(
-                        fontSize: 13, color: AppColors.tx3, height: 1.4),
+                    style: G.label(size: 11.5, color: G.muted),
                     child: subtitle!,
                   ),
                 ],
@@ -55,26 +50,26 @@ class ScreenHeader extends StatelessWidget {
           ),
           const SizedBox(width: 12),
           _HeadButton(icon: Icons.grid_view_rounded, onTap: onMore),
-          const SizedBox(width: 9),
+          const SizedBox(width: 8),
           GestureDetector(
             onTap: onMore,
             child: Container(
-              width: 40,
-              height: 40,
+              width: 36,
+              height: 36,
               decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                gradient: LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [AppColors.accent, AppColors.career],
+                borderRadius: BorderRadius.circular(4),
+                color: G.accent.withValues(alpha: 0.15),
+                border: Border.all(
+                  color: G.accent.withValues(alpha: 0.35),
+                  width: 0.5,
                 ),
               ),
               child: Center(
-                child: Text(avatarInitial,
-                    style: GoogleFonts.hankenGrotesk(
-                        fontWeight: FontWeight.w800,
-                        fontSize: 15,
-                        color: const Color(0xFF0A0C08))),
+                child: Text(
+                  avatarInitial,
+                  style: G.text(14,
+                      w: FontWeight.w700, color: G.accent),
+                ),
               ),
             ),
           ),
@@ -93,19 +88,19 @@ class _HeadButton extends StatelessWidget {
   Widget build(BuildContext context) => GestureDetector(
         onTap: onTap,
         child: Container(
-          width: 40,
-          height: 40,
+          width: 36,
+          height: 36,
           decoration: BoxDecoration(
-            color: AppColors.glassBg,
-            borderRadius: BorderRadius.circular(13),
-            border: Border.all(color: AppColors.glassBorder),
+            color: G.card,
+            borderRadius: BorderRadius.circular(4),
+            border: Border.all(color: G.lineSoft, width: 0.5),
           ),
-          child: Icon(icon, size: 18, color: AppColors.tx2),
+          child: Icon(icon, size: 17, color: G.muted),
         ),
       );
 }
 
-/// Section header row — `Sec`.
+/// Section header row.
 class SectionHeader extends StatelessWidget {
   final String title;
   final String? link;
@@ -119,23 +114,20 @@ class SectionHeader extends StatelessWidget {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(title,
-              style: GoogleFonts.hankenGrotesk(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                  letterSpacing: -0.2,
-                  color: AppColors.tx)),
+          Text(
+            title.toUpperCase(),
+            style: G.label(size: 11, color: G.faint),
+          ),
           if (link != null)
             GestureDetector(
               onTap: onLink,
               child: Row(
                 children: [
-                  Text(link!,
-                      style: TextStyle(
-                          fontSize: 12.5,
-                          fontWeight: FontWeight.w600,
-                          color: AppColors.tx3)),
-                  Icon(Icons.chevron_right, size: 15, color: AppColors.tx3),
+                  Text(
+                    link!,
+                    style: G.label(size: 11, color: G.accent),
+                  ),
+                  Icon(Icons.chevron_right, size: 14, color: G.accent),
                 ],
               ),
             ),
@@ -145,14 +137,11 @@ class SectionHeader extends StatelessWidget {
   }
 }
 
-/// Back-style header for secondary (More) screens — `BackHead`.
+/// Back-style header for secondary screens.
 class BackHeader extends StatelessWidget {
   final String eyebrow;
   final String title;
   final Color? color;
-  /// Optional trailing action (e.g. an edit button) shown where the balancing
-  /// spacer normally sits. Falls back to the plain spacer when omitted, so
-  /// every other existing call site is unaffected.
   final VoidCallback? onEdit;
   const BackHeader(
       {super.key,
@@ -171,22 +160,22 @@ class BackHeader extends StatelessWidget {
           _HeadButton(
               icon: Icons.chevron_left,
               onTap: () => Navigator.of(context).maybePop()),
+          const SizedBox(width: 12),
           Expanded(
             child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Eyebrow(eyebrow),
                 const SizedBox(height: 2),
-                Text(title,
-                    style: GoogleFonts.hankenGrotesk(
-                        fontSize: 19,
-                        fontWeight: FontWeight.w700,
-                        color: color ?? AppColors.tx)),
+                Text(
+                  title,
+                  style: G.voice(19, color: color ?? G.ink),
+                ),
               ],
             ),
           ),
-          onEdit != null
-              ? _HeadButton(icon: Icons.edit_outlined, onTap: onEdit!)
-              : const SizedBox(width: 40),
+          if (onEdit != null)
+            _HeadButton(icon: Icons.edit_outlined, onTap: onEdit!),
         ],
       ),
     );

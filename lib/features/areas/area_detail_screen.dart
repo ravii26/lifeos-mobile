@@ -2,15 +2,11 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:google_fonts/google_fonts.dart';
 
 import '../../core/di/service_locator.dart';
-import '../../core/theme/app_colors.dart';
 import '../../data/models/area.dart';
 import '../../data/repositories/life_repository.dart';
-import '../../widgets/bits.dart';
-import '../../widgets/glass.dart';
-import '../../widgets/screen_header.dart';
+import '../guide/guide_style.dart';
 import '../shell/life_cubit.dart';
 import '../tasks/task_detail_screen.dart';
 import '../tasks/task_row.dart';
@@ -28,7 +24,6 @@ class _AreaDetailScreenState extends State<AreaDetailScreen> {
   @override
   void initState() {
     super.initState();
-    // Fire-and-forget behaviour signal — powers the coach's neglect detection.
     getIt<LifeRepository>().recordBehavior('AREA_VIEWED',
         metadata: {'areaId': widget.areaId}).ignore();
   }
@@ -43,8 +38,11 @@ class _AreaDetailScreenState extends State<AreaDetailScreen> {
         }
         if (a == null) {
           return Scaffold(
-            backgroundColor: AppColors.bg,
-            body: Center(child: Text('Area not found')),
+            backgroundColor: G.bg,
+            appBar: const GTopBar('Area', showBack: true),
+            body: Center(
+              child: Text('Area not found', style: G.voice(15, color: G.muted)),
+            ),
           );
         }
         final area = a;
@@ -54,133 +52,193 @@ class _AreaDetailScreenState extends State<AreaDetailScreen> {
             s.habits.where((h) => h.areaId == area.id).toList();
 
         return Scaffold(
-          backgroundColor: AppColors.bg,
+          backgroundColor: G.bg,
+          appBar: GTopBar(
+            area.name,
+            subtitle: area.type == 'PRIMARY' ? 'Primary focus' : 'Maintenance',
+            showBack: true,
+            trailing: IconButton(
+              icon: Icon(Icons.edit_outlined, size: 18, color: G.muted),
+              onPressed: () => openAreaForm(context, area: area),
+            ),
+          ),
           body: ListView(
-            padding: const EdgeInsets.only(bottom: 40),
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 40),
             children: [
-              BackHeader(
-                  eyebrow: area.type == 'PRIMARY' ? 'Primary area' : 'Area',
-                  title: area.name,
-                  color: area.color,
-                  onEdit: () => openAreaForm(context, area: area)),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: G.card,
+                  border: Border.all(color: G.lineSoft, width: 0.5),
+                  borderRadius: BorderRadius.circular(4),
+                ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    GlassCard(
-                      padding: const EdgeInsets.all(18),
-                      child: Row(
-                        children: [
-                          Donut(
-                            value: area.score.toDouble(),
-                            size: 84,
-                            stroke: 7,
-                            color: area.color,
-                            center: Text('${area.score}',
-                                style: GoogleFonts.jetBrainsMono(
-                                    fontSize: 22,
-                                    fontWeight: FontWeight.w600,
-                                    color: AppColors.tx)),
-                          ),
-                          const SizedBox(width: 18),
-                          Expanded(
-                            child: Wrap(
-                              spacing: 8,
-                              runSpacing: 8,
-                              children: [
-                                Chip3('${area.tasksDone}/${area.tasksTotal} tasks'),
-                                Chip3('${area.streak}d streak',
-                                    icon: Icons.local_fire_department),
-                                Chip3('${area.focusMins}m focus'),
-                              ],
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Row(
+                          children: [
+                            Container(
+                              width: 8,
+                              height: 8,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: area.color,
+                              ),
                             ),
+                            const SizedBox(width: 8),
+                            Text(
+                              'Area Balance',
+                              style: G.label(size: 11, color: G.faint),
+                            ),
+                          ],
+                        ),
+                        Text(
+                          '${area.score}%',
+                          style: G.numeral(24, color: G.ink),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        Text('${area.tasksDone}/${area.tasksTotal} tasks done',
+                            style: G.label(size: 11, color: G.muted)),
+                        Text(' · ', style: G.label(size: 11, color: G.faint)),
+                        Text('${area.streak}d streak',
+                            style: G.label(size: 11, color: G.muted)),
+                        Text(' · ', style: G.label(size: 11, color: G.faint)),
+                        Text('${area.focusMins}m focus',
+                            style: G.label(size: 11, color: G.muted)),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+                    Container(
+                      height: 3,
+                      decoration: BoxDecoration(
+                        color: G.inset,
+                        borderRadius: BorderRadius.circular(1.5),
+                      ),
+                      child: FractionallySizedBox(
+                        alignment: Alignment.centerLeft,
+                        widthFactor: (area.score / 100).clamp(0.0, 1.0),
+                        child: Container(
+                          decoration: BoxDecoration(
+                            color: area.color,
+                            borderRadius: BorderRadius.circular(1.5),
                           ),
-                        ],
+                        ),
                       ),
                     ),
-                    const SizedBox(height: 16),
-                    SectionHeader('Open tasks · ${tasks.length}'),
-                    const SizedBox(height: 10),
-                    if (tasks.isEmpty)
-                      const _Empty('No open tasks in this area.')
-                    else
-                      for (final t in tasks)
-                        Padding(
-                          padding: const EdgeInsets.only(bottom: 9),
-                          child: GestureDetector(
-                            onTap: () {
-                              final cubit = context.read<LifeCubit>();
-                              Navigator.of(context).push(MaterialPageRoute(
-                                builder: (_) => BlocProvider.value(
-                                  value: cubit,
-                                  child: TaskDetailScreen(taskId: t.id),
-                                ),
-                              ));
-                            },
-                            child: TaskRow(
-                              task: t,
-                              area: area,
-                              onComplete: () =>
-                                  context.read<LifeCubit>().completeTask(t.id),
-                              onDelete: () =>
-                                  context.read<LifeCubit>().deleteTask(t.id),
-                            ),
-                          ),
-                        ),
-                    const SizedBox(height: 16),
-                    SectionHeader('Habits · ${habits.length}'),
-                    const SizedBox(height: 10),
-                    if (habits.isEmpty)
-                      const _Empty('No habits in this area.')
-                    else
-                      for (final h in habits)
-                        Padding(
-                          padding: const EdgeInsets.only(bottom: 9),
-                          child: Container(
-                            padding: const EdgeInsets.all(14),
-                            decoration: BoxDecoration(
-                              color: AppColors.surface2,
-                              borderRadius: BorderRadius.circular(16),
-                              border: Border.all(color: AppColors.line),
-                            ),
-                            child: Row(
-                              children: [
-                                AreaDot(area.color, size: 9),
-                                const SizedBox(width: 11),
-                                Expanded(
-                                  child: Text(h.title,
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: const TextStyle(
-                                          fontSize: 14,
-                                          fontWeight: FontWeight.w500)),
-                                ),
-                                Chip3('${h.currentStreak}d',
-                                    icon: Icons.local_fire_department),
-                              ],
-                            ),
-                          ),
-                        ),
                   ],
                 ),
               ),
+              const SizedBox(height: 20),
+              Padding(
+                padding: const EdgeInsets.only(left: 2, bottom: 8),
+                child: Text('OPEN TASKS (${tasks.length})',
+                    style: G.label(size: 11, color: G.faint)),
+              ),
+              if (tasks.isEmpty)
+                Container(
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    color: G.card,
+                    border: Border.all(color: G.lineSoft, width: 0.5),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: Center(
+                    child: Text('No open tasks in this area.',
+                        style: G.voice(13.5, color: G.muted)),
+                  ),
+                )
+              else
+                for (final t in tasks)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 6),
+                    child: GestureDetector(
+                      onTap: () {
+                        final cubit = context.read<LifeCubit>();
+                        Navigator.of(context).push(MaterialPageRoute(
+                          builder: (_) => BlocProvider.value(
+                            value: cubit,
+                            child: TaskDetailScreen(taskId: t.id),
+                          ),
+                        ));
+                      },
+                      child: TaskRow(
+                        task: t,
+                        area: area,
+                        onComplete: () =>
+                            context.read<LifeCubit>().completeTask(t.id),
+                        onDelete: () =>
+                            context.read<LifeCubit>().deleteTask(t.id),
+                      ),
+                    ),
+                  ),
+              const SizedBox(height: 20),
+              Padding(
+                padding: const EdgeInsets.only(left: 2, bottom: 8),
+                child: Text('HABITS (${habits.length})',
+                    style: G.label(size: 11, color: G.faint)),
+              ),
+              if (habits.isEmpty)
+                Container(
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    color: G.card,
+                    border: Border.all(color: G.lineSoft, width: 0.5),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: Center(
+                    child: Text('No habits in this area.',
+                        style: G.voice(13.5, color: G.muted)),
+                  ),
+                )
+              else
+                for (final h in habits)
+                  Container(
+                    margin: const EdgeInsets.only(bottom: 6),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 14, vertical: 12),
+                    decoration: BoxDecoration(
+                      color: G.card,
+                      borderRadius: BorderRadius.circular(4),
+                      border: Border.all(color: G.lineSoft, width: 0.5),
+                    ),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 6,
+                          height: 6,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: area.color,
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            h.title,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: G.text(14,
+                                w: FontWeight.w400, color: G.ink),
+                          ),
+                        ),
+                        Text(
+                          '${h.currentStreak}d continuity',
+                          style: G.label(size: 11, color: G.faint),
+                        ),
+                      ],
+                    ),
+                  ),
             ],
           ),
         );
       },
     );
   }
-}
-
-class _Empty extends StatelessWidget {
-  final String text;
-  const _Empty(this.text);
-  @override
-  Widget build(BuildContext context) => SurfaceCard(
-        padding: const EdgeInsets.all(20),
-        child: Center(
-            child: Text(text,
-                style: TextStyle(color: AppColors.tx4, fontSize: 13))),
-      );
 }

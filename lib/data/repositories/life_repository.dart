@@ -1034,6 +1034,8 @@ class LifeRepository {
     return asString((data as Json)['mode'], 'NORMAL');
   }
 
+  Future<void> setMode(String mode) => _api.put('/now/mode', body: {'mode': mode});
+
   /// Fix the title of something Ally just captured ("edit" on the confirm card).
   /// [type] is task | habit | project | note.
   Future<void> renameCaptured(String type, String id, String title) =>

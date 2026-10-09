@@ -261,20 +261,41 @@ class _Bubble extends StatelessWidget {
         child: Column(
           crossAxisAlignment: m.fromUser ? CrossAxisAlignment.end : CrossAxisAlignment.start,
           children: [
-            if (!m.fromUser && m.role != null)
+            if (!m.fromUser) ...[
               Padding(
-                padding: const EdgeInsets.only(top: 14),
-                child: Text(_roleLabel[m.role] ?? 'Ally', style: G.text(11, color: G.muted)),
+                padding: const EdgeInsets.only(top: 14, bottom: 4),
+                child: Row(mainAxisSize: MainAxisSize.min, children: [
+                  Icon(Icons.auto_awesome_rounded, size: 14, color: G.accent),
+                  const SizedBox(width: 5),
+                  Text(_roleLabel[m.role] ?? 'Ally whisper', style: G.label(size: 11, color: G.faint)),
+                ]),
               ),
-            Container(
-              margin: EdgeInsets.only(top: m.fromUser ? 12 : 4),
-              padding: m.fromUser ? const EdgeInsets.symmetric(horizontal: 14, vertical: 11) : EdgeInsets.zero,
-              decoration: m.fromUser ? BoxDecoration(color: G.card, borderRadius: BorderRadius.circular(4)) : null,
-              child: Text(
-                m.text,
-                style: m.fromUser ? G.text(15, height: 1.45) : G.voice(21, color: G.ink),
+              Container(
+                margin: const EdgeInsets.only(top: 2),
+                padding: const EdgeInsets.only(left: 10, top: 4, bottom: 4),
+                decoration: BoxDecoration(
+                  border: Border(left: BorderSide(color: G.accent.withValues(alpha: 0.5), width: 1.5)),
+                ),
+                child: Text(
+                  '“${m.text}”',
+                  style: G.voice(15.5, color: G.ink),
+                ),
               ),
-            ),
+            ] else ...[
+              Container(
+                margin: const EdgeInsets.only(top: 10),
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                decoration: BoxDecoration(
+                  color: G.card,
+                  border: Border.all(color: G.lineSoft, width: 0.5),
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: Text(
+                  m.text,
+                  style: G.text(14.5, height: 1.4, color: G.ink),
+                ),
+              ),
+            ],
             if (grouped)
               _SavedCard(
                 items: [for (final i in created) (i, m.actions[i])],
@@ -468,53 +489,69 @@ class _SavedCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final live = items.where((e) => !e.$2.undone).length;
     return Container(
-      margin: const EdgeInsets.only(top: 16),
+      margin: const EdgeInsets.only(top: 12),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: G.inset,
+        border: Border.all(color: G.lineSoft, width: 0.5),
+        borderRadius: BorderRadius.circular(4),
+      ),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Container(
-          width: double.infinity,
-          padding: const EdgeInsets.only(bottom: 9),
-          decoration: BoxDecoration(border: Border(bottom: BorderSide(color: G.ink, width: 2))),
-          child: Text(live == 0 ? 'All undone' : 'Saved $live thing${live == 1 ? '' : 's'}. Check?',
-              style: G.text(15, w: FontWeight.w700)),
-        ),
-        for (final (ai, a) in items)
-          Container(
-            padding: const EdgeInsets.symmetric(vertical: 11),
-            decoration: BoxDecoration(border: Border(bottom: BorderSide(color: G.line))),
+        Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+          Row(children: [
+            Icon(Icons.check_circle_outline_rounded, size: 16, color: G.good),
+            const SizedBox(width: 6),
+            Text(live == 0 ? 'All undone' : 'Saved $live thing${live == 1 ? '' : 's'}. Check?',
+                style: G.label(size: 12, color: G.ink, w: FontWeight.w600)),
+          ]),
+          if (live > 1)
+            InkWell(
+              onTap: onUndoAll,
+              child: Text('Undo all', style: G.label(size: 11, color: G.faint)),
+            ),
+        ]),
+        const SizedBox(height: 8),
+        Container(height: 0.5, color: G.lineSoft),
+        for (final (ai, a) in items) ...[
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 8),
             child: Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
+              Container(
+                width: 3,
+                height: 16,
+                decoration: BoxDecoration(
+                  color: a.itemType == 'HABIT' ? G.good : G.carried,
+                  borderRadius: BorderRadius.circular(1.5),
+                ),
+              ),
+              const SizedBox(width: 8),
               Expanded(
-                child: Text(_describe(a).$2,
-                    style: G.text(15, color: a.undone ? G.muted : G.ink, w: FontWeight.w500, height: 1.35)
-                        .copyWith(decoration: a.undone ? TextDecoration.lineThrough : null)),
+                child: Text(
+                  _describe(a).$2,
+                  style: G.text(13.5, color: a.undone ? G.faint : G.ink, w: FontWeight.w500)
+                      .copyWith(decoration: a.undone ? TextDecoration.lineThrough : null),
+                ),
               ),
               if (!a.undone && a.id != null && a.itemType != null)
                 InkWell(
                   onTap: () => onEdit(ai, a.text),
                   child: Padding(
-                    padding: const EdgeInsets.only(left: 14, top: 4, bottom: 4),
-                    child: Text('Edit', style: G.text(13, color: G.muted)),
+                    padding: const EdgeInsets.only(left: 10, top: 4, bottom: 4),
+                    child: Text('Edit', style: G.label(size: 11, color: G.accent)),
                   ),
                 ),
               if (!a.undone && a.activityId != null)
                 InkWell(
                   onTap: () => onUndo(ai),
                   child: Padding(
-                    padding: const EdgeInsets.only(left: 14, top: 4, bottom: 4),
-                    child: Text('Undo', style: G.text(13, color: G.muted)),
+                    padding: const EdgeInsets.only(left: 10, top: 4, bottom: 4),
+                    child: Text('Undo', style: G.label(size: 11, color: G.faint)),
                   ),
                 ),
             ]),
           ),
-        if (live > 1)
-          Align(
-            alignment: Alignment.centerRight,
-            child: TextButton(
-              onPressed: onUndoAll,
-              child: Text('Undo all', style: G.text(13, color: G.muted)),
-            ),
-          )
-        else
-          const SizedBox(height: 6),
+          if (items.last != (ai, a)) Container(height: 0.5, color: G.lineSoft),
+        ],
       ]),
     );
   }
@@ -625,12 +662,15 @@ class _Composer extends StatelessWidget {
             ),
           ),
         Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
           decoration: BoxDecoration(
-            color: G.dark ? Colors.transparent : G.card,
-            border: Border.all(color: listening ? G.accent : G.line),
+            color: G.card,
+            border: Border.all(color: listening ? G.accent : G.lineSoft, width: 0.5),
             borderRadius: BorderRadius.circular(4),
           ),
           child: Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
+            Icon(Icons.edit_note_rounded, size: 20, color: G.faint),
+            const SizedBox(width: 8),
             Expanded(
               child: TextField(
                 controller: controller,
@@ -638,50 +678,72 @@ class _Composer extends StatelessWidget {
                 maxLines: 5,
                 textInputAction: TextInputAction.send,
                 onSubmitted: (_) => onSend(),
-                style: G.text(15),
+                style: G.text(14),
                 cursorColor: G.accent,
                 decoration: InputDecoration(
-                  hintText: listening ? 'Listening…' : 'Tell Ally anything',
-                  hintStyle: G.text(15, color: G.muted),
+                  hintText: listening ? 'Listening…' : 'Tell Ally anything or ask…',
+                  hintStyle: G.label(size: 13, color: G.faint),
                   isDense: true,
                   filled: false,
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 2, vertical: 10),
                   border: InputBorder.none,
                   enabledBorder: InputBorder.none,
                   focusedBorder: InputBorder.none,
                 ),
               ),
             ),
-            // Tap the label to switch the speaking language.
+            // Dialect Toggle Pill
             InkWell(
               onTap: onLang,
-              child: SizedBox(
-                height: 48,
-                width: 40,
-                child: Center(child: Text(lang == 'hi_IN' ? 'हिं' : 'EN', style: G.text(12, w: FontWeight.w700, color: G.muted))),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2.5),
+                decoration: BoxDecoration(
+                  border: Border.all(color: G.lineSoft, width: 0.5),
+                  borderRadius: BorderRadius.circular(3),
+                ),
+                child: Text(
+                  lang == 'hi_IN' ? 'हिं' : 'EN',
+                  style: G.label(size: 10, color: G.muted, w: FontWeight.w600),
+                ),
               ),
             ),
+            const SizedBox(width: 4),
+            // Link-Save Icon
             InkWell(
               onTap: onSave,
-              child: SizedBox(height: 48, width: 40, child: Icon(Icons.link_rounded, size: 20, color: G.muted)),
-            ),
-            Container(
-              decoration: BoxDecoration(border: Border(left: BorderSide(color: G.line))),
-              child: ValueListenableBuilder<TextEditingValue>(
-                valueListenable: controller,
-                builder: (_, v, _) {
-                  final send = v.text.trim().isNotEmpty && !listening;
-                  return InkWell(
-                    onTap: send ? (sending ? null : () => onSend()) : onMic,
-                    child: SizedBox(
-                      height: 48,
-                      width: 48,
-                      child: Icon(send ? Icons.arrow_upward_rounded : (listening ? Icons.stop_rounded : Icons.mic_none_rounded),
-                          size: 22, color: G.ink),
-                    ),
-                  );
-                },
+              child: SizedBox(
+                height: 38,
+                width: 34,
+                child: Icon(Icons.bookmark_add_outlined, size: 18, color: G.faint),
               ),
+            ),
+            // Send / Mic Action Capsule
+            ValueListenableBuilder<TextEditingValue>(
+              valueListenable: controller,
+              builder: (_, v, _) {
+                final send = v.text.trim().isNotEmpty && !listening;
+                return InkWell(
+                  onTap: send ? (sending ? null : () => onSend()) : onMic,
+                  child: Container(
+                    height: 32,
+                    width: 32,
+                    margin: const EdgeInsets.only(left: 4),
+                    decoration: BoxDecoration(
+                      color: send
+                          ? G.accent.withValues(alpha: 0.15)
+                          : (listening ? G.accent.withValues(alpha: 0.2) : G.inset),
+                      borderRadius: BorderRadius.circular(3),
+                    ),
+                    child: Icon(
+                      send
+                          ? Icons.arrow_upward_rounded
+                          : (listening ? Icons.stop_rounded : Icons.mic_none_rounded),
+                      size: 17,
+                      color: send || listening ? G.accent : G.faint,
+                    ),
+                  ),
+                );
+              },
             ),
           ]),
         ),

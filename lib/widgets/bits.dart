@@ -1,11 +1,10 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 
-import '../core/theme/app_colors.dart';
+import '../features/guide/guide_style.dart';
 
-/// Dashed "add new" tile used at the foot of list sections.
+/// Planar "add new" tile used at the foot of list sections.
 class AddTile extends StatelessWidget {
   final String label;
   final VoidCallback onTap;
@@ -16,22 +15,22 @@ class AddTile extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 14),
+        padding: const EdgeInsets.symmetric(vertical: 12),
         decoration: BoxDecoration(
-          color: AppColors.surface2,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: AppColors.line2),
+          color: G.card,
+          borderRadius: BorderRadius.circular(4),
+          border: Border.all(color: G.lineSoft, width: 0.5),
         ),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.add, size: 18, color: AppColors.accent),
+            Icon(Icons.add, size: 16, color: G.accent),
             const SizedBox(width: 8),
-            Text(label,
-                style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.accent)),
+            Text(
+              label,
+              style: G.text(13.5,
+                  w: FontWeight.w500, color: G.accent),
+            ),
           ],
         ),
       ),
@@ -39,7 +38,7 @@ class AddTile extends StatelessWidget {
   }
 }
 
-/// Uppercase mono eyebrow label — `.m-eyebrow`.
+/// Uppercase mono eyebrow label — Nocturne Sanctuary label.
 class Eyebrow extends StatelessWidget {
   final String text;
   final Color? color;
@@ -48,16 +47,14 @@ class Eyebrow extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Text(
         text.toUpperCase(),
-        style: GoogleFonts.jetBrainsMono(
-          fontSize: 10.5,
-          letterSpacing: 1.2,
-          fontWeight: FontWeight.w500,
-          color: color ?? AppColors.tx3,
+        style: G.label(
+          size: 10.5,
+          color: color ?? G.faint,
         ),
       );
 }
 
-/// Small mono pill — `.m-chip`.
+/// Small planar badge.
 class Chip3 extends StatelessWidget {
   final String text;
   final Color? color;
@@ -69,37 +66,41 @@ class Chip3 extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Container(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
         decoration: BoxDecoration(
-          color: bg ?? AppColors.surface3,
-          borderRadius: BorderRadius.circular(20),
+          color: bg ?? G.inset,
+          borderRadius: BorderRadius.circular(2),
           border: Border.all(
-              color: bg == null ? AppColors.line : Colors.transparent),
+            color: bg == null ? G.lineSoft : Colors.transparent,
+            width: 0.5,
+          ),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
             if (leading != null) ...[leading!, const SizedBox(width: 5)],
             if (icon != null) ...[
-              Icon(icon, size: 11, color: color ?? AppColors.tx2),
-              const SizedBox(width: 5),
+              Icon(icon, size: 11, color: color ?? G.muted),
+              const SizedBox(width: 4),
             ],
-            Text(text,
-                style: GoogleFonts.jetBrainsMono(
-                    fontSize: 10,
-                    letterSpacing: .2,
-                    color: color ?? AppColors.tx2)),
+            Text(
+              text,
+              style: G.label(
+                size: 10,
+                color: color ?? G.muted,
+              ),
+            ),
           ],
         ),
       );
 }
 
-/// Colored area dot — `.adot`.
+/// Colored area dot.
 class AreaDot extends StatelessWidget {
   final Color color;
   final double size;
   final bool glow;
-  const AreaDot(this.color, {super.key, this.size = 8, this.glow = false});
+  const AreaDot(this.color, {super.key, this.size = 7, this.glow = false});
 
   @override
   Widget build(BuildContext context) => Container(
@@ -108,33 +109,37 @@ class AreaDot extends StatelessWidget {
         decoration: BoxDecoration(
           color: color,
           shape: BoxShape.circle,
-          boxShadow: glow
-              ? [BoxShadow(color: color, blurRadius: 8, spreadRadius: 0)]
-              : null,
         ),
       );
 }
 
-/// Thin progress bar — `.m-bar`.
+/// Thin planar progress bar.
 class ProgressBar extends StatelessWidget {
   final double value; // 0..1
   final Color? color;
   const ProgressBar(this.value, {super.key, this.color});
 
   @override
-  Widget build(BuildContext context) => ClipRRect(
-        borderRadius: BorderRadius.circular(20),
-        child: LinearProgressIndicator(
-          value: value.clamp(0, 1),
-          minHeight: 6,
-          backgroundColor: AppColors.surface3,
-          valueColor:
-              AlwaysStoppedAnimation(color ?? AppColors.accent),
+  Widget build(BuildContext context) => Container(
+        height: 3,
+        decoration: BoxDecoration(
+          color: G.inset,
+          borderRadius: BorderRadius.circular(1.5),
+        ),
+        child: FractionallySizedBox(
+          alignment: Alignment.centerLeft,
+          widthFactor: value.clamp(0.0, 1.0),
+          child: Container(
+            decoration: BoxDecoration(
+              color: color ?? G.accent,
+              borderRadius: BorderRadius.circular(1.5),
+            ),
+          ),
         ),
       );
 }
 
-/// Priority tag P1/P2/P3 — `.pri`.
+/// Priority tag P1/P2/P3.
 class PriorityTag extends StatelessWidget {
   final String label; // P1 | P2 | P3
   const PriorityTag(this.label, {super.key});
@@ -142,23 +147,26 @@ class PriorityTag extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final (fg, bg) = switch (label) {
-      'P1' => (const Color(0xFFFF8A8A), const Color(0x29FF5D62)),
-      'P2' => (AppColors.warn, const Color(0x29FFB547)),
-      _ => (AppColors.tx3, AppColors.surface3),
+      'P1' => (G.carried, G.carried.withValues(alpha: 0.15)),
+      'P2' => (G.accent, G.accent.withValues(alpha: 0.15)),
+      _ => (G.faint, G.inset),
     };
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
-      decoration:
-          BoxDecoration(color: bg, borderRadius: BorderRadius.circular(5)),
-      child: Text(label,
-          style: GoogleFonts.jetBrainsMono(
-              fontSize: 9.5, fontWeight: FontWeight.w700, color: fg)),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(2),
+        border: Border.all(color: G.lineSoft, width: 0.5),
+      ),
+      child: Text(
+        label,
+        style: G.label(size: 9.5, color: fg),
+      ),
     );
   }
 }
 
-/// Segmented control — `.seg` / `.seg button`. Pass equal-length [labels]
-/// and [values]; [selected] must be one of [values].
+/// Segmented control.
 class SegmentedControl<T> extends StatelessWidget {
   final List<T> values;
   final List<String> labels;
@@ -174,11 +182,11 @@ class SegmentedControl<T> extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Container(
-        padding: const EdgeInsets.all(3),
+        padding: const EdgeInsets.all(2),
         decoration: BoxDecoration(
-          color: AppColors.surface2,
-          borderRadius: BorderRadius.circular(9),
-          border: Border.all(color: AppColors.line),
+          color: G.inset,
+          borderRadius: BorderRadius.circular(4),
+          border: Border.all(color: G.lineSoft, width: 0.5),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
@@ -188,20 +196,23 @@ class SegmentedControl<T> extends StatelessWidget {
                 onTap: () => onChanged(values[i]),
                 child: Container(
                   padding:
-                      const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                   decoration: BoxDecoration(
                     color: values[i] == selected
-                        ? AppColors.surface4
+                        ? G.accent.withValues(alpha: 0.15)
                         : Colors.transparent,
-                    borderRadius: BorderRadius.circular(7),
+                    borderRadius: BorderRadius.circular(3),
                   ),
-                  child: Text(labels[i],
-                      style: TextStyle(
-                          fontSize: 12.5,
-                          fontWeight: FontWeight.w600,
-                          color: values[i] == selected
-                              ? AppColors.tx
-                              : AppColors.tx3)),
+                  child: Text(
+                    labels[i],
+                    style: G.text(
+                      12,
+                      w: values[i] == selected
+                          ? FontWeight.w600
+                          : FontWeight.w400,
+                      color: values[i] == selected ? G.accent : G.muted,
+                    ),
+                  ),
                 ),
               ),
           ],
@@ -209,44 +220,21 @@ class SegmentedControl<T> extends StatelessWidget {
       );
 }
 
-/// Toggle switch — `.switch`.
+/// Toggle switch.
 class ToggleSwitch extends StatelessWidget {
   final bool value;
   final ValueChanged<bool> onChanged;
   const ToggleSwitch({super.key, required this.value, required this.onChanged});
 
   @override
-  Widget build(BuildContext context) => GestureDetector(
-        onTap: () => onChanged(!value),
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 180),
-          width: 38,
-          height: 22,
-          padding: const EdgeInsets.all(2),
-          decoration: BoxDecoration(
-            color: value ? AppColors.accent : AppColors.surface4,
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(
-                color: value ? Colors.transparent : AppColors.line2),
-          ),
-          child: AnimatedAlign(
-            duration: const Duration(milliseconds: 180),
-            curve: Curves.easeOut,
-            alignment: value ? Alignment.centerRight : Alignment.centerLeft,
-            child: Container(
-              width: 16,
-              height: 16,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: value ? AppColors.accentInk : AppColors.tx2,
-              ),
-            ),
-          ),
-        ),
+  Widget build(BuildContext context) => Switch(
+        value: value,
+        activeColor: G.accent,
+        onChanged: onChanged,
       );
 }
 
-/// Circular score ring — `Donut`.
+/// Circular score ring — Donut.
 class Donut extends StatelessWidget {
   final double value; // 0..100
   final double size;
@@ -256,8 +244,8 @@ class Donut extends StatelessWidget {
   const Donut({
     super.key,
     required this.value,
-    this.size = 66,
-    this.stroke = 6,
+    this.size = 60,
+    this.stroke = 4,
     required this.color,
     this.center,
   });
@@ -286,7 +274,7 @@ class _DonutPainter extends CustomPainter {
     final track = Paint()
       ..style = PaintingStyle.stroke
       ..strokeWidth = stroke
-      ..color = AppColors.surface3;
+      ..color = G.lineSoft;
     final arc = Paint()
       ..style = PaintingStyle.stroke
       ..strokeCap = StrokeCap.round

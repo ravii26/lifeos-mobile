@@ -1,60 +1,57 @@
 import 'package:flutter/material.dart';
 
-/// LifeOS color tokens — now a RUNTIME palette so the app can switch between
-/// dark and light and re-skin the accent live.
-///
-/// Fields are mutable statics (not `const`). Call [AppColors.apply] whenever
-/// the theme mode or accent changes, then rebuild the widget tree. Because the
-/// values are read at build time, every (non-const) widget picks up the change.
+/// Ally color tokens — Nocturne Sanctuary palette.
+/// Fields are mutable statics — call [AppColors.apply] whenever mode/accent
+/// changes, then rebuild the widget tree.
 class AppColors {
   AppColors._();
 
   static bool isLight = false;
 
   // Surfaces
-  static Color bg = const Color(0xFF0A0B0D);
-  static Color surface1 = const Color(0xFF101216);
-  static Color surface2 = const Color(0xFF15181D);
-  static Color surface3 = const Color(0xFF1C2027);
-  static Color surface4 = const Color(0xFF242932);
-  static Color inset = const Color(0xFF0C0E11);
+  static Color bg = const Color(0xFF111214);
+  static Color surface1 = const Color(0xFF1B1C1E);
+  static Color surface2 = const Color(0xFF1F2022);
+  static Color surface3 = const Color(0xFF292A2C);
+  static Color surface4 = const Color(0xFF343537);
+  static Color inset = const Color(0xFF0D0E10);
 
-  // Hairlines
-  static Color line = const Color(0x11FFFFFF);
-  static Color line2 = const Color(0x1CFFFFFF);
-  static Color line3 = const Color(0x2EFFFFFF);
+  // Hairlines — Nocturne: deep rail #2A2B2E
+  static Color line = const Color(0x332A2B2E);
+  static Color line2 = const Color(0x55454652);
+  static Color line3 = const Color(0x88454652);
 
-  // Text
-  static Color tx = const Color(0xFFECEEF0);
-  static Color tx2 = const Color(0xFFA6ABB3);
-  static Color tx3 = const Color(0xFF6B717A);
-  static Color tx4 = const Color(0xFF474C54);
+  // Text — on-surface / on-surface-variant
+  static Color tx = const Color(0xFFE3E2E4);
+  static Color tx2 = const Color(0xFFC5C5D3);
+  static Color tx3 = const Color(0xFF8F909D);
+  static Color tx4 = const Color(0xFF454652);
 
-  // Glass recipe (used by frosted surfaces)
-  static Color glassBg = const Color(0x94141B22);
-  static Color glassBg2 = const Color(0xA81C2027);
+  // Glass recipe (kept for compatibility; Nocturne is flat — avoid glass)
+  static Color glassBg = const Color(0x941F2022);
+  static Color glassBg2 = const Color(0xA8292A2C);
   static Color glassBorder = const Color(0x1AFFFFFF);
 
-  // Accent (driven by the active AppAccent)
-  static Color accent = const Color(0xFFC5F23F);
-  static Color accent2 = const Color(0xFFD4FA66);
-  static Color accentInk = const Color(0xFF11160A);
-  static Color accentSoft = const Color(0x21C5F23F);
-  static Color accentLine = const Color(0x59C5F23F);
-  static Color accentGlow = const Color(0x38C5F23F);
+  // Accent (driven by AppAccent — defaults to Nocturne slate-indigo)
+  static Color accent = const Color(0xFFB9C3FF);
+  static Color accent2 = const Color(0xFF8FA2FF);
+  static Color accentInk = const Color(0xFF0D267F);
+  static Color accentSoft = const Color(0x21B9C3FF);
+  static Color accentLine = const Color(0x59B9C3FF);
+  static Color accentGlow = const Color(0x38B9C3FF);
 
   // Life-area hues (mode-independent)
-  static const career = Color(0xFF4F8CFF);
-  static const health = Color(0xFF2DD4A7);
-  static const mind = Color(0xFFA884FF);
-  static const finance = Color(0xFFC5F23F);
-  static const relationships = Color(0xFFFF6B81);
-  static const creative = Color(0xFFFF9D4D);
+  static const career = Color(0xFF8FA2FF);       // primary-container
+  static const health = Color(0xFF92D5A7);       // secondary (sage)
+  static const mind = Color(0xFFB9C3FF);         // primary
+  static const finance = Color(0xFFFFB780);      // tertiary (ochre)
+  static const relationships = Color(0xFFFFB4AB);
+  static const creative = Color(0xFFE1975C);
 
-  // Semantic (mode-independent)
-  static const danger = Color(0xFFFF5D62);
-  static const warn = Color(0xFFFFB547);
-  static const ok = Color(0xFF2DD4A7);
+  // Semantic
+  static const danger = Color(0xFFFFB4AB);
+  static const warn = Color(0xFFFFB780);
+  static const ok = Color(0xFF92D5A7);
 
   /// Swap the whole palette for the given mode + accent.
   static void apply({required bool light, required AppAccent accent}) {
@@ -67,38 +64,38 @@ class AppColors {
     AppColors.accentGlow = accent.glow;
 
     if (light) {
-      bg = const Color(0xFFEEF0F3);
-      surface1 = const Color(0xFFFFFFFF);
-      surface2 = const Color(0xFFF4F5F8);
-      surface3 = const Color(0xFFE9EBF0);
-      surface4 = const Color(0xFFDFE2E9);
-      inset = const Color(0xFFF7F8FA);
-      line = const Color(0x140F141E);
-      line2 = const Color(0x210F141E);
-      line3 = const Color(0x330F141E);
-      tx = const Color(0xFF14171C);
-      tx2 = const Color(0xFF444B55);
-      tx3 = const Color(0xFF767D88);
-      tx4 = const Color(0xFFA3A9B3);
-      glassBg = const Color(0x9EFFFFFF);
+      bg = const Color(0xFFF2F2EF);
+      surface1 = const Color(0xFFF9F9F7);
+      surface2 = const Color(0xFFEFEFED);
+      surface3 = const Color(0xFFE8E8E6);
+      surface4 = const Color(0xFFDFDFDC);
+      inset = const Color(0xFFF5F5F3);
+      line = const Color(0x22000000);
+      line2 = const Color(0x33000000);
+      line3 = const Color(0x55000000);
+      tx = const Color(0xFF15140F);
+      tx2 = const Color(0xFF5B5A53);
+      tx3 = const Color(0xFF8B8B82);
+      tx4 = const Color(0xFFBBBBB0);
+      glassBg = const Color(0x9EF9F9F7);
       glassBg2 = const Color(0xBDFFFFFF);
-      glassBorder = const Color(0x140F141E);
+      glassBorder = const Color(0x14000000);
     } else {
-      bg = const Color(0xFF0A0B0D);
-      surface1 = const Color(0xFF101216);
-      surface2 = const Color(0xFF15181D);
-      surface3 = const Color(0xFF1C2027);
-      surface4 = const Color(0xFF242932);
-      inset = const Color(0xFF0C0E11);
-      line = const Color(0x11FFFFFF);
-      line2 = const Color(0x1CFFFFFF);
-      line3 = const Color(0x2EFFFFFF);
-      tx = const Color(0xFFECEEF0);
-      tx2 = const Color(0xFFA6ABB3);
-      tx3 = const Color(0xFF6B717A);
-      tx4 = const Color(0xFF474C54);
-      glassBg = const Color(0x94141B22);
-      glassBg2 = const Color(0xA81C2027);
+      bg = const Color(0xFF111214);
+      surface1 = const Color(0xFF1B1C1E);
+      surface2 = const Color(0xFF1F2022);
+      surface3 = const Color(0xFF292A2C);
+      surface4 = const Color(0xFF343537);
+      inset = const Color(0xFF0D0E10);
+      line = const Color(0x332A2B2E);
+      line2 = const Color(0x55454652);
+      line3 = const Color(0x88454652);
+      tx = const Color(0xFFE3E2E4);
+      tx2 = const Color(0xFFC5C5D3);
+      tx3 = const Color(0xFF8F909D);
+      tx4 = const Color(0xFF454652);
+      glassBg = const Color(0x941F2022);
+      glassBg2 = const Color(0xA8292A2C);
       glassBorder = const Color(0x1AFFFFFF);
     }
   }
@@ -120,50 +117,54 @@ class AppAccent {
     required this.glow,
   });
 
-  static const chartreuse = AppAccent(
-    color: Color(0xFFC5F23F),
-    ink: Color(0xFF11160A),
-    soft: Color(0x21C5F23F),
-    line: Color(0x59C5F23F),
-    glow: Color(0x38C5F23F),
+  /// Nocturne Sanctuary default — Calm Slate-Indigo (#B9C3FF).
+  static const nocturne = AppAccent(
+    color: Color(0xFFB9C3FF),
+    ink: Color(0xFF0D267F),
+    soft: Color(0x21B9C3FF),
+    line: Color(0x59B9C3FF),
+    glow: Color(0x38B9C3FF),
   );
 
+  /// All legacy accents remapped to Nocturne palette tokens.
+  static const chartreuse = nocturne; // was chartreuse, now remapped
+
   static const teal = AppAccent(
-    color: Color(0xFF2DD4A7),
-    ink: Color(0xFF04140F),
-    soft: Color(0x212DD4A7),
-    line: Color(0x592DD4A7),
-    glow: Color(0x382DD4A7),
+    color: Color(0xFF92D5A7),
+    ink: Color(0xFF00391E),
+    soft: Color(0x2192D5A7),
+    line: Color(0x5992D5A7),
+    glow: Color(0x3892D5A7),
   );
 
   static const blue = AppAccent(
-    color: Color(0xFF4F8CFF),
-    ink: Color(0xFFFFFFFF),
-    soft: Color(0x264F8CFF),
-    line: Color(0x664F8CFF),
-    glow: Color(0x474F8CFF),
+    color: Color(0xFF8FA2FF),
+    ink: Color(0xFF1F348B),
+    soft: Color(0x268FA2FF),
+    line: Color(0x668FA2FF),
+    glow: Color(0x478FA2FF),
   );
 
   static const purple = AppAccent(
-    color: Color(0xFFA884FF),
-    ink: Color(0xFFFFFFFF),
-    soft: Color(0x26A884FF),
-    line: Color(0x66A884FF),
-    glow: Color(0x47A884FF),
+    color: Color(0xFFB9C3FF),
+    ink: Color(0xFF0D267F),
+    soft: Color(0x26B9C3FF),
+    line: Color(0x66B9C3FF),
+    glow: Color(0x47B9C3FF),
   );
 
   static const orange = AppAccent(
-    color: Color(0xFFFF9D4D),
-    ink: Color(0xFF1A0F04),
-    soft: Color(0x26FF9D4D),
-    line: Color(0x66FF9D4D),
-    glow: Color(0x47FF9D4D),
+    color: Color(0xFFFFB780),
+    ink: Color(0xFF4E2600),
+    soft: Color(0x26FFB780),
+    line: Color(0x66FFB780),
+    glow: Color(0x47FFB780),
   );
 
-  static const all = [chartreuse, teal, blue, purple, orange];
+  static const all = [nocturne, teal, blue, purple, orange];
 
   static AppAccent fromHex(String? hex) {
-    if (hex == null) return chartreuse;
+    if (hex == null) return nocturne;
     final v = hex.toUpperCase().replaceAll('#', '');
     for (final a in all) {
       if (a.color.toARGB32().toRadixString(16).substring(2).toUpperCase() ==
@@ -171,6 +172,6 @@ class AppAccent {
         return a;
       }
     }
-    return chartreuse;
+    return nocturne;
   }
 }

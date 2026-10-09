@@ -1,9 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 
-import '../core/theme/app_colors.dart';
+import '../features/guide/guide_style.dart';
 
-/// Glass bottom-sheet scaffold shared by the create/edit forms.
+/// Nocturne Sanctuary bottom-sheet scaffold shared by the create/edit forms.
 class FormSheet extends StatelessWidget {
   final String title;
   final List<Widget> children;
@@ -16,11 +15,15 @@ class FormSheet extends StatelessWidget {
           EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
       child: Container(
         decoration: BoxDecoration(
-          color: AppColors.surface1,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
-          border: Border(top: BorderSide(color: AppColors.glassBorder)),
+          color: G.card,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
+          border: Border(
+            top: BorderSide(color: G.lineSoft, width: 0.5),
+            left: BorderSide(color: G.lineSoft, width: 0.5),
+            right: BorderSide(color: G.lineSoft, width: 0.5),
+          ),
         ),
-        padding: const EdgeInsets.fromLTRB(18, 12, 18, 24),
+        padding: const EdgeInsets.fromLTRB(18, 12, 18, 28),
         child: SingleChildScrollView(
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -28,17 +31,19 @@ class FormSheet extends StatelessWidget {
             children: [
               Center(
                 child: Container(
-                  width: 40,
-                  height: 5,
+                  width: 32,
+                  height: 3,
                   decoration: BoxDecoration(
-                      color: AppColors.line3,
-                      borderRadius: BorderRadius.circular(10)),
+                    color: G.lineSoft,
+                    borderRadius: BorderRadius.circular(1.5),
+                  ),
                 ),
               ),
-              const SizedBox(height: 16),
-              Text(title,
-                  style: GoogleFonts.hankenGrotesk(
-                      fontSize: 20, fontWeight: FontWeight.w700)),
+              const SizedBox(height: 14),
+              Text(
+                title,
+                style: G.voice(18, color: G.ink),
+              ),
               const SizedBox(height: 16),
               ...children,
             ],
@@ -50,12 +55,11 @@ class FormSheet extends StatelessWidget {
 }
 
 Widget formLabel(String t) => Padding(
-      padding: const EdgeInsets.only(bottom: 8, left: 2),
-      child: Text(t,
-          style: TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
-              color: AppColors.tx3)),
+      padding: const EdgeInsets.only(bottom: 6, left: 2),
+      child: Text(
+        t.toUpperCase(),
+        style: G.label(size: 10.5, color: G.faint),
+      ),
     );
 
 Widget formField(TextEditingController c, String hint,
@@ -65,71 +69,83 @@ Widget formField(TextEditingController c, String hint,
       autofocus: autofocus,
       maxLines: lines,
       keyboardType: keyboard,
-      style: const TextStyle(fontSize: 15),
+      style: G.text(14.5, color: G.ink),
       decoration: InputDecoration(
         hintText: hint,
-        hintStyle: TextStyle(color: AppColors.tx4),
+        hintStyle: G.text(14, color: G.faint),
         filled: true,
-        fillColor: AppColors.surface2,
+        fillColor: G.inset,
         contentPadding:
             const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
         border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
-          borderSide: BorderSide(color: AppColors.line),
+          borderRadius: BorderRadius.circular(4),
+          borderSide: BorderSide(color: G.lineSoft, width: 0.5),
         ),
         enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
-          borderSide: BorderSide(color: AppColors.line),
+          borderRadius: BorderRadius.circular(4),
+          borderSide: BorderSide(color: G.lineSoft, width: 0.5),
         ),
         focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
-          borderSide: BorderSide(color: AppColors.accentLine),
+          borderRadius: BorderRadius.circular(4),
+          borderSide: BorderSide(color: G.accent, width: 0.8),
         ),
       ),
     );
 
 Widget chipWrap(List<Widget> chips) =>
-    Wrap(spacing: 8, runSpacing: 8, children: chips);
+    Wrap(spacing: 6, runSpacing: 6, children: chips);
 
 Widget selChip(String label, bool selected, VoidCallback onTap, {Color? color}) {
-  final c = color ?? AppColors.accent;
+  final c = color ?? G.accent;
   return GestureDetector(
     onTap: onTap,
     child: Container(
-      padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       constraints: const BoxConstraints(maxWidth: 260),
       decoration: BoxDecoration(
-        color: selected ? c.withValues(alpha: 0.16) : AppColors.surface2,
-        borderRadius: BorderRadius.circular(20),
+        color: selected ? c.withValues(alpha: 0.15) : G.inset,
+        borderRadius: BorderRadius.circular(4),
         border: Border.all(
-            color: selected ? c : AppColors.line, width: selected ? 1.3 : 1),
+          color: selected ? c : G.lineSoft,
+          width: 0.5,
+        ),
       ),
-      child: Text(label,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: TextStyle(
-              fontSize: 13,
-              fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
-              color: selected ? c : AppColors.tx2)),
+      child: Text(
+        label,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: G.text(
+          12.5,
+          w: selected ? FontWeight.w600 : FontWeight.w400,
+          color: selected ? c : G.muted,
+        ),
+      ),
     ),
   );
 }
 
 Widget saveButton(bool saving, VoidCallback onTap, String label) => SizedBox(
       width: double.infinity,
-      child: FilledButton(
+      height: 44,
+      child: OutlinedButton(
         onPressed: saving ? null : onTap,
-        style: FilledButton.styleFrom(
-          backgroundColor: AppColors.accent,
-          foregroundColor: AppColors.accentInk,
-          padding: const EdgeInsets.symmetric(vertical: 15),
+        style: OutlinedButton.styleFrom(
+          backgroundColor: G.accent.withValues(alpha: 0.12),
+          side: BorderSide(color: G.accent.withValues(alpha: 0.4), width: 0.5),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
         ),
         child: saving
-            ? const SizedBox(
-                width: 18,
-                height: 18,
-                child: CircularProgressIndicator(strokeWidth: 2))
-            : Text(label),
+            ? SizedBox(
+                width: 16,
+                height: 16,
+                child: CircularProgressIndicator(
+                  strokeWidth: 1.5,
+                  color: G.accent,
+                ))
+            : Text(
+                label,
+                style: G.text(14, w: FontWeight.w500, color: G.accent),
+              ),
       ),
     );
 
@@ -137,8 +153,8 @@ Widget deleteRow(BuildContext context, String label, VoidCallback onTap) =>
     Center(
       child: TextButton.icon(
         onPressed: onTap,
-        icon: const Icon(Icons.delete_outline, size: 18, color: AppColors.danger),
-        label: Text(label, style: const TextStyle(color: AppColors.danger)),
+        icon: Icon(Icons.delete_outline, size: 16, color: G.carried),
+        label: Text(label, style: G.label(size: 12, color: G.carried)),
       ),
     );
 
@@ -147,18 +163,22 @@ Future<bool> confirmDelete(BuildContext context, String message) async {
   final ok = await showDialog<bool>(
     context: context,
     builder: (dctx) => AlertDialog(
-      backgroundColor: AppColors.surface2,
-      title: const Text('Delete?', style: TextStyle(fontSize: 16)),
-      content: Text(message,
-          style: TextStyle(fontSize: 13, color: AppColors.tx3)),
+      backgroundColor: G.card,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(4),
+        side: BorderSide(color: G.lineSoft, width: 0.5),
+      ),
+      title: Text('Delete?', style: G.voice(16, color: G.ink)),
+      content: Text(message, style: G.text(13.5, color: G.muted)),
       actions: [
         TextButton(
-            onPressed: () => Navigator.of(dctx).pop(false),
-            child: const Text('Cancel')),
+          onPressed: () => Navigator.of(dctx).pop(false),
+          child: Text('Cancel', style: G.label(size: 12, color: G.muted)),
+        ),
         TextButton(
-            onPressed: () => Navigator.of(dctx).pop(true),
-            child: const Text('Delete',
-                style: TextStyle(color: AppColors.danger))),
+          onPressed: () => Navigator.of(dctx).pop(true),
+          child: Text('Delete', style: G.label(size: 12, color: G.carried)),
+        ),
       ],
     ),
   );

@@ -1,12 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:google_fonts/google_fonts.dart';
 
-import '../../core/theme/app_colors.dart';
 import '../../data/models/habit.dart';
-import '../../widgets/bits.dart';
-import '../../widgets/glass.dart';
-import '../../widgets/screen_header.dart';
+import '../guide/guide_style.dart';
 import '../shell/life_cubit.dart';
 import 'habit_detail_screen.dart';
 import 'habit_form.dart';
@@ -25,99 +21,101 @@ void openHabitForm(BuildContext context, {Habit? habit}) {
 }
 
 class HabitsScreen extends StatelessWidget {
-  final VoidCallback onOpenMore;
-  const HabitsScreen({super.key, required this.onOpenMore});
+  final VoidCallback? onOpenMore;
+  const HabitsScreen({super.key, this.onOpenMore});
 
   @override
   Widget build(BuildContext context) {
     return BlocBuilder<LifeCubit, LifeState>(
       builder: (context, s) {
         final logged = s.habits.where((h) => h.todayDone).length;
-        final best = s.habits.isEmpty
-            ? 0
-            : s.habits.map((h) => h.longestStreak).reduce((a, b) => a > b ? a : b);
+        final total = s.habits.length;
 
-        return RefreshIndicator(
-          color: AppColors.accent,
-          backgroundColor: AppColors.surface2,
-          onRefresh: () => context.read<LifeCubit>().refresh(),
-          child: ListView(
-            padding: const EdgeInsets.only(bottom: 120),
-            children: [
-              ScreenHeader(
-                eyebrow: 'Execution',
-                title: 'Habits',
-                avatarInitial: '·',
-                onMore: onOpenMore,
-                subtitle: Text(
-                    '$logged/${s.habits.length} logged today · $best-day best streak'),
-              ),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: Column(
-                  children: [
-                    Row(
-                      children: [
-                        _stat('$logged', 'Logged'),
-                        const SizedBox(width: 10),
-                        _stat('${s.habits.length}', 'Active'),
-                        const SizedBox(width: 10),
-                        _stat('$best', 'Best streak', accent: true),
-                      ],
-                    ),
-                    const SizedBox(height: 14),
-                    if (s.habits.isEmpty)
-                      SurfaceCard(
-                        padding: EdgeInsets.all(26),
-                        child: Center(
-                          child: Text('No habits yet.',
-                              style: TextStyle(
-                                  color: AppColors.tx4, fontSize: 13)),
+        return Scaffold(
+          backgroundColor: G.bg,
+          appBar: GTopBar(
+            'Habits',
+            subtitle: '$logged of $total logged today',
+            showBack: true,
+            trailing: IconButton(
+              icon: Icon(Icons.add, size: 20, color: G.accent),
+              onPressed: () => openHabitForm(context),
+            ),
+          ),
+          body: RefreshIndicator(
+            color: G.accent,
+            backgroundColor: G.card,
+            onRefresh: () => context.read<LifeCubit>().refresh(),
+            child: ListView(
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 80),
+              children: [
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                  decoration: BoxDecoration(
+                    color: G.inset,
+                    border: Border.all(color: G.lineSoft, width: 0.5),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Icon(Icons.repeat_rounded, size: 16, color: G.accent),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          'No resets, no broken chains. Every 2-minute minimum counts and progress only accumulates.',
+                          style: G.voice(13.5, color: G.muted),
                         ),
-                      )
-                    else
-                      for (final h in s.habits)
-                        Padding(
-                          padding: const EdgeInsets.only(bottom: 11),
-                          child: GestureDetector(
-                            onLongPress: () =>
-                                openHabitForm(context, habit: h),
-                            child: _HabitCard(
-                                habit: h,
-                                areaColor: s.areaById(h.areaId)?.color),
-                          ),
-                        ),
-                    const SizedBox(height: 4),
-                    AddTile(
-                        label: 'New habit',
-                        onTap: () => openHabitForm(context)),
-                  ],
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-            ],
+                const SizedBox(height: 16),
+                if (s.habits.isEmpty)
+                  Container(
+                    padding: const EdgeInsets.all(28),
+                    decoration: BoxDecoration(
+                      color: G.card,
+                      border: Border.all(color: G.lineSoft, width: 0.5),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: Center(
+                      child: Text(
+                        'No habits tracked yet.\nCreate small repeated anchors to build effortless momentum.',
+                        textAlign: TextAlign.center,
+                        style: G.voice(14, color: G.muted),
+                      ),
+                    ),
+                  )
+                else
+                  for (final h in s.habits)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: GestureDetector(
+                        onTap: () {
+                          final cubit = context.read<LifeCubit>();
+                          Navigator.of(context).push(MaterialPageRoute(
+                            builder: (_) => BlocProvider.value(
+                              value: cubit,
+                              child: HabitDetailScreen(habitId: h.id),
+                            ),
+                          ));
+                        },
+                        onLongPress: () => openHabitForm(context, habit: h),
+                        child: _HabitCard(
+                          habit: h,
+                          areaColor: s.areaById(h.areaId)?.color,
+                        ),
+                      ),
+                    ),
+              ],
+            ),
           ),
         );
       },
     );
   }
-
-  Widget _stat(String num, String label, {bool accent = false}) => Expanded(
-        child: GlassCard(
-          padding: const EdgeInsets.all(13),
-          child: Column(
-            children: [
-              Text(num,
-                  style: GoogleFonts.jetBrainsMono(
-                      fontSize: 26,
-                      fontWeight: FontWeight.w600,
-                      height: 1,
-                      color: accent ? AppColors.accent : AppColors.tx)),
-              const SizedBox(height: 6),
-              Eyebrow(label),
-            ],
-          ),
-        ),
-      );
 }
 
 class _HabitCard extends StatelessWidget {
@@ -128,90 +126,110 @@ class _HabitCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final h = habit;
-    final color = areaColor ?? AppColors.tx3;
+    final color = areaColor ?? G.accent;
     final pct = h.target == 0
         ? (h.todayDone ? 1.0 : 0.0)
         : (h.todayVal / h.target).clamp(0, 1).toDouble();
 
-    return GlassCard(
-      padding: const EdgeInsets.all(15),
-      onTap: () {
-        final cubit = context.read<LifeCubit>();
-        Navigator.of(context).push(MaterialPageRoute(
-          builder: (_) => BlocProvider.value(
-            value: cubit,
-            child: HabitDetailScreen(habitId: h.id),
-          ),
-        ));
-      },
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: G.card,
+        borderRadius: BorderRadius.circular(4),
+        border: Border.all(color: G.lineSoft, width: 0.5),
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              AreaDot(color, size: 10),
-              const SizedBox(width: 10),
+              GestureDetector(
+                onTap: () => context.read<LifeCubit>().logHabit(h),
+                child: Container(
+                  width: 22,
+                  height: 22,
+                  decoration: BoxDecoration(
+                    color: h.todayDone ? G.good : G.inset,
+                    borderRadius: BorderRadius.circular(3),
+                    border: Border.all(
+                      color: h.todayDone ? G.good : G.lineSoft,
+                      width: 0.8,
+                    ),
+                  ),
+                  child: h.todayDone
+                      ? Icon(Icons.check, size: 14, color: G.onInk)
+                      : null,
+                ),
+              ),
+              const SizedBox(width: 12),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(h.title,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                            fontSize: 15, fontWeight: FontWeight.w600)),
-                    const SizedBox(height: 1),
                     Text(
-                        h.kind == 'timer'
-                            ? '${h.todayMinutes}/${h.targetMinutes} min'
-                            : h.kind == 'count'
-                                ? '${h.todayCount}/${h.targetCount} today'
-                                : 'Daily',
-                        style: TextStyle(
-                            fontSize: 11, color: AppColors.tx3)),
+                      h.title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: G.text(
+                        14.5,
+                        w: FontWeight.w500,
+                        color: h.todayDone ? G.faint : G.ink,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Row(
+                      children: [
+                        Container(
+                          width: 5,
+                          height: 5,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: color,
+                          ),
+                        ),
+                        const SizedBox(width: 5),
+                        Text(
+                          h.kind == 'timer'
+                              ? '${h.todayMinutes}/${h.targetMinutes} min'
+                              : h.kind == 'count'
+                                  ? '${h.todayCount}/${h.targetCount} today'
+                                  : 'Daily rhythm',
+                          style: G.label(size: 10.5, color: G.faint),
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          '· ${h.currentStreak}d continuity',
+                          style: G.label(size: 10.5, color: G.muted),
+                        ),
+                      ],
+                    ),
                   ],
-                ),
-              ),
-              GestureDetector(
-                onTap: () => context.read<LifeCubit>().logHabit(h),
-                child: Container(
-                  width: 38,
-                  height: 38,
-                  decoration: BoxDecoration(
-                    color: h.todayDone ? AppColors.accent : Colors.transparent,
-                    borderRadius: BorderRadius.circular(13),
-                    border: Border.all(
-                        color:
-                            h.todayDone ? AppColors.accent : AppColors.line3,
-                        width: 1.6),
-                  ),
-                  child: Icon(h.todayDone ? Icons.check : Icons.add,
-                      size: 19,
-                      color:
-                          h.todayDone ? AppColors.accentInk : AppColors.tx2),
                 ),
               ),
             ],
           ),
           if (h.kind != 'boolean') ...[
-            const SizedBox(height: 13),
-            ProgressBar(pct, color: color),
+            const SizedBox(height: 10),
+            Container(
+              height: 3,
+              decoration: BoxDecoration(
+                color: G.inset,
+                borderRadius: BorderRadius.circular(1.5),
+              ),
+              child: FractionallySizedBox(
+                alignment: Alignment.centerLeft,
+                widthFactor: pct,
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: h.todayDone ? G.good : color,
+                    borderRadius: BorderRadius.circular(1.5),
+                  ),
+                ),
+              ),
+            ),
           ],
-          const SizedBox(height: 14),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Chip3('${h.currentStreak}-day streak',
-                  icon: Icons.local_fire_department,
-                  color: AppColors.warn,
-                  bg: const Color(0x1FFFB547)),
-              Text('best ${h.longestStreak}',
-                  style: GoogleFonts.jetBrainsMono(
-                      fontSize: 10, color: AppColors.tx4)),
-            ],
-          ),
           if (h.history.isNotEmpty) ...[
-            const SizedBox(height: 11),
+            const SizedBox(height: 10),
             _HistoryDots(history: h.history, color: color),
           ],
         ],
@@ -227,19 +245,19 @@ class _HistoryDots extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final days = history.length > 28
-        ? history.sublist(history.length - 28)
+    final days = history.length > 21
+        ? history.sublist(history.length - 21)
         : history;
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
         for (final done in days)
           Container(
-            width: 7,
-            height: 7,
+            width: 6,
+            height: 6,
             decoration: BoxDecoration(
-              color: done ? color : AppColors.surface3,
-              borderRadius: BorderRadius.circular(2),
+              color: done ? G.good : G.lineSoft,
+              borderRadius: BorderRadius.circular(1.5),
             ),
           ),
       ],

@@ -1,12 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 
-import '../../core/theme/app_colors.dart';
 import '../../data/models/area.dart';
 import '../../data/models/task.dart';
-import '../../widgets/bits.dart';
+import '../guide/guide_style.dart';
 
-/// Swipe-right-to-complete, swipe-left-to-delete task row — `MTaskRow`.
+/// Planar Nocturne task row with hairline border, square checkbox, and gentle actions.
 class TaskRow extends StatelessWidget {
   final Task task;
   final Area? area;
@@ -22,13 +20,13 @@ class TaskRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final areaColor = area?.color ?? AppColors.tx3;
+    final areaColor = area?.color ?? G.faint;
     final content = Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
       decoration: BoxDecoration(
-        color: AppColors.surface2,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.line),
+        color: G.card,
+        borderRadius: BorderRadius.circular(4),
+        border: Border.all(color: G.lineSoft, width: 0.5),
       ),
       child: Row(
         children: [
@@ -40,43 +38,65 @@ class TaskRow extends StatelessWidget {
               children: [
                 Text(
                   task.title,
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w500,
-                    letterSpacing: -0.1,
-                    color: task.isDone ? AppColors.tx4 : AppColors.tx,
-                    decoration:
-                        task.isDone ? TextDecoration.lineThrough : null,
+                  style: G.text(
+                    14,
+                    w: FontWeight.w400,
+                    color: task.isDone ? G.faint : G.ink,
+                  ).copyWith(
+                    decoration: task.isDone ? TextDecoration.lineThrough : null,
                   ),
                 ),
-                const SizedBox(height: 4),
+                const SizedBox(height: 3),
                 Row(
                   children: [
-                    AreaDot(areaColor, size: 6),
+                    Container(
+                      width: 5,
+                      height: 5,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: areaColor,
+                      ),
+                    ),
                     const SizedBox(width: 5),
-                    Text(area?.name ?? '—',
-                        style: GoogleFonts.jetBrainsMono(
-                            fontSize: 11, color: areaColor)),
+                    Text(
+                      area?.name ?? '—',
+                      style: G.label(size: 10.5, color: areaColor),
+                    ),
                     if (task.source != null &&
                         task.source!.toUpperCase() != 'MANUAL') ...[
-                      const SizedBox(width: 8),
-                      Text('↳ ${task.source}',
-                          style: GoogleFonts.jetBrainsMono(
-                              fontSize: 9, color: AppColors.tx3)),
+                      const SizedBox(width: 6),
+                      Text(
+                        '↳ ${task.source}',
+                        style: G.label(size: 9.5, color: G.faint),
+                      ),
                     ],
                     if (task.kind == 'count') ...[
-                      const SizedBox(width: 8),
-                      Text('${task.completedCount}/${task.targetCount}',
-                          style: GoogleFonts.jetBrainsMono(
-                              fontSize: 10.5, color: AppColors.tx3)),
+                      const SizedBox(width: 6),
+                      Text(
+                        '${task.completedCount}/${task.targetCount}',
+                        style: G.label(size: 10, color: G.muted),
+                      ),
                     ],
                   ],
                 ),
               ],
             ),
           ),
-          const SizedBox(width: 8),
-          PriorityTag(task.priorityLabel),
+          if (task.priorityLabel.isNotEmpty && task.priorityLabel != 'NONE') ...[
+            const SizedBox(width: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+              decoration: BoxDecoration(
+                color: G.inset,
+                borderRadius: BorderRadius.circular(2),
+                border: Border.all(color: G.lineSoft, width: 0.5),
+              ),
+              child: Text(
+                task.priorityLabel,
+                style: G.label(size: 9.5, color: G.faint),
+              ),
+            ),
+          ],
         ],
       ),
     );
@@ -90,7 +110,7 @@ class TaskRow extends StatelessWidget {
       confirmDismiss: (dir) async {
         if (dir == DismissDirection.startToEnd) {
           onComplete();
-          return false; // keep row; list refresh will remove it
+          return false;
         }
         onDelete();
         return true;
@@ -101,36 +121,30 @@ class TaskRow extends StatelessWidget {
 
   Widget _swipeBg({required bool left}) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 22),
+      padding: const EdgeInsets.symmetric(horizontal: 16),
       alignment: left ? Alignment.centerLeft : Alignment.centerRight,
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(16),
-        gradient: LinearGradient(
-          colors: left
-              ? [AppColors.accent, AppColors.accent2]
-              : [const Color(0xFF2A2D34), AppColors.danger],
-        ),
+        borderRadius: BorderRadius.circular(4),
+        color: left
+            ? G.good.withValues(alpha: 0.15)
+            : G.carried.withValues(alpha: 0.15),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: left
             ? [
-                Icon(Icons.check, size: 16, color: AppColors.accentInk),
-                SizedBox(width: 8),
+                Icon(Icons.check, size: 15, color: G.good),
+                const SizedBox(width: 6),
                 Text('Complete',
-                    style: TextStyle(
-                        color: AppColors.accentInk,
-                        fontWeight: FontWeight.w700,
-                        fontSize: 13)),
+                    style: G.text(12,
+                        w: FontWeight.w600, color: G.good)),
               ]
-            : const [
-                Text('Delete',
-                    style: TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.w700,
-                        fontSize: 13)),
-                SizedBox(width: 8),
-                Icon(Icons.delete_outline, size: 16, color: Colors.white),
+            : [
+                Text('Remove',
+                    style: G.text(12,
+                        w: FontWeight.w600, color: G.carried)),
+                const SizedBox(width: 6),
+                Icon(Icons.delete_outline, size: 15, color: G.carried),
               ],
       ),
     );
@@ -146,16 +160,18 @@ class _Check extends StatelessWidget {
   Widget build(BuildContext context) => GestureDetector(
         onTap: onTap,
         child: Container(
-          width: 26,
-          height: 26,
+          width: 20,
+          height: 20,
           decoration: BoxDecoration(
-            color: done ? AppColors.accent : Colors.transparent,
-            borderRadius: BorderRadius.circular(9),
+            color: done ? G.good : G.inset,
+            borderRadius: BorderRadius.circular(3),
             border: Border.all(
-                color: done ? AppColors.accent : AppColors.line3, width: 1.6),
+              color: done ? G.good : G.lineSoft,
+              width: 0.8,
+            ),
           ),
           child: done
-              ? Icon(Icons.check, size: 15, color: AppColors.accentInk)
+              ? Icon(Icons.check, size: 13, color: G.onInk)
               : null,
         ),
       );
