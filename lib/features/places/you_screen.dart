@@ -141,18 +141,10 @@ class _YouScreenState extends State<YouScreen> {
                   Icon(Icons.bedtime_outlined, size: 20, color: G.accent),
                   const SizedBox(width: 8),
                   Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    Text('Sab shaant hai', style: G.voice(16, color: G.ink)),
+                    Text('You', style: G.voice(16, color: G.ink)),
                     Text('Where you stand & personal trajectory', style: G.label(size: 11, color: G.faint)),
                   ]),
                 ]),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                  decoration: BoxDecoration(
-                    border: Border.all(color: G.lineSoft, width: 0.5),
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                  child: Text('Hinglish', style: G.label(size: 11, color: G.muted)),
-                ),
               ]),
               const SizedBox(height: 14),
 

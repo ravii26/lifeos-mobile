@@ -329,7 +329,7 @@ class _CaptureSheetState extends State<CaptureSheet> {
                     Icon(Icons.bolt, color: AppColors.accent, size: 20),
                     const SizedBox(width: 8),
                     Text('Brain dump',
-                        style: GoogleFonts.hankenGrotesk(
+                        style: GoogleFonts.instrumentSans(
                             fontSize: 18,
                             fontWeight: FontWeight.w700,
                             color: AppColors.tx)),
@@ -695,7 +695,7 @@ class _PickerSheet extends StatelessWidget {
           Padding(
             padding: const EdgeInsets.fromLTRB(20, 18, 20, 8),
             child: Text(title,
-                style: GoogleFonts.hankenGrotesk(
+                style: GoogleFonts.instrumentSans(
                     fontSize: 16,
                     fontWeight: FontWeight.w700,
                     color: AppColors.tx)),

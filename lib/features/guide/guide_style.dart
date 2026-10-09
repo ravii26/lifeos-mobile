@@ -3,7 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 
 /// Ally's look (step 8, ADR 0021): the day as a shape, one thing as a sentence,
 /// nothing that counts against you. Paper in the day, near-black at night.
-/// Libre Franklin for everything you tap, Libre Caslon italic for Ally's voice.
+/// Instrument Sans for everything you tap, Instrument Serif italic for Ally's voice.
 ///
 /// Colours are getters because they follow the phone's light/dark setting;
 /// [dark] is set once at the app root (see main.dart) and the tree is rebuilt
@@ -89,24 +89,24 @@ class G {
 
   // — Typography helpers —
 
-  /// Libre Caslon Text (italic) — Ally's voice for headlines.
+  /// Instrument Serif (italic) — Ally's voice for headlines.
   static TextStyle display(double size,
           {Color? color, FontWeight w = FontWeight.w400}) =>
-      GoogleFonts.libreCaslonText(
-          fontSize: size,
-          fontWeight: w,
+      GoogleFonts.instrumentSerif(
+          fontSize: size * 1.12,
+          fontWeight: FontWeight.w400,
           fontStyle: FontStyle.italic,
           color: color ?? ink,
           height: size >= 28 ? 1.17 : 1.35,
           letterSpacing: size >= 28 ? -0.015 * size : 0);
 
-  /// Libre Franklin — system text, tasks, labels, action targets.
+  /// Instrument Sans — system text, tasks, labels, action targets.
   static TextStyle text(double size,
           {Color? color,
           FontWeight w = FontWeight.w400,
           double height = 1.5,
           double letterSpacing = 0}) =>
-      GoogleFonts.libreFranklin(
+      GoogleFonts.instrumentSans(
           fontSize: size,
           fontWeight: w,
           color: color ?? ink,
@@ -115,20 +115,20 @@ class G {
 
   /// Ally's own voice: italic serif, used for the one sentence that matters.
   static TextStyle voice(double size, {Color? color}) =>
-      GoogleFonts.libreCaslonText(
-          fontSize: size,
+      GoogleFonts.instrumentSerif(
+          fontSize: size * 1.12,
           fontStyle: FontStyle.italic,
           color: color ?? muted,
           height: size >= 28 ? 1.17 : 1.4,
           letterSpacing: 0);
 
-  /// Small label — Libre Franklin, 500 weight, 0.04em tracking.
+  /// Small label — Instrument Sans, 500 weight, 0.04em tracking.
   static TextStyle label(
           {double size = 12,
           Color? color,
           FontWeight w = FontWeight.w500,
           double letterSpacing = 0.04}) =>
-      GoogleFonts.libreFranklin(
+      GoogleFonts.instrumentSans(
           fontSize: size,
           fontWeight: w,
           color: color ?? faint,
@@ -137,12 +137,12 @@ class G {
 
   /// Large numeral: light weight, tight tracking.
   static TextStyle numeral(double size, {Color? color}) =>
-      GoogleFonts.libreFranklin(
-          fontSize: size,
-          fontWeight: FontWeight.w300,
+      GoogleFonts.instrumentSerif(
+          fontSize: size * 1.1,
+          fontWeight: FontWeight.w400,
           color: color ?? ink,
-          height: 1.17,
-          letterSpacing: -0.03 * size);
+          height: 1.1,
+          letterSpacing: -0.02 * size);
 }
 
 // ─── Shared Components ────────────────────────────────────────────────────────
@@ -279,7 +279,7 @@ class GTopBar extends StatelessWidget implements PreferredSizeWidget {
 }
 
 /// Minimal reassurance status capsule — a hairline border, no fill.
-/// "Sab shaant hai. Rest now."
+/// "All calm. Rest now."
 class GStatusCapsule extends StatelessWidget {
   final String text;
   final String? trailingText;
@@ -357,10 +357,10 @@ class DayStrip extends StatelessWidget {
   const DayStrip({super.key, required this.now});
 
   static const _parts = [
-    ('MORNING', 6.0, 9.5, 'Subah'),
-    ('OFFICE', 9.5, 19.0, 'Dopahar'),
-    ('EVENING', 19.0, 22.0, 'Shaam'),
-    ('NIGHT', 22.0, 24.0, 'Raat'),
+    ('MORNING', 6.0, 9.5, 'Morning'),
+    ('OFFICE', 9.5, 19.0, 'Day'),
+    ('EVENING', 19.0, 22.0, 'Evening'),
+    ('NIGHT', 22.0, 24.0, 'Night'),
   ];
 
   static String partOf(DateTime t) {

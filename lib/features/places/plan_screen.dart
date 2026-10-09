@@ -153,17 +153,9 @@ class _PlanScreenState extends State<PlanScreen> {
                   const SizedBox(width: 8),
                   Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                     Text('Plan', style: G.voice(17, color: G.ink)),
-                    Text('Aaj aur aage ka safar', style: G.label(size: 11, color: G.faint)),
+                    Text('Today and what is ahead', style: G.label(size: 11, color: G.faint)),
                   ]),
                 ]),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                  decoration: BoxDecoration(
-                    border: Border.all(color: G.lineSoft, width: 0.5),
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                  child: Text('Hinglish', style: G.label(size: 11, color: G.muted)),
-                ),
               ]),
               const SizedBox(height: 12),
 
@@ -199,11 +191,11 @@ class _PlanScreenState extends State<PlanScreen> {
                       ),
                   ]),
                 ),
-                Text('$timeStr · Sab shaant', style: G.label(size: 11, color: G.faint)),
+                Text('$timeStr · All calm', style: G.label(size: 11, color: G.faint)),
               ]),
               const SizedBox(height: 10),
 
-              // Day Flow Timeline Bar: Subah, Dopahar, Shaam, Raat
+              // Day Flow Timeline Bar: Morning, Day, Evening, Night
               DayStrip(now: now),
               const SizedBox(height: 14),
 
@@ -372,7 +364,7 @@ class _PlanScreenState extends State<PlanScreen> {
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
                 ),
                 icon: Icon(Icons.check_rounded, size: 16, color: G.good),
-                label: Text('Done (Shaant)', style: G.label(size: 11, color: G.good, w: FontWeight.w600)),
+                label: Text('Done', style: G.label(size: 11, color: G.good, w: FontWeight.w600)),
               ),
               Row(children: [
                 TextButton(
@@ -382,7 +374,7 @@ class _PlanScreenState extends State<PlanScreen> {
                 const SizedBox(width: 6),
                 TextButton(
                   onPressed: () => _tick(activeItem),
-                  child: Text('Kal subah', style: G.label(size: 11, color: G.carried)),
+                  child: Text('Tomorrow morning', style: G.label(size: 11, color: G.carried)),
                 ),
               ]),
             ]),

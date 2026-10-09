@@ -51,7 +51,7 @@ class TweaksSheet extends StatelessWidget {
                   ),
                   const SizedBox(height: 16),
                   Text('Tweaks',
-                      style: GoogleFonts.hankenGrotesk(
+                      style: GoogleFonts.instrumentSans(
                           fontSize: 20, fontWeight: FontWeight.w700)),
                   const SizedBox(height: 20),
                   Eyebrow('Mode'),

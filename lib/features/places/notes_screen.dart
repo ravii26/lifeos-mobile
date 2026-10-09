@@ -99,18 +99,10 @@ class _NotesScreenState extends State<NotesScreen> {
                   Icon(Icons.bedtime_outlined, size: 20, color: G.accent),
                   const SizedBox(width: 8),
                   Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    Text('Sab shaant hai', style: G.voice(16, color: G.ink)),
+                    Text('Notes', style: G.voice(16, color: G.ink)),
                     Text('What you taught Ally & saved content', style: G.label(size: 11, color: G.faint)),
                   ]),
                 ]),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                  decoration: BoxDecoration(
-                    border: Border.all(color: G.lineSoft, width: 0.5),
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                  child: Text('Hinglish', style: G.label(size: 11, color: G.muted)),
-                ),
               ]),
               const SizedBox(height: 12),
 
@@ -196,7 +188,7 @@ class _NotesScreenState extends State<NotesScreen> {
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      'Raat ko dimaag khali karke sona hai. No stress backlog.',
+                      'Empty your head and sleep. No stress backlog.',
                       style: G.voice(13, color: G.muted),
                     ),
                   ),

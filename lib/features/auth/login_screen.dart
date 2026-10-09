@@ -66,7 +66,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       const SizedBox(height: 24),
                       Text(_register ? 'Create your account' : 'Welcome back',
                           textAlign: TextAlign.center,
-                          style: GoogleFonts.hankenGrotesk(
+                          style: GoogleFonts.instrumentSans(
                               fontSize: 26,
                               fontWeight: FontWeight.w700,
                               letterSpacing: -0.5,
@@ -159,7 +159,7 @@ class _LoginScreenState extends State<LoginScreen> {
               ),
               child: Center(
                 child: Text('A',
-                    style: GoogleFonts.hankenGrotesk(
+                    style: GoogleFonts.instrumentSans(
                         fontSize: 28,
                         fontWeight: FontWeight.w800,
                         color: AppColors.accentInk)),
@@ -168,7 +168,7 @@ class _LoginScreenState extends State<LoginScreen> {
             const SizedBox(height: 12),
             RichText(
               text: TextSpan(
-                style: GoogleFonts.hankenGrotesk(
+                style: GoogleFonts.instrumentSans(
                     fontSize: 18,
                     fontWeight: FontWeight.w700,
                     color: AppColors.tx),

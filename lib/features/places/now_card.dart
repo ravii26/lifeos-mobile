@@ -80,7 +80,7 @@ class NowCard extends StatelessWidget {
     }
 
     final isLateNight = now.hour >= 21 || now.hour < 5;
-    final greeting = isLateNight ? 'Aaj ka aakhri kadam.' : 'Aaj ka agla kadam.';
+    final greeting = isLateNight ? "Today's last step." : "Today's next step.";
     final subtitle = isLateNight
         ? 'No catch-up. No penalty. Just winding down quietly.'
         : 'One thing at a time. The rest waits patiently.';
@@ -96,21 +96,13 @@ class NowCard extends StatelessWidget {
                 Icon(Icons.bedtime_outlined, size: 20, color: G.accent),
                 const SizedBox(width: 8),
                 Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Text('Sab shaant hai', style: G.voice(15, color: G.ink)),
+                  Text('All calm', style: G.voice(15, color: G.ink)),
                   Text(
                     '${DateFormat('h:mm a').format(now)} · ${DayStrip.partName(part)}',
                     style: G.label(size: 11, color: G.faint),
                   ),
                 ]),
               ]),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                decoration: BoxDecoration(
-                  border: Border.all(color: G.lineSoft, width: 0.5),
-                  borderRadius: BorderRadius.circular(4),
-                ),
-                child: Text('Hinglish', style: G.label(size: 11, color: G.muted)),
-              ),
             ]),
             const SizedBox(height: 12),
             // Segmented Day Strip
@@ -230,7 +222,7 @@ class NowCard extends StatelessWidget {
                             const SizedBox(height: 3),
                             Text(s.prep.join('; '), style: G.text(13, color: G.ink, height: 1.35)),
                             const SizedBox(height: 2),
-                            Text('Kal subah ready.', style: G.label(size: 11, color: G.faint)),
+                            Text('Ready for tomorrow morning.', style: G.label(size: 11, color: G.faint)),
                           ]),
                         ),
                       ]),
@@ -254,7 +246,7 @@ class NowCard extends StatelessWidget {
                         decoration: BoxDecoration(shape: BoxShape.circle, color: G.good.withValues(alpha: 0.6)),
                       ),
                       const SizedBox(width: 8),
-                      Text('Sab shaant hai. Rest when you are ready.',
+                      Text('All calm. Rest when you are ready.',
                           style: G.label(size: 11, color: G.faint)),
                     ]),
                   ),
