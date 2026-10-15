@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
+import '../../core/links/open_link.dart';
 import '../../data/models/habit.dart';
 import '../guide/guide_style.dart';
 import '../shell/life_cubit.dart';
@@ -49,6 +50,11 @@ class HabitDetailScreen extends StatelessWidget {
           body: ListView(
             padding: const EdgeInsets.fromLTRB(16, 16, 16, 40),
             children: [
+              // Made from a save: the video or post is one tap away.
+              if (habit.sourceUrl != null) ...[
+                OpenSourceButton(habit.sourceUrl!),
+                const SizedBox(height: 8),
+              ],
               Row(
                 children: [
                   _stat('${habit.currentStreak}', 'Days logged', G.good),

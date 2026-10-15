@@ -225,6 +225,15 @@ void widgetRefreshCallbackDispatcher() {
     } catch (_) {
       // the plain "your step is ready" nudge stays scheduled
     }
+    // Reminders stay set without opening the app: new ones from another
+    // device, and the next times of repeating ones, are scheduled here.
+    try {
+      final repo = getIt<LifeRepository>();
+      await NotificationService.instance.syncReminders(await repo.reminders());
+      await NotificationService.instance.syncHabitReminders(await repo.habits());
+    } catch (_) {
+      // offline or signed out: what is already scheduled stays
+    }
     return true;
   });
 }

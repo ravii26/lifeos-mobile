@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
+import '../../core/links/open_link.dart';
 import '../../data/models/task.dart';
 import '../focus/focus_screen.dart';
 import '../guide/guide_style.dart';
@@ -163,6 +164,16 @@ class TaskDetailScreen extends StatelessWidget {
                         ],
                       ),
                     ],
+                    if (_noteText(task).isNotEmpty) ...[
+                      const SizedBox(height: 10),
+                      Text(_noteText(task),
+                          style: G.text(13.5, color: G.muted, height: 1.45)),
+                    ],
+                    // Made from a save: the video or post is one tap away.
+                    if (task.sourceUrl != null) ...[
+                      const SizedBox(height: 6),
+                      OpenSourceButton(task.sourceUrl!),
+                    ],
                   ],
                 ),
               ),
@@ -265,6 +276,13 @@ class TaskDetailScreen extends StatelessWidget {
         );
       },
     );
+  }
+
+  // The description without its link ("From your save: …"); the link gets its own button.
+  static String _noteText(Task t) {
+    final url = t.sourceUrl;
+    final text = t.description ?? '';
+    return (url == null ? text : text.replaceAll(url, '')).trim();
   }
 
   static String _fmtDate(DateTime d) {

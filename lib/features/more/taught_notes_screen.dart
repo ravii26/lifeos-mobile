@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/api/api_exception.dart';
 import '../../core/di/service_locator.dart';
+import '../../core/links/open_link.dart';
 import '../../data/repositories/life_repository.dart';
 import '../guide/guide_style.dart';
 
@@ -242,7 +243,10 @@ class _TaughtNotesScreenState extends State<TaughtNotesScreen> {
                             Expanded(child: Text('${(n['items'] as List)[i]}', style: G.text(13, color: G.muted))),
                           ]),
                         ),
-                    if (n['text'] != null && '${n['text']}'.isNotEmpty)
+                    // A video summary keeps its link as the note's text: show it as a button.
+                    if (_link(n['text']) != null)
+                      OpenSourceButton(_link(n['text'])!)
+                    else if (n['text'] != null && '${n['text']}'.isNotEmpty)
                       Text('${n['text']}', style: G.text(13, color: G.muted)),
                   ]),
                 ),
@@ -251,5 +255,10 @@ class _TaughtNotesScreenState extends State<TaughtNotesScreen> {
         ),
       ),
     );
+  }
+
+  static String? _link(Object? text) {
+    final t = '${text ?? ''}'.trim();
+    return RegExp(r'^https?://\S+$').hasMatch(t) ? t : null;
   }
 }

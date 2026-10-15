@@ -62,6 +62,10 @@ dependencies:
   webview_flutter: ^4.9.0
   # Non-sensitive local flags (active focus session marker for the widget)
   shared_preferences: ^2.3.3
+  # Open the video / post a to-do or habit came from ("Open video").
+  url_launcher: ^6.3.3
+  # "Your data": hand the export file to the system share sheet (save to Files / Drive).
+  share_plus: ^12.0.2
 
 dev_dependencies:
   flutter_test:

@@ -1053,6 +1053,31 @@ class LifeRepository {
     return (data as List).whereType<Json>().map(Reminder.fromJson).toList();
   }
 
+  // ---- Your data ----
+
+  /// Everything the account holds, as one JSON document.
+  Future<Json> exportData() async => (await _api.get('/auth/export')) as Json;
+
+  /// Deletes the account and everything in it. Permanent.
+  Future<void> deleteAccount() => _api.delete('/auth/account', body: {'confirm': 'DELETE'});
+
+  // ---- First run ----
+
+  /// Whether the person has told Ally their day yet (any weekday set).
+  Future<bool> dayIsSet() async {
+    final data = await _api.get('/now/schedule');
+    return (data as List).whereType<Json>().any((d) => d['custom'] == true);
+  }
+
+  /// Wake and sleep time, office days (0 = Sunday) and hours → the whole week.
+  Future<void> setDayBasics({required String wake, required String sleep, List<int> officeDays = const [], String? officeStart, String? officeEnd}) =>
+      _api.put('/now/basics', body: {
+        'wake': wake,
+        'sleep': sleep,
+        'officeDays': officeDays,
+        'office': officeStart != null && officeEnd != null ? {'start': officeStart, 'end': officeEnd} : null,
+      });
+
   // ---- Assistant ("Jarvis") ----
   // Same unified persona endpoint the web overlay calls — one message in,
   // one grounded reply out (either the decisions engine's briefing or a

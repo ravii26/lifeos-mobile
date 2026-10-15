@@ -35,6 +35,7 @@ class Task {
   final String? projectId;
   final String? goalId;
   final String? source; // MANUAL | DUMP | LEARN
+  final String? description;
 
   const Task({
     required this.id,
@@ -50,7 +51,12 @@ class Task {
     this.projectId,
     this.goalId,
     this.source,
+    this.description,
   });
+
+  /// The link a to-do came from (a saved video or post): the first web
+  /// address in its description.
+  String? get sourceUrl => RegExp(r'https?://\S+').firstMatch(description ?? '')?.group(0);
 
   bool get isDone => status.toUpperCase() == 'COMPLETED';
   String get priorityLabel => Priority.label(priority);
@@ -76,5 +82,6 @@ class Task {
         projectId: asStringOrNull(j['projectId']),
         goalId: asStringOrNull(j['goalId']),
         source: asStringOrNull(j['source']),
+        description: asStringOrNull(j['description']),
       );
 }

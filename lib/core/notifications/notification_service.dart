@@ -34,6 +34,20 @@ class NotificationService {
   static const nightlyId = 9000;
   static const morningId = 9001;
   static const prepId = 9002;
+  static const testId = 9003;
+
+  /// Android lets an app hold about 500 alarms; stay well under it.
+  static const _maxReminderAlarms = 300;
+
+  /// Exact alarms fire on the minute; inexact ones can be held back by an hour
+  /// or more when the phone is idle (and longer on Samsung). Exact needs the
+  /// person's OK on Android 12+, so this is checked before every sync.
+  bool _exact = false;
+  AndroidScheduleMode get _mode =>
+      _exact ? AndroidScheduleMode.exactAllowWhileIdle : AndroidScheduleMode.inexactAllowWhileIdle;
+
+  AndroidFlutterLocalNotificationsPlugin? get _android =>
+      _plugin.resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
   static const _prefsPaused = 'ally_paused';
   static const _nightlyCategory = 'tonight';
   static const _prefsTime = 'guide_nightly_time';
@@ -98,6 +112,51 @@ class NotificationService {
       onDidReceiveBackgroundNotificationResponse: nightlyNotificationBackground,
     );
     _ready = true;
+    await refreshExactMode();
+  }
+
+  /// Whether reminders can fire at the exact minute (Android 12+ asks).
+  Future<bool> canScheduleExact() async {
+    if (kIsWeb || defaultTargetPlatform != TargetPlatform.android) return true;
+    try {
+      return await _android?.canScheduleExactNotifications() ?? true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  Future<void> refreshExactMode() async => _exact = await canScheduleExact();
+
+  /// Opens Android's "Alarms & reminders" page for Ally.
+  Future<void> requestExact() async {
+    await _android?.requestExactAlarmsPermission();
+    await refreshExactMode();
+  }
+
+  /// Whether the phone lets Ally show notifications at all.
+  Future<bool> notificationsAllowed() async {
+    if (kIsWeb || defaultTargetPlatform != TargetPlatform.android) return true;
+    try {
+      return await _android?.areNotificationsEnabled() ?? true;
+    } catch (_) {
+      return true;
+    }
+  }
+
+  /// How many reminder notifications are waiting on this phone right now.
+  Future<int> pendingReminderCount() async {
+    if (!_ready || kIsWeb) return 0;
+    return (await _plugin.pendingNotificationRequests()).where((p) => (p.id & 0x40000000) != 0).length;
+  }
+
+  /// "Send me a test reminder": one notification a minute from now, scheduled
+  /// exactly like a real reminder, so the person can see reminders work.
+  Future<DateTime?> sendTestReminder() async {
+    if (!_ready || kIsWeb) return null;
+    await refreshExactMode();
+    final at = DateTime.now().add(const Duration(minutes: 1));
+    await _schedule(testId, 'Test reminder', 'Reminders are working. This one was set a minute ago.', at);
+    return at;
   }
 
   Future<void> requestPermission() async {
@@ -118,7 +177,7 @@ class NotificationService {
     if (!_ready || kIsWeb) return;
     for (final p in await _plugin.pendingNotificationRequests()) {
       final isReminder = (p.id & 0x40000000) != 0;
-      if (p.id != nightlyId && p.id != morningId && p.id != prepId && !isReminder) await _plugin.cancel(p.id);
+      if (p.id != nightlyId && p.id != morningId && p.id != prepId && p.id != testId && !isReminder) await _plugin.cancel(p.id);
     }
     await _plugin.cancel(prepId);
     // Sick / travelling / on holiday: no habit or prep prompts at all.
@@ -202,18 +261,30 @@ class NotificationService {
         text,
         tz.TZDateTime.from(at, tz.local),
         _reminderDetails,
-        androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
+        androidScheduleMode: _mode,
         uiLocalNotificationDateInterpretation: UILocalNotificationDateInterpretation.absoluteTime,
       );
 
+  // The 2nd, 3rd… upcoming time of a repeating reminder (the 1st uses _reminderNotifId).
+  static int _occurrenceNotifId(String id, int i) => 0x40000000 | ((id.hashCode * 31 + i * 7919) & 0x3fffffff);
+
+  static List<int> _idsFor(Reminder r, int times) => [
+        _reminderNotifId(r.id),
+        _windowNotifId(r.id),
+        for (var i = 1; i < times; i++) _occurrenceNotifId(r.id, i),
+      ];
+
   /// A reminder notifies at [at]. With a [windowEnd] ("sometime between 5 and
-  /// 7") it also notifies shortly before the window closes. Repeating
-  /// reminders need nothing extra: the server creates the next occurrence
-  /// when one is done, and [syncReminders] schedules it.
-  Future<void> scheduleReminder(String id, String text, DateTime at, {DateTime? windowEnd}) async {
+  /// 7") it also notifies shortly before the window closes. A repeating
+  /// reminder goes through [syncReminders], which schedules its next times
+  /// whether or not the last one was ticked.
+  Future<void> scheduleReminder(String id, String text, DateTime at, {DateTime? windowEnd, List<DateTime> later = const []}) async {
     if (!_ready || kIsWeb) return;
     final now = DateTime.now();
     if (at.isAfter(now)) await _schedule(_reminderNotifId(id), 'Reminder', text, at);
+    for (var i = 0; i < later.length; i++) {
+      if (later[i].isAfter(now)) await _schedule(_occurrenceNotifId(id, i + 1), 'Reminder', text, later[i]);
+    }
     if (windowEnd != null) {
       final warn = windowEnd.subtract(_windowWarnBefore);
       final when = warn.isAfter(at) ? warn : windowEnd;
@@ -226,6 +297,9 @@ class NotificationService {
   Future<void> cancelReminder(String id) async {
     await _plugin.cancel(_reminderNotifId(id));
     await _plugin.cancel(_windowNotifId(id));
+    for (var i = 1; i < 7; i++) {
+      await _plugin.cancel(_occurrenceNotifId(id, i));
+    }
   }
 
   /// Makes the phone match the server: schedules every upcoming reminder
@@ -233,14 +307,17 @@ class NotificationService {
   /// (done, undone, or deleted on another device).
   Future<void> syncReminders(List<Reminder> reminders) async {
     if (!_ready || kIsWeb) return;
-    final keep = {
-      for (final r in reminders) ...[_reminderNotifId(r.id), _windowNotifId(r.id)],
-    };
+    await refreshExactMode();
+    // With many reminders, fewer upcoming times each, to stay under the alarm limit.
+    final times = reminders.isEmpty ? 7 : (_maxReminderAlarms ~/ reminders.length).clamp(1, 7);
+    final keep = {for (final r in reminders) ..._idsFor(r, times)};
     for (final p in await _plugin.pendingNotificationRequests()) {
       if ((p.id & 0x40000000) != 0 && !keep.contains(p.id)) await _plugin.cancel(p.id);
     }
     for (final r in reminders) {
-      await scheduleReminder(r.id, r.text, r.remindAt, windowEnd: r.windowEnd);
+      final list = r.occurrences.take(times).toList();
+      await scheduleReminder(r.id, r.text, list.isEmpty ? r.remindAt : list.first,
+          windowEnd: r.windowEnd, later: list.skip(1).toList());
     }
   }
 
@@ -300,7 +377,7 @@ class NotificationService {
           iOS: const DarwinNotificationDetails(categoryIdentifier: _nightlyCategory),
         ),
         payload: c.date,
-        androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
+        androidScheduleMode: _mode,
         uiLocalNotificationDateInterpretation:
             UILocalNotificationDateInterpretation.absoluteTime,
       );
@@ -315,7 +392,7 @@ class NotificationService {
       "Your next step is ready. It takes 2 minutes to start.",
       when,
       NotificationDetails(android: _nightlyChannel(withActions: false)),
-      androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
+      androidScheduleMode: _mode,
       uiLocalNotificationDateInterpretation:
           UILocalNotificationDateInterpretation.absoluteTime,
     );
@@ -338,7 +415,7 @@ class NotificationService {
       today ? '${c.title}\nMinimum: ${c.minimum}' : 'Open Ally to see it.',
       when,
       NotificationDetails(android: _nightlyChannel(withActions: false)),
-      androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
+      androidScheduleMode: _mode,
       uiLocalNotificationDateInterpretation:
           UILocalNotificationDateInterpretation.absoluteTime,
     );
@@ -399,7 +476,7 @@ class NotificationService {
       body,
       when,
       const NotificationDetails(android: _channel, iOS: DarwinNotificationDetails()),
-      androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
+      androidScheduleMode: _mode,
       uiLocalNotificationDateInterpretation:
           UILocalNotificationDateInterpretation.absoluteTime,
       matchDateTimeComponents: DateTimeComponents.time, // repeat daily

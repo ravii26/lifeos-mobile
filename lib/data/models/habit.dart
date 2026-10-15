@@ -13,6 +13,7 @@ class Habit {
   final String? areaId;
   final bool isActive;
   final String stage; // NEW | BUILDING | AUTOMATIC (automatic = no more reminders)
+  final String? sourceUrl; // the video or post it was made from (a save)
 
   // Stats block (from GET /habits)
   final int currentStreak;
@@ -35,6 +36,7 @@ class Habit {
     this.areaId,
     required this.isActive,
     this.stage = 'NEW',
+    this.sourceUrl,
     required this.currentStreak,
     required this.longestStreak,
     required this.todayDone,
@@ -67,6 +69,7 @@ class Habit {
       areaId: asStringOrNull(j['areaId']),
       isActive: asBool(j['isActive'], true),
       stage: asString(j['stage'], 'NEW'),
+      sourceUrl: asStringOrNull(j['sourceUrl']),
       currentStreak: asInt(j['currentStreak']),
       longestStreak: asInt(j['longestStreak']),
       todayDone: asBool(j['todayDone']),

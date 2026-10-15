@@ -9,6 +9,7 @@ import '../areas/areas_screen.dart';
 import '../auth/bloc/auth_bloc.dart';
 import '../guide/guide_setup_sheet.dart';
 import '../guide/guide_style.dart';
+import '../more/reminders_check_screen.dart';
 import '../more/settings_screen.dart';
 import '../more/where_you_stand_screen.dart';
 import '../shell/life_cubit.dart';
@@ -355,6 +356,12 @@ class _YouScreenState extends State<YouScreen> {
                 title: 'Goals and nudges',
                 sub: 'Set up what Ally may remind you about',
                 onTap: () => openGuideSetup(context),
+              ),
+              _NavActionRow(
+                icon: Icons.alarm_on_outlined,
+                title: 'Reminders',
+                sub: "Check they arrive on time, see what's coming, send a test",
+                onTap: () => _push(const RemindersCheckScreen()),
               ),
               _NavActionRow(
                 icon: Icons.settings_outlined,

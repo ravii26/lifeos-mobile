@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../core/di/service_locator.dart';
 import '../../core/intents/capture_intent_bus.dart';
@@ -14,6 +15,7 @@ import '../chat/chat_screen.dart';
 import '../guide/guide_style.dart';
 import '../guide/save_sheet.dart';
 import '../guide/tonight_cubit.dart';
+import '../onboarding/first_run_screen.dart';
 import '../places/notes_screen.dart';
 import '../places/now_cubit.dart';
 import '../places/plan_screen.dart';
@@ -48,6 +50,8 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
     // Behaviour signal: the app was opened (once per session, on shell mount).
     getIt<LifeRepository>().recordBehavior('APP_OPEN').ignore();
 
+    WidgetsBinding.instance.addPostFrameCallback((_) => _maybeFirstRun());
+
     final bus = getIt<CaptureIntentBus>();
     _captureIntentSub = bus.stream.listen(_handleCaptureIntent);
     final pending = bus.pending;
@@ -55,6 +59,37 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
       bus.consumePending();
       WidgetsBinding.instance
           .addPostFrameCallback((_) => _handleCaptureIntent(pending));
+    }
+  }
+
+  static const _prefsFirstRunSeen = 'ally_first_run_seen';
+
+  /// Once per install: if Ally doesn't know the person's day yet, ask the
+  /// three first-run questions. Offline or already answered: nothing.
+  Future<void> _maybeFirstRun() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      if (prefs.getBool(_prefsFirstRunSeen) == true) return;
+      if (await getIt<LifeRepository>().dayIsSet()) {
+        await prefs.setBool(_prefsFirstRunSeen, true);
+        return;
+      }
+      if (!mounted) return;
+      final help = await Navigator.of(context).push<String>(
+        MaterialPageRoute(fullscreenDialog: true, builder: (_) => const FirstRunScreen()),
+      );
+      await prefs.setBool(_prefsFirstRunSeen, true);
+      final ctx = _cubitContext;
+      if (ctx == null || !ctx.mounted) return;
+      ctx.read<NowCubit>().load();
+      placesRefresh.value++;
+      // Their own words become the first chat message; Ally proposes, they confirm.
+      if (help != null) {
+        setState(() => _index = 0);
+        ctx.read<ChatCubit>().send(help).ignore();
+      }
+    } catch (_) {
+      // Offline or the server is waking: ask next time instead.
     }
   }
 

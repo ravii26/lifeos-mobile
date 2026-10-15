@@ -217,10 +217,21 @@ class Reminder {
   final String text;
   final DateTime remindAt;
   final DateTime? windowEnd;
-  const Reminder(this.id, this.text, this.remindAt, [this.windowEnd]);
+  /// Every time this reminder fires next (up to 7 for a repeating one), so the
+  /// phone keeps reminding even when one is missed. Just [remindAt] otherwise.
+  final List<DateTime> occurrences;
+  final bool repeats;
+  const Reminder(this.id, this.text, this.remindAt, [this.windowEnd, this.occurrences = const [], this.repeats = false]);
 
-  factory Reminder.fromJson(Json j) => Reminder(asString(j['id']), asString(j['text']),
-      asDate(j['remindAt'])?.toLocal() ?? asDate(j['windowEnd'])!.toLocal(), asDate(j['windowEnd'])?.toLocal());
+  factory Reminder.fromJson(Json j) {
+    final at = asDate(j['remindAt'])?.toLocal() ?? asDate(j['windowEnd'])!.toLocal();
+    final times = ((j['occurrences'] as List?) ?? const [])
+        .map((v) => asDate(v)?.toLocal())
+        .whereType<DateTime>()
+        .toList();
+    return Reminder(asString(j['id']), asString(j['text']), at, asDate(j['windowEnd'])?.toLocal(),
+        times.isEmpty ? [at] : times, j['repeatRule'] != null);
+  }
 }
 
 /// Something the assistant remembers about the person (from chat).

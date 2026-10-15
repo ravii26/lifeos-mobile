@@ -3,6 +3,12 @@
     <!-- Habit reminder notifications -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
+    <!-- Reminders at the exact minute (Android 12+ asks the person; see the
+         reminders check in You). Without it Android may delay them by an hour. -->
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM"/>
+    <!-- Lets Ally ask once to be left out of battery saving, so Samsung does
+         not hold reminders back. -->
+    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS"/>
     <!-- Multimodal capture: on-device voice dictation + photos -->
     <uses-permission android:name="android.permission.RECORD_AUDIO"/>
     <uses-feature android:name="android.hardware.camera" android:required="false"/>
@@ -121,6 +127,11 @@
         <!-- Lets speech_to_text discover the on-device recognition service (Android 11+). -->
         <intent>
             <action android:name="android.speech.RecognitionService"/>
+        </intent>
+        <!-- url_launcher: open saved videos and links in the browser / their app. -->
+        <intent>
+            <action android:name="android.intent.action.VIEW"/>
+            <data android:scheme="https"/>
         </intent>
     </queries>
 </manifest>

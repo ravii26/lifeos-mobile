@@ -1,7 +1,13 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:share_plus/share_plus.dart';
 
+import '../../core/api/api_exception.dart';
+import '../../core/di/service_locator.dart';
 import '../../data/models/user.dart';
+import '../../data/repositories/life_repository.dart';
 import '../appearance/appearance_cubit.dart';
 import '../appearance/tweaks_sheet.dart';
 import '../auth/bloc/auth_bloc.dart';
@@ -135,6 +141,11 @@ class SettingsScreen extends StatelessWidget {
               ],
             ),
           ),
+          const GHeading('Your data'),
+          GRow('Download your data', 'Everything Ally has, as one file you can save or send', () => _export(context),
+              action: 'Download'),
+          GRow('Delete account', 'Removes your account and everything in it. Cannot be undone', () => _delete(context),
+              action: 'Delete', last: true),
           const SizedBox(height: 20),
           SizedBox(
             width: double.infinity,
@@ -168,5 +179,59 @@ class SettingsScreen extends StatelessWidget {
         ],
       ),
     );
+  }
+
+  Future<void> _export(BuildContext context) async {
+    final messenger = ScaffoldMessenger.of(context);
+    messenger.showSnackBar(const SnackBar(content: Text('Getting your data…')));
+    try {
+      final data = await getIt<LifeRepository>().exportData();
+      final bytes = utf8.encode(const JsonEncoder.withIndent('  ').convert(data));
+      final name = 'ally-data-${DateTime.now().toIso8601String().substring(0, 10)}.json';
+      await SharePlus.instance.share(ShareParams(
+        files: [XFile.fromData(bytes, mimeType: 'application/json', name: name)],
+        fileNameOverrides: [name],
+        subject: 'My Ally data',
+      ));
+    } on ApiException catch (e) {
+      messenger.showSnackBar(SnackBar(content: Text(e.message)));
+    } catch (_) {
+      messenger.showSnackBar(const SnackBar(content: Text("Couldn't prepare the file. Try again.")));
+    }
+  }
+
+  // Permanent, so the person types DELETE first.
+  Future<void> _delete(BuildContext context) async {
+    final typed = TextEditingController();
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setState) => AlertDialog(
+          title: const Text('Delete your account?'),
+          content: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+            const Text('Everything goes: to-dos, habits, notes, saves, reminders. This cannot be undone. '
+                'Download your data first if you want a copy.\n\nType DELETE to confirm.'),
+            const SizedBox(height: 12),
+            TextField(controller: typed, autofocus: true, onChanged: (_) => setState(() {})),
+          ]),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Keep it')),
+            TextButton(
+              onPressed: typed.text.trim() == 'DELETE' ? () => Navigator.pop(ctx, true) : null,
+              child: const Text('Delete'),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (ok != true || !context.mounted) return;
+    try {
+      await getIt<LifeRepository>().deleteAccount();
+      if (!context.mounted) return;
+      Navigator.of(context).popUntil((r) => r.isFirst);
+      context.read<AuthBloc>().add(const AuthLogoutRequested());
+    } on ApiException catch (e) {
+      if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+    }
   }
 }

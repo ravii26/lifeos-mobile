@@ -4,6 +4,7 @@ import '../../core/api/api_exception.dart';
 import '../../core/di/service_locator.dart';
 import '../../data/repositories/life_repository.dart';
 import '../guide/guide_style.dart';
+import '../onboarding/first_run_screen.dart';
 
 const _weekdays = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 const _blockLabel = {
@@ -80,9 +81,14 @@ class _YourDayScreenState extends State<YourDayScreen> {
           padding: const EdgeInsets.fromLTRB(20, 16, 20, 36),
           children: [
             Text(
-              'This is how Ally thinks your days run. To change it, tell Ally in chat, like "I work 10 to 8:30 on weekdays".',
+              'This is how Ally thinks your days run. To change it, tell Ally in chat, like "I work 10 to 8:30 on weekdays", or answer the three questions again.',
               style: G.voice(14, color: G.muted),
             ),
+            const SizedBox(height: 10),
+            GButton('Set my day again', primary: false, onTap: () async {
+              await Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => const FirstRunScreen()));
+              await _load();
+            }),
             const SizedBox(height: 14),
             // Current Mode Banner
             Container(
