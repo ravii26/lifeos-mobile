@@ -29,6 +29,7 @@ class _YouScreenState extends State<YouScreen> {
   final _repo = getIt<LifeRepository>();
   List<Map<String, dynamic>> _projects = const [];
   String _mode = 'NORMAL';
+  int? _kept;
   bool _loading = false;
   String? _error;
 
@@ -50,11 +51,13 @@ class _YouScreenState extends State<YouScreen> {
       final results = await Future.wait([
         _repo.progress(),
         _repo.mode(),
+        _repo.keptThisWeek(),
       ]);
       if (!mounted) return;
       setState(() {
         _projects = results[0] as List<Map<String, dynamic>>;
         _mode = results[1] as String;
+        _kept = results[2] as int;
         _error = null;
       });
     } on ApiException catch (e) {
@@ -198,13 +201,16 @@ class _YouScreenState extends State<YouScreen> {
               Text('NO GUILT ACCUMULATOR', style: G.label(size: 10, color: G.accent, w: FontWeight.w600)),
               const SizedBox(height: 4),
               Row(crossAxisAlignment: CrossAxisAlignment.baseline, textBaseline: TextBaseline.alphabetic, children: [
-                Text('19', style: G.numeral(36, color: G.ink)),
+                Text(_kept == null ? '–' : '$_kept', style: G.numeral(36, color: G.ink)),
                 const SizedBox(width: 8),
-                Text('kept promises', style: G.text(18, w: FontWeight.w500, color: G.ink)),
+                Text(_kept == 1 ? 'kept promise this week' : 'kept promises this week',
+                    style: G.text(18, w: FontWeight.w500, color: G.ink)),
               ]),
               const SizedBox(height: 4),
               Text(
-                'Morning routines · Focused work blocks · Evening wind-downs.',
+                _kept == 0
+                    ? 'Every Done, smallest version or habit log counts here.'
+                    : 'Every Done, smallest version and habit log this week.',
                 style: G.text(13, color: G.muted),
               ),
               const SizedBox(height: 8),
@@ -268,42 +274,36 @@ class _YouScreenState extends State<YouScreen> {
                 style: G.label(size: 11, color: G.faint),
               ),
               const SizedBox(height: 10),
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: G.card,
-                  border: Border.all(color: G.lineSoft, width: 0.5),
-                  borderRadius: BorderRadius.circular(4),
-                ),
-                child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Icon(Icons.edit_note_rounded, size: 18, color: G.accent),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Text(
-                      '“Showing up consistently across days without forced streaks.”',
-                      style: G.voice(13.5, color: G.ink),
-                    ),
-                  ),
-                ]),
-              ),
-              const SizedBox(height: 8),
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: G.card,
-                  border: Border.all(color: G.lineSoft, width: 0.5),
-                  borderRadius: BorderRadius.circular(4),
-                ),
-                child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Icon(Icons.verified_outlined, size: 18, color: G.good),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Text(
-                      '“18 gym sessions logged. No forced streaks, just showing up.”',
-                      style: G.voice(13.5, color: G.ink),
-                    ),
-                  ),
-                ]),
+              // Only what the habit logs show: nothing here until something was logged.
+              BlocBuilder<LifeCubit, LifeState>(
+                builder: (context, life) {
+                  final proof = [
+                    for (final h in life.habits)
+                      if (h.history.where((d) => d).isNotEmpty) (h.title, h.history.where((d) => d).length, h.history.length),
+                  ]..sort((a, b) => b.$2.compareTo(a.$2));
+                  if (proof.isEmpty) {
+                    return Text('As you log habits, the proof shows up here.', style: G.text(13, color: G.muted));
+                  }
+                  return Column(children: [
+                    for (final (title, done, days) in proof.take(3))
+                      Container(
+                        margin: const EdgeInsets.only(bottom: 8),
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: G.card,
+                          border: Border.all(color: G.lineSoft, width: 0.5),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                          Icon(Icons.verified_outlined, size: 18, color: G.good),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Text('$title: done on $done of the last $days days.', style: G.voice(13.5, color: G.ink)),
+                          ),
+                        ]),
+                      ),
+                  ]);
+                },
               ),
               const SizedBox(height: 18),
               Container(height: 0.5, color: G.lineSoft),
@@ -318,19 +318,30 @@ class _YouScreenState extends State<YouScreen> {
                 ),
               ]),
               const SizedBox(height: 8),
-              Container(
-                decoration: BoxDecoration(
-                  color: G.card,
-                  border: Border.all(color: G.lineSoft, width: 0.5),
-                  borderRadius: BorderRadius.circular(4),
-                ),
-                child: Column(children: [
-                  _AreaRow(label: 'Career', tier: 'Main tier · Signal accent', color: G.accent),
-                  Container(height: 0.5, color: G.lineSoft),
-                  _AreaRow(label: 'Health & Fitness', tier: 'Secondary', color: G.good),
-                  Container(height: 0.5, color: G.lineSoft),
-                  _AreaRow(label: 'Personal Finance & Investing', tier: 'Maintain', color: G.faint),
-                ]),
+              BlocBuilder<LifeCubit, LifeState>(
+                builder: (context, life) {
+                  const order = {'MAIN': 0, 'SECONDARY': 1, 'MAINTAIN': 2, 'LATER': 3};
+                  const names = {'MAIN': 'Main', 'SECONDARY': 'Secondary', 'MAINTAIN': 'Maintain', 'LATER': 'Later'};
+                  final areas = life.areas.where((a) => a.isActive).toList()
+                    ..sort((a, b) => (order[a.tier] ?? 9).compareTo(order[b.tier] ?? 9));
+                  if (areas.isEmpty) {
+                    return Text('No areas yet. Tell Ally which parts of life matter to you, like career or health.',
+                        style: G.text(13, color: G.muted));
+                  }
+                  return Container(
+                    decoration: BoxDecoration(
+                      color: G.card,
+                      border: Border.all(color: G.lineSoft, width: 0.5),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: Column(children: [
+                      for (var i = 0; i < areas.length; i++) ...[
+                        if (i > 0) Container(height: 0.5, color: G.lineSoft),
+                        _AreaRow(label: areas[i].name, tier: names[areas[i].tier] ?? areas[i].tier, color: areas[i].color),
+                      ],
+                    ]),
+                  );
+                },
               ),
               const SizedBox(height: 18),
               Container(height: 0.5, color: G.lineSoft),

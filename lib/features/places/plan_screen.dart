@@ -328,26 +328,26 @@ class _PlanScreenState extends State<PlanScreen> {
                 Text('NOW IN FOCUS', style: G.label(size: 10, color: G.accent, w: FontWeight.w600)),
               ]),
               if (activeItem['minutes'] != null)
-                Text('${activeItem['minutes']} min bache', style: G.label(size: 11, color: G.faint)),
+                Text('${activeItem['minutes']} min', style: G.label(size: 11, color: G.faint)),
             ]),
             const SizedBox(height: 8),
             Text(
               '${activeItem['title']}',
               style: G.text(17, w: FontWeight.w500, color: G.ink, height: 1.3),
             ),
-            const SizedBox(height: 6),
-            Container(
-              padding: const EdgeInsets.fromLTRB(10, 6, 10, 6),
-              decoration: BoxDecoration(
-                color: G.inset,
-                border: Border(left: BorderSide(color: G.accent, width: 2)),
-                borderRadius: const BorderRadius.horizontal(right: Radius.circular(3)),
+            // The smallest version, when the item has one (real data, nothing invented).
+            if ('${activeItem['minimum'] ?? ''}'.isNotEmpty) ...[
+              const SizedBox(height: 6),
+              Container(
+                padding: const EdgeInsets.fromLTRB(10, 6, 10, 6),
+                decoration: BoxDecoration(
+                  color: G.inset,
+                  border: Border(left: BorderSide(color: G.accent, width: 2)),
+                  borderRadius: const BorderRadius.horizontal(right: Radius.circular(3)),
+                ),
+                child: Text('Smallest version: ${activeItem['minimum']}', style: G.voice(13, color: G.muted)),
               ),
-              child: Text(
-                '“Bas ek glance, no memorizing pressure tonight.”',
-                style: G.voice(13, color: G.muted),
-              ),
-            ),
+            ],
             const SizedBox(height: 12),
             Container(height: 0.5, color: G.lineSoft),
             const SizedBox(height: 8),

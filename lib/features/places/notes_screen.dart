@@ -299,7 +299,7 @@ class _NotesScreenState extends State<NotesScreen> {
                 ]),
                 const SizedBox(height: 2),
                 Text(
-                  'Distraction reels se calm actions nikaal liye hain. Keep only what serves tomorrow.',
+                  'Decide what each save is for. Keep only what serves you.',
                   style: G.label(size: 12, color: G.faint),
                 ),
                 const SizedBox(height: 12),

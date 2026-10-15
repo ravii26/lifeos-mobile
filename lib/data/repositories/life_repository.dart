@@ -856,6 +856,16 @@ class LifeRepository {
   /// Reverses one logged action (see the server's /activity/:id/undo).
   Future<void> undo(String activityId) => _api.post('/activity/$activityId/undo');
 
+  /// Kept promises this week: every Done, Minimum or habit log in the last
+  /// 7 days that wasn't undone (glossary: "Kept promise").
+  Future<int> keptThisWeek() async {
+    final data = await _api.get('/activity', query: {'days': 7});
+    return (data as List)
+        .whereType<Json>()
+        .where((e) => e['undoneAt'] == null && const {'DONE', 'MINIMUM', 'LOGGED'}.contains(e['type']))
+        .length;
+  }
+
   /// Sends anything that was queued while offline.
   Future<int> syncOffline() => _api.flushQueue();
 
