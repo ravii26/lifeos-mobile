@@ -43,7 +43,8 @@ Removed from the UI (code kept, ADR 0012): home, companion, now, projects, learn
   `queueOffline: true` and must handle `QueuedOfflineException` optimistically (see `TonightCubit.respond`).
 - **Undo:** server responses carry `activityId`; offer Undo via `LifeRepository.undo(activityId)`.
 - **Notifications are opt-in** (ADR 0006). Never schedule anything the user didn't ask for. Id ranges: habits `& 0x3fffffff`,
-  chat reminders `0x40000000 | …`, nightly `9000`, morning `9001`.
+  chat reminders `0x40000000 | …` (each upcoming time of a repeat has its own id), nightly `9000`, morning `9001`, prep `9002`, test `9003`.
+  Reminders are exact alarms when allowed and the next 7 times come from the server (ADR 0024); You → Reminders checks permissions.
 - User-visible name is **Ally**. Never change `applicationId` / bundle ids.
 - The new screens use `features/guide/guide_style.dart` (`G` tokens). Visual design is final only in build step 8 (ADR 0011).
   Don't use the banned fonts listed in the root `AGENTS.md`.
