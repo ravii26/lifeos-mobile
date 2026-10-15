@@ -2,6 +2,7 @@ import 'package:equatable/equatable.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../core/api/api_exception.dart';
+import '../../../core/session/local_data.dart';
 import '../../../data/models/user.dart';
 import '../../../data/repositories/auth_repository.dart';
 
@@ -25,6 +26,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     }
     try {
       final user = await _repo.me();
+      await LocalData.claimFor(user.id);
       emit(state.copyWith(status: AuthStatus.authenticated, user: user));
     } on ApiException catch (e) {
       if (e.isUnauthorized) {
@@ -43,6 +45,8 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     emit(state.copyWith(status: AuthStatus.authenticating));
     try {
       final user = await _repo.login(email: e.email, password: e.password);
+      // Never open an account on top of another account's local data.
+      await LocalData.claimFor(user.id);
       emit(state.copyWith(status: AuthStatus.authenticated, user: user));
     } on ApiException catch (err) {
       emit(state.copyWith(
@@ -56,6 +60,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     try {
       final user = await _repo.register(
           name: e.name, email: e.email, password: e.password);
+      await LocalData.claimFor(user.id);
       emit(state.copyWith(status: AuthStatus.authenticated, user: user));
     } on ApiException catch (err) {
       emit(state.copyWith(
@@ -66,6 +71,8 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
   Future<void> _onLogout(
       AuthLogoutRequested e, Emitter<AuthState> emit) async {
     await _repo.logout();
+    // Finished before the sign-in screen shows, so the next account starts empty.
+    await LocalData.wipe();
     emit(const AuthState(status: AuthStatus.unauthenticated));
   }
 }

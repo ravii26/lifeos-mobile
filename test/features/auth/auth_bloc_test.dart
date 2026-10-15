@@ -6,6 +6,7 @@ import 'package:lifeos_mobile/core/api/token_store.dart';
 import 'package:lifeos_mobile/data/models/user.dart';
 import 'package:lifeos_mobile/data/repositories/auth_repository.dart';
 import 'package:lifeos_mobile/features/auth/bloc/auth_bloc.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 const _user = AppUser(id: '1', email: 'a@b.com', name: 'Ada');
 
@@ -55,6 +56,10 @@ class _FakeAuthRepository extends AuthRepository {
 }
 
 void main() {
+  // Signing in and out now clears this phone's per-account data.
+  TestWidgetsFlutterBinding.ensureInitialized();
+  setUp(() => SharedPreferences.setMockInitialValues({}));
+
   group('AuthBloc', () {
     late _FakeAuthRepository repo;
 

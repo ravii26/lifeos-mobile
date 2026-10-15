@@ -115,6 +115,12 @@ class NotificationService {
     await refreshExactMode();
   }
 
+  /// Every scheduled notification goes (signing out: the next account starts clean).
+  Future<void> cancelAll() async {
+    if (!_ready || kIsWeb) return;
+    await _plugin.cancelAll();
+  }
+
   /// Whether reminders can fire at the exact minute (Android 12+ asks).
   Future<bool> canScheduleExact() async {
     if (kIsWeb || defaultTargetPlatform != TargetPlatform.android) return true;
