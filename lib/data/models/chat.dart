@@ -59,6 +59,7 @@ class ChatAction {
   final int tasks; // PROJECT_ADDED: starter to-dos
   final String? detail; // HABIT_ADDED: time block; PROJECT_ADDED: deadline
   final List<AskOption> options; // ASK
+  final Json? proposal; // GOAL_PLAN: the plan to keep, change or park
 
   const ChatAction(
       {required this.type,
@@ -74,7 +75,8 @@ class ChatAction {
       this.items = const [],
       this.tasks = 0,
       this.detail,
-      this.options = const []});
+      this.options = const [],
+      this.proposal});
 
   ChatAction copyWith({String? text, bool? undone}) => ChatAction(
       type: type,
@@ -90,7 +92,8 @@ class ChatAction {
       items: items,
       tasks: tasks,
       detail: detail,
-      options: options);
+      options: options,
+      proposal: proposal);
 
   ChatAction markUndone() => copyWith(undone: true);
 
@@ -125,6 +128,7 @@ class ChatAction {
             .whereType<Json>()
             .map((o) => AskOption(asString(o['id']), asString(o['title']), (o['minutes'] as num?)?.toInt() ?? 0, asBool(o['smaller'])))
             .toList(),
+        proposal: j['proposal'] is Json ? j['proposal'] as Json : null,
       );
 
   Json toJson() => {
@@ -138,6 +142,7 @@ class ChatAction {
         if (time != null) 'time': time,
         if (activityId != null) 'activityId': activityId,
         if (undone) 'undone': true,
+        if (proposal != null) 'proposal': proposal,
         if (items.isNotEmpty) 'items': items,
         if (tasks > 0) 'tasks': tasks,
         if (detail != null) 'deadline': detail,

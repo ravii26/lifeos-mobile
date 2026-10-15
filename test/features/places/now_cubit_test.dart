@@ -39,7 +39,7 @@ class _FakeRepo implements LifeRepository {
   }
 
   @override
-  Future<String?> respondNow(String sourceType, String sourceId, String action) async {
+  Future<String?> respondNow(String sourceType, String sourceId, String action, {int? minutes, int? count}) async {
     calls.add('respond($sourceId,$action)');
     if (offlineAnswers) throw QueuedOfflineException();
     return 'undo-$action';

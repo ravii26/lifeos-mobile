@@ -971,14 +971,30 @@ class LifeRepository {
   }
 
   /// Done / Smaller (MINIMUM) / Not now (SKIP) on the Now card. Queues offline. Returns the Undo id.
-  Future<String?> respondNow(String sourceType, String sourceId, String action) async {
+  /// [minutes] / [count]: what a weekly-target session (sourceType PROJECT) added up to.
+  Future<String?> respondNow(String sourceType, String sourceId, String action, {int? minutes, int? count}) async {
     final data = await _api.post('/now/respond', queueOffline: true, body: {
       'sourceType': sourceType,
       'sourceId': sourceId,
       'action': action,
+      if (minutes != null && minutes > 0) 'minutes': minutes,
+      if (count != null && count > 0) 'count': count,
     });
     return asStringOrNull((data as Json)['activityId']);
   }
+
+  /// One of the advice buttons on Now (SMALLER / TOMORROW / WEEKEND / LET_GO).
+  Future<Json> nowAdvice(String sourceType, String sourceId, String choice) async =>
+      (await _api.post('/now/advice', body: {'sourceType': sourceType, 'sourceId': sourceId, 'choice': choice})) as Json;
+
+  // ---- Goal plans ----
+
+  /// A goal in the person's words → weekly targets to keep (nothing saved yet).
+  Future<Json> proposeGoalPlan(String text) async => (await _api.post('/goal-plan/propose', body: {'text': text})) as Json;
+
+  /// Keep the plan (or park it until [parkUntil]).
+  Future<Json> acceptGoalPlan(Json plan, {bool park = false, String? parkUntil}) async =>
+      (await _api.post('/goal-plan/accept', body: {'plan': plan, 'park': park, 'parkUntil': ?parkUntil})) as Json;
 
   /// Today by part of the day, this week, goals, habits.
   Future<Map<String, dynamic>> plan() async => (await _api.get('/now/plan')) as Map<String, dynamic>;

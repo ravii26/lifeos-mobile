@@ -13,6 +13,7 @@ import '../places/now_card.dart';
 import '../places/now_cubit.dart';
 import '../guide/tonight_cubit.dart';
 import 'chat_cubit.dart';
+import 'goal_plan_card.dart';
 
 /// Home tab: one chat. Talk normally; it answers in the right role and does
 /// things (adds/completes tasks, logs habits, sets reminders) as it goes.
@@ -304,8 +305,10 @@ class _Bubble extends StatelessWidget {
                 onEdit: onEdit,
               ),
             for (var ai = 0; ai < m.actions.length; ai++)
-              if (m.actions[ai].type != 'ASK' && m.actions[ai].type != 'NOW_PICK' && m.actions[ai].type != 'STAND' && m.actions[ai].type != 'WEEK_CARD' && m.actions[ai].type != 'NOTES_USED' && m.actions[ai].type != 'COMFORT_SHOWN' && m.actions[ai].type != 'SEARCH_RESULTS' && !(grouped && m.actions[ai].isCreation))
+              if (m.actions[ai].type != 'ASK' && m.actions[ai].type != 'NOW_PICK' && m.actions[ai].type != 'STAND' && m.actions[ai].type != 'WEEK_CARD' && m.actions[ai].type != 'NOTES_USED' && m.actions[ai].type != 'COMFORT_SHOWN' && m.actions[ai].type != 'SEARCH_RESULTS' && m.actions[ai].type != 'GOAL_PLAN' && !(grouped && m.actions[ai].isCreation))
                 _Receipt(m.actions[ai], onUndo: () => onUndo(ai)),
+            for (final a in m.actions)
+              if (a.type == 'GOAL_PLAN' && a.proposal != null) GoalPlanCard(proposal: a.proposal!),
             if (ask != null)
               Padding(
                 padding: const EdgeInsets.only(top: 8),
@@ -423,6 +426,10 @@ String _repeatLabel(String rule) {
       ),
     'NOTE_UPDATED' => (Icons.sticky_note_2_outlined, 'Updated note: ${a.text}'),
     'PROGRESS_LOGGED' => (Icons.trending_up_rounded, 'Logged: ${a.detail ?? a.text}'),
+    'BUSY_SET' => (
+        Icons.event_busy_outlined,
+        a.detail == null ? 'Free again' : 'Busy until ${time(DateTime.parse(a.detail!).toLocal())}: nothing from me till then'
+      ),
     'PROJECT_STATUS' => (
         Icons.flag_outlined,
         switch (a.kind) {

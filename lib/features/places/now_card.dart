@@ -74,7 +74,8 @@ class NowCard extends StatelessWidget {
       if (s.options.isNotEmpty) why = 'Rest is fine too.';
     } else {
       sentence = o.smaller ? o.minimum.replaceAll(RegExp(r'\.$'), '') : o.title;
-      why = o.why.isEmpty ? null : o.why;
+      // A deadline taking the rest of today: the message says what waits.
+      why = s.focus ? s.message : (o.why.isEmpty ? null : o.why);
       if (o.smaller && o.title != sentence) why = [?why, 'The small version of: ${o.title}'].join('. ');
       if (s.later.isNotEmpty) then = s.later.map((l) => l.title.toLowerCase()).join(' · ');
     }
@@ -96,7 +97,7 @@ class NowCard extends StatelessWidget {
                 Icon(Icons.bedtime_outlined, size: 20, color: G.accent),
                 const SizedBox(width: 8),
                 Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Text('All calm', style: G.voice(15, color: G.ink)),
+                  Text('Now', style: G.voice(15, color: G.ink)),
                   Text(
                     '${DateFormat('h:mm a').format(now)} · ${DayStrip.partName(part)}',
                     style: G.label(size: 11, color: G.faint),
@@ -154,13 +155,6 @@ class NowCard extends StatelessWidget {
                       ),
                       const SizedBox(height: 8),
 
-                      // Priority / Context Meta
-                      if (picking)
-                        Row(children: [
-                          Text('Priority focus', style: G.label(size: 11, color: G.faint)),
-                          Text('  •  ', style: G.label(size: 11, color: G.line)),
-                          Text('Quiet cadence', style: G.label(size: 11, color: G.faint)),
-                        ]),
 
                       // Why Context Whisper
                       if (why != null) ...[
@@ -229,6 +223,12 @@ class NowCard extends StatelessWidget {
                     ),
                   ],
 
+                  // The honest "not now" / "better way", with the person's choices.
+                  if (s.advice != null) ...[
+                    const SizedBox(height: 14),
+                    _AdviceBox(advice: s.advice!, busy: s.busy, onChoice: cubit.adviceChoice),
+                  ],
+
                   if (s.note != null) ...[
                     const SizedBox(height: 12),
                     Text(s.note!, style: G.text(13, color: G.muted, height: 1.5)),
@@ -236,9 +236,9 @@ class NowCard extends StatelessWidget {
 
                   if (s.undoId != null) _UndoLine(onUndo: cubit.undo),
 
-                  // Reassuring Sleep Status Capsule
-                  const SizedBox(height: 20),
-                  Center(
+                  // Only when there's truly nothing asked of you.
+                  if (!picking) const SizedBox(height: 20),
+                  if (!picking) Center(
                     child: Row(mainAxisSize: MainAxisSize.min, children: [
                       Container(
                         width: 6,
@@ -296,6 +296,14 @@ class NowCard extends StatelessWidget {
                     icon: Icons.compress_rounded,
                     label: o.smaller ? 'Small version active' : 'Smaller',
                     onTap: s.busy || o.smaller ? null : cubit.smaller,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: _ThumbAction(
+                    icon: Icons.battery_2_bar_rounded,
+                    label: s.lowEnergy ? 'Low energy: on' : 'Low energy',
+                    onTap: s.busy || s.lowEnergy ? null : cubit.lowEnergy,
                   ),
                 ),
                 const SizedBox(width: 8),
@@ -362,6 +370,37 @@ class _UndoLine extends StatelessWidget {
             onTap: onUndo,
             child: Text('Undo', style: G.label(size: 12, color: G.accent, w: FontWeight.w600)),
           ),
+        ]),
+      );
+}
+
+class _AdviceBox extends StatelessWidget {
+  final NowAdvice advice;
+  final bool busy;
+  final ValueChanged<String> onChoice;
+  const _AdviceBox({required this.advice, required this.busy, required this.onChoice});
+
+  @override
+  Widget build(BuildContext context) => Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: G.inset,
+          border: Border(left: BorderSide(color: G.carried, width: 2)),
+          borderRadius: const BorderRadius.horizontal(right: Radius.circular(3)),
+        ),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text(advice.message, style: G.text(14, color: G.ink, height: 1.4)),
+          const SizedBox(height: 8),
+          Wrap(spacing: 14, runSpacing: 4, children: [
+            for (final (label, choice) in advice.actions)
+              InkWell(
+                onTap: busy ? null : () => onChoice(choice),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 6),
+                  child: Text(label, style: G.label(size: 12.5, color: G.accent, w: FontWeight.w600)),
+                ),
+              ),
+          ]),
         ]),
       );
 }

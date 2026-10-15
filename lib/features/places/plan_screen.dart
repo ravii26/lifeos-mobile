@@ -96,6 +96,67 @@ class _PlanScreenState extends State<PlanScreen> {
     }
   }
 
+  // A suggestion done from Plan: logged the same way as from Now.
+  Future<void> _doSuggested(Json item) async {
+    if (item['done'] == true) return;
+    setState(() => item['done'] = true);
+    try {
+      final id = await _repo.respondNow('${item['sourceType']}', '${item['sourceId']}', 'DONE',
+          minutes: asInt(item['minutes']), count: item['count'] == null ? null : asInt(item['count']));
+      placesRefresh.value++;
+      _say('Done', undoId: id);
+    } on QueuedOfflineException {
+      _say("Saved offline. It'll sync when you're back online.");
+    } on ApiException catch (e) {
+      setState(() => item['done'] = false);
+      _say(e.message);
+    }
+  }
+
+  static const _blockNames = {'MORNING': 'Morning', 'COMMUTE': 'Commute', 'GYM': 'Gym', 'EVENING': 'Evening', 'NIGHT': 'Night'};
+
+  // What the brain would place in each free part of the rest of today, with why.
+  List<Widget> _suggested(Map<String, dynamic> plan) {
+    final blocks = ((plan['suggested'] as List?) ?? const []).whereType<Json>().toList();
+    if (blocks.isEmpty) return const [];
+    return [
+      Text('Suggested for the rest of today', style: G.text(15, w: FontWeight.w600)),
+      const SizedBox(height: 2),
+      Text("From your goals, deadlines and free time. Tick one when it's done.", style: G.label(size: 11, color: G.faint)),
+      const SizedBox(height: 8),
+      for (final b in blocks) ...[
+        Padding(
+          padding: const EdgeInsets.only(top: 6, bottom: 4),
+          child: Text('${_blockNames['${b['block']}'] ?? '${b['block']}'} · ${b['start']}–${b['end']}',
+              style: G.label(size: 11, color: G.part('${b['block']}'), w: FontWeight.w600)),
+        ),
+        for (final i in ((b['items'] as List?) ?? const []).whereType<Json>())
+          InkWell(
+            onTap: () => _doSuggested(i),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Padding(
+                  padding: const EdgeInsets.only(top: 2, right: 10),
+                  child: Icon(i['done'] == true ? Icons.check_circle : Icons.radio_button_unchecked, size: 18, color: i['done'] == true ? G.good : G.faint),
+                ),
+                Expanded(
+                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Text('${i['title']}', style: G.text(14.5, w: FontWeight.w500)),
+                    Text('${i['why']}', style: G.text(12.5, color: G.muted, height: 1.35)),
+                  ]),
+                ),
+                Text('${i['minutes']} min', style: G.label(size: 11, color: G.faint)),
+              ]),
+            ),
+          ),
+      ],
+      const SizedBox(height: 10),
+      Container(height: 0.5, color: G.lineSoft),
+      const SizedBox(height: 10),
+    ];
+  }
+
   void _open(Json item) {
     final life = context.read<LifeCubit>();
     final id = '${item['id']}';
@@ -191,7 +252,7 @@ class _PlanScreenState extends State<PlanScreen> {
                       ),
                   ]),
                 ),
-                Text('$timeStr · All calm', style: G.label(size: 11, color: G.faint)),
+                Text(timeStr, style: G.label(size: 11, color: G.faint)),
               ]),
               const SizedBox(height: 10),
 
@@ -210,6 +271,7 @@ class _PlanScreenState extends State<PlanScreen> {
 
               if ((_stale?['total'] ?? 0) as num > 0) _stale_(),
 
+              if (plan != null && _selectedTab == 0) ..._suggested(plan),
               if (plan != null && _selectedTab == 0) ..._todayFolded(plan),
               if (plan != null && _selectedTab == 1) ..._weekFolded(plan),
               if (plan != null && _selectedTab == 2) ..._laterFolded(plan),
