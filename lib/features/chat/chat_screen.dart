@@ -1,12 +1,17 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:speech_to_text/speech_to_text.dart';
 
+import '../../core/di/service_locator.dart';
+import '../../core/notifications/notification_service.dart';
+import '../../core/system/system_settings.dart';
 import '../../data/models/chat.dart';
+import '../../data/repositories/life_repository.dart';
 import '../guide/guide_style.dart';
 import '../guide/save_sheet.dart';
 import '../places/now_card.dart';
@@ -14,6 +19,7 @@ import '../places/now_cubit.dart';
 import '../guide/tonight_cubit.dart';
 import 'chat_cubit.dart';
 import 'goal_plan_card.dart';
+import 'starters.dart';
 
 /// Home tab: one chat. Talk normally; it answers in the right role and does
 /// things (adds/completes tasks, logs habits, sets reminders) as it goes.
@@ -33,18 +39,153 @@ class _ChatScreenState extends State<ChatScreen> {
   String _lang = 'en_IN';
   String _dictBase = '';
   static const _langKey = 'chat_voice_lang';
+  static const _startedKey = 'ally_started';
+
+  // A guided starter in progress (doc 17): one question at a time.
+  Starter? _starter;
+  final Map<String, String> _answers = {};
+  final List<String> _answered = [];
+  bool _askFree = false;
+  // Has this person ever told Ally anything? Changes Now's hello.
+  bool _started = true;
+
+  void _onStarterRequest() {
+    final s = starterRequest.value;
+    if (s == null) return;
+    starterRequest.value = null;
+    _startGuide(s);
+  }
 
   @override
   void initState() {
     super.initState();
+    starterRequest.addListener(_onStarterRequest);
     SharedPreferences.getInstance().then((p) {
       final l = p.getString(_langKey);
-      if (l != null && mounted) setState(() => _lang = l);
+      if (!mounted) return;
+      setState(() {
+        if (l != null) _lang = l;
+        _started = p.getBool(_startedKey) ?? false;
+      });
     }).catchError((_) {});
+  }
+
+  void _markStarted() {
+    if (_started) return;
+    setState(() => _started = true);
+    SharedPreferences.getInstance().then((p) => p.setBool(_startedKey, true)).catchError((_) => false);
+  }
+
+  StarterStep? get _step =>
+      _starter == null ? null : nextStep(_starter!, _answers, askFree: _askFree, now: DateTime.now());
+
+  Future<void> _startGuide(Starter s) async {
+    HapticFeedback.selectionClick();
+    var askFree = false;
+    if (s == Starter.goal) {
+      // Asked only the first time a plan needs it.
+      try {
+        askFree = !await getIt<LifeRepository>().dayIsSet();
+      } catch (_) {}
+    }
+    if (!mounted) return;
+    setState(() {
+      _starter = s;
+      _askFree = askFree;
+      _answers.clear();
+      _answered.clear();
+    });
+    _input.clear();
+  }
+
+  void _closeGuide() => setState(() {
+        _starter = null;
+        _answers.clear();
+        _answered.clear();
+      });
+
+  // A quick double tap on a chip must not also answer the next question.
+  DateTime _lastAnswer = DateTime(0);
+
+  Future<void> _answer(String text) async {
+    final step = _step;
+    if (step == null) return;
+    final now = DateTime.now();
+    if (now.difference(_lastAnswer) < const Duration(milliseconds: 400)) return;
+    _lastAnswer = now;
+    var value = text.trim();
+    if (value == 'Paste from clipboard') {
+      value = (await Clipboard.getData(Clipboard.kTextPlain))?.text?.trim() ?? '';
+      if (value.isEmpty) {
+        if (mounted) {
+          ScaffoldMessenger.of(context)
+              .showSnackBar(const SnackBar(content: Text('Nothing copied yet. Copy the link first, or paste it in the box.')));
+        }
+        return;
+      }
+    }
+    if (value.isEmpty && !step.canSkip) return;
+    setState(() {
+      _answers[step.key] = value;
+      _answered.add(step.key);
+    });
+    _input.clear();
+    if (_step == null) await _finishGuide();
+  }
+
+  void _back() {
+    if (_answered.isEmpty) return _closeGuide();
+    setState(() => _answers.remove(_answered.removeLast()));
+  }
+
+  Future<void> _finishGuide() async {
+    final s = _starter!;
+    final answers = Map<String, String>.from(_answers);
+    _closeGuide();
+    _markStarted();
+    final free = answers['free'];
+    if (s == Starter.goal && free != null) {
+      final b = basicsForFree(free);
+      if (b != null) {
+        try {
+          await getIt<LifeRepository>().setDayBasics(
+              wake: b.wake, sleep: b.sleep, officeDays: b.officeDays, officeStart: b.start, officeEnd: b.end);
+        } catch (_) {}
+      }
+    }
+    if (!mounted) return;
+    final message = composeMessage(s, answers, DateTime.now());
+    if (s == Starter.video) {
+      final tonight = context.read<TonightCubit>();
+      final now = context.read<NowCubit>();
+      if (await openSaveSheet(context, SaveSource(text: message))) {
+        tonight.load();
+        now.load();
+        placesRefresh.value++;
+      }
+      return;
+    }
+    context.read<ChatCubit>().send(message);
+  }
+
+  /// The notification card's button: Android's own question, then exact
+  /// alarms. If the person said no before, Android won't ask again, so the
+  /// app's settings page opens instead.
+  Future<void> _allowNotifications() async {
+    final n = NotificationService.instance;
+    final cubit = context.read<ChatCubit>();
+    await n.requestPermission();
+    if (!await n.notificationsAllowed()) {
+      await SystemSettings.openAppSettings();
+      return;
+    }
+    if (!await n.canScheduleExact()) await n.requestExact();
+    cubit.notificationsHandled(allowed: true);
   }
 
   @override
   void dispose() {
+    starterRequest.removeListener(_onStarterRequest);
     _speech.cancel();
     _input.dispose();
     _scroll.dispose();
@@ -53,7 +194,12 @@ class _ChatScreenState extends State<ChatScreen> {
 
   void _send([String? text]) {
     final t = text ?? _input.text;
+    if (_starter != null) {
+      _answer(t);
+      return;
+    }
     if (t.trim().isEmpty) return;
+    _markStarted();
     if (t.endsWith('…')) {
       _input.text = t.replaceAll('…', '');
       _input.selection = TextSelection.collapsed(offset: _input.text.length);
@@ -169,11 +315,28 @@ class _ChatScreenState extends State<ChatScreen> {
           },
           builder: (context, s) {
             final talking = s.messages.isNotEmpty;
+            final step = _step;
+            final guiding = _starter != null && step != null;
+            final nowPicking = context.select<NowCubit, bool>((c) => c.state.current != null && c.state.kind == 'PICK');
             return Column(children: [
               // Before you say anything, Now is the whole screen. Once you talk, it
               // folds to one line and the conversation takes the space.
-              NowCard(compact: talking),
-              if (talking)
+              if (!guiding) NowCard(compact: talking, fresh: !_started, onStarter: _startGuide),
+              if (guiding)
+                Expanded(
+                  child: _GuidePanel(
+                    starter: _starter!,
+                    step: step,
+                    answers: _answers,
+                    total: steps(_starter!, _answers, askFree: _askFree, now: DateTime.now()).length,
+                    askFree: _askFree,
+                    onChip: _answer,
+                    onSkip: () => _answer(''),
+                    onBack: _back,
+                    onClose: _closeGuide,
+                  ),
+                )
+              else if (talking)
                 Expanded(
                   child: ListView.builder(
                     controller: _scroll,
@@ -200,8 +363,19 @@ class _ChatScreenState extends State<ChatScreen> {
                             onUndoMove: () => context.read<ChatCubit>().undoMove(i)),
                   ),
                 ),
+              // Reminders need permission: asked right after the first one is set, with the reason.
+              if (!guiding && s.askNotifications)
+                _NotifyCard(
+                  onAllow: _allowNotifications,
+                  onLater: () => context.read<ChatCubit>().notificationsHandled(allowed: false),
+                ),
+              // Never a blank box: things to say, always one tap away. Hidden while
+              // the empty Now already shows the big starters.
+              if (!guiding && (talking || nowPicking))
+                _Suggestions(controller: _input, onStarter: _startGuide, onSay: _send),
               _Composer(
                 controller: _input,
+                hint: guiding ? step.hint : null,
                 sending: s.sending,
                 onSend: _send,
                 listening: _listening,
@@ -633,6 +807,7 @@ class _TypingState extends State<_Typing> {
 
 class _Composer extends StatelessWidget {
   final TextEditingController controller;
+  final String? hint;
   final bool sending;
   final void Function([String?]) onSend;
   final VoidCallback onSave;
@@ -642,6 +817,7 @@ class _Composer extends StatelessWidget {
   final VoidCallback onLang;
   const _Composer(
       {required this.controller,
+      this.hint,
       required this.sending,
       required this.onSend,
       required this.onSave,
@@ -688,7 +864,7 @@ class _Composer extends StatelessWidget {
                 style: G.text(14),
                 cursorColor: G.accent,
                 decoration: InputDecoration(
-                  hintText: listening ? 'Listening…' : 'Tell Ally anything or ask…',
+                  hintText: listening ? 'Listening…' : (hint ?? 'Tell Ally anything or ask…'),
                   hintStyle: G.label(size: 13, color: G.faint),
                   isDense: true,
                   filled: false,
@@ -757,4 +933,165 @@ class _Composer extends StatelessWidget {
       ]),
     );
   }
+}
+
+/// One guided question at a time: what was answered so far, the question,
+/// big chips, and always a way back out (doc 17).
+class _GuidePanel extends StatelessWidget {
+  final Starter starter;
+  final StarterStep step;
+  final Map<String, String> answers;
+  final int total;
+  final bool askFree;
+  final ValueChanged<String> onChip;
+  final VoidCallback onSkip;
+  final VoidCallback onBack;
+  final VoidCallback onClose;
+  const _GuidePanel({
+    required this.starter,
+    required this.step,
+    required this.answers,
+    required this.total,
+    required this.askFree,
+    required this.onChip,
+    required this.onSkip,
+    required this.onBack,
+    required this.onClose,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final done = steps(starter, answers, askFree: askFree, now: DateTime.now()).where((x) => answers.containsKey(x.key)).toList();
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Padding(
+        padding: const EdgeInsets.fromLTRB(20, 10, 8, 0),
+        child: Row(children: [
+          Icon(starter.icon, size: 18, color: G.accent),
+          const SizedBox(width: 8),
+          Expanded(child: Text(starter.label, style: G.text(15, w: FontWeight.w600))),
+          if (total > 1) Text('${done.length + 1} of $total', style: G.label(size: 12, color: G.faint)),
+          IconButton(
+            tooltip: 'Close',
+            onPressed: onClose,
+            icon: Icon(Icons.close_rounded, color: G.muted),
+          ),
+        ]),
+      ),
+      Expanded(
+        child: ListView(padding: const EdgeInsets.fromLTRB(24, 8, 24, 12), children: [
+          for (final d in done) ...[
+            Text(d.question, style: G.text(13, color: G.muted)),
+            const SizedBox(height: 4),
+            Align(
+              alignment: Alignment.centerRight,
+              child: Container(
+                margin: const EdgeInsets.only(bottom: 14),
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                decoration: BoxDecoration(
+                  color: G.card,
+                  border: Border.all(color: G.lineSoft, width: 0.5),
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: Text(answers[d.key]!.isEmpty ? 'Skipped' : answers[d.key]!, style: G.text(14.5)),
+              ),
+            ),
+          ],
+          Text(step.question, style: G.voice(19, color: G.ink)),
+          const SizedBox(height: 16),
+          Wrap(spacing: 10, runSpacing: 10, children: [
+            for (final c in step.chips)
+              ActionChip(
+                label: Text(c, style: G.text(15, w: FontWeight.w600)),
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+                materialTapTargetSize: MaterialTapTargetSize.padded,
+                backgroundColor: G.card,
+                side: BorderSide(color: G.line),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+                onPressed: () => onChip(c),
+              ),
+          ]),
+          if (step.chips.isEmpty)
+            Text('Type it below, or tap the mic and say it.', style: G.text(13, color: G.muted)),
+          const SizedBox(height: 20),
+          Row(children: [
+            TextButton.icon(
+              onPressed: onBack,
+              icon: Icon(Icons.arrow_back_rounded, size: 18, color: G.muted),
+              label: Text(done.isEmpty ? 'Cancel' : 'Back', style: G.text(14, color: G.muted)),
+            ),
+            const Spacer(),
+            if (step.canSkip)
+              TextButton(onPressed: onSkip, child: Text('Skip', style: G.text(14, color: G.muted))),
+          ]),
+        ]),
+      ),
+    ]);
+  }
+}
+
+/// Small things to say above the text box, so it is never a blank page.
+/// Hidden while typing.
+class _Suggestions extends StatelessWidget {
+  final TextEditingController controller;
+  final ValueChanged<Starter> onStarter;
+  final void Function([String?]) onSay;
+  const _Suggestions({required this.controller, required this.onStarter, required this.onSay});
+
+  @override
+  Widget build(BuildContext context) {
+    final evening = DateTime.now().hour >= 18;
+    final ask = evening ? 'Plan tomorrow' : 'What should I do now?';
+    return ValueListenableBuilder<TextEditingValue>(
+      valueListenable: controller,
+      builder: (_, v, _) {
+        if (v.text.isNotEmpty) return const SizedBox.shrink();
+        Widget chip(String label, VoidCallback onTap) => Padding(
+              padding: const EdgeInsets.only(right: 8),
+              child: ActionChip(
+                label: Text(label, style: G.text(13.5, w: FontWeight.w500)),
+                backgroundColor: Colors.transparent,
+                side: BorderSide(color: G.line),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+                onPressed: onTap,
+              ),
+            );
+        return SizedBox(
+          height: 48,
+          child: ListView(scrollDirection: Axis.horizontal, padding: const EdgeInsets.symmetric(horizontal: 16), children: [
+            chip(ask, () => onSay(ask)),
+            for (final s in nowStarters) chip(s.short, () => onStarter(s)),
+          ]),
+        );
+      },
+    );
+  }
+}
+
+/// Asked once, right after the first reminder: why, then Android's question.
+class _NotifyCard extends StatelessWidget {
+  final VoidCallback onAllow;
+  final VoidCallback onLater;
+  const _NotifyCard({required this.onAllow, required this.onLater});
+
+  @override
+  Widget build(BuildContext context) => Container(
+        margin: const EdgeInsets.fromLTRB(16, 4, 16, 4),
+        padding: const EdgeInsets.fromLTRB(14, 12, 8, 6),
+        decoration: BoxDecoration(
+          color: G.inset,
+          border: Border(left: BorderSide(color: G.accent, width: 2)),
+          borderRadius: const BorderRadius.horizontal(right: Radius.circular(3)),
+        ),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text('To remind you on time, I need to send you notifications.', style: G.text(14.5, height: 1.4)),
+          Text('Only for things you ask for. Nothing else.', style: G.text(12.5, color: G.muted)),
+          Row(mainAxisAlignment: MainAxisAlignment.end, children: [
+            TextButton(onPressed: onLater, child: Text('Not now', style: G.text(14, color: G.muted))),
+            TextButton(
+              onPressed: onAllow,
+              child: Text('Allow notifications', style: G.text(14, w: FontWeight.w700, color: G.accent)),
+            ),
+          ]),
+        ]),
+      );
 }

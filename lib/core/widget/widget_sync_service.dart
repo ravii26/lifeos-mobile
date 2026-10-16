@@ -39,6 +39,7 @@ class WidgetSyncService {
   }
 
   Future<void> init() async {
+    if (kIsWeb) return; // no home-screen widget in a browser
     await HomeWidget.setAppGroupId(kWidgetAppGroupId);
     HomeWidget.registerInteractivityCallback(widgetBackgroundCallback);
     // Periodic background refresh is Android-only for v1 — iOS's background
@@ -150,11 +151,13 @@ class WidgetSyncService {
   }
 
   Future<WidgetSnapshot?> _readCurrent() async {
+    if (kIsWeb) return null;
     final raw = await HomeWidget.getWidgetData<String>(_snapshotKey);
     return WidgetSnapshot.decode(raw);
   }
 
   Future<void> _save(WidgetSnapshot snapshot) async {
+    if (kIsWeb) return;
     await HomeWidget.saveWidgetData(_snapshotKey, snapshot.encode());
     await HomeWidget.updateWidget(
       qualifiedAndroidName: _androidWidgetQualifiedName,

@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
 
+import '../chat/starters.dart';
 import '../guide/guide_style.dart';
 import 'now_cubit.dart';
 
@@ -12,7 +13,11 @@ import 'now_cubit.dart';
 /// [compact] is the one-line version that sits above a conversation.
 class NowCard extends StatelessWidget {
   final bool compact;
-  const NowCard({super.key, this.compact = false});
+  // Nobody has told Ally anything yet: say hello instead of "nothing waiting".
+  final bool fresh;
+  // The four starters, shown whenever there is nothing to do right now.
+  final ValueChanged<Starter>? onStarter;
+  const NowCard({super.key, this.compact = false, this.fresh = false, this.onStarter});
 
   @override
   Widget build(BuildContext context) {
@@ -80,6 +85,7 @@ class NowCard extends StatelessWidget {
       if (s.later.isNotEmpty) then = s.later.map((l) => l.title.toLowerCase()).join(' · ');
     }
 
+    final showStarters = !picking && s.status != NowStatus.loading && onStarter != null;
     final isLateNight = now.hour >= 21 || now.hour < 5;
     final greeting = isLateNight ? 'Last thing tonight' : 'Up next';
     final subtitle = isLateNight
@@ -120,7 +126,9 @@ class NowCard extends StatelessWidget {
               child: Column(
                 key: ValueKey(sentence),
                 crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
+                children: showStarters
+                    ? [_StartHere(fresh: fresh, state: s, onStarter: onStarter!)]
+                    : [
                   // Greeting in Serif Italic
                   Text(greeting, style: G.voice(22, color: G.ink)),
                   const SizedBox(height: 2),
@@ -138,7 +146,7 @@ class NowCard extends StatelessWidget {
                     child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                       // Eyebrow
                       Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-                        Text('ONE THING FOR RIGHT NOW',
+                        Text('Do this now',
                             style: G.label(size: 11, color: G.accent, w: FontWeight.w600)),
                         if (picking && o.minutes > 0)
                           Text('${o.minutes} mins', style: G.label(size: 11, color: G.faint)),
@@ -237,8 +245,8 @@ class NowCard extends StatelessWidget {
                   if (s.undoId != null) _UndoLine(onUndo: cubit.undo),
 
                   // Only when there's truly nothing asked of you.
-                  if (!picking) const SizedBox(height: 20),
-                  if (!picking) Center(
+                  if (!picking && s.status != NowStatus.loading) const SizedBox(height: 20),
+                  if (!picking && s.status != NowStatus.loading) Center(
                     child: Row(mainAxisSize: MainAxisSize.min, children: [
                       Container(
                         width: 6,
@@ -289,29 +297,47 @@ class NowCard extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 8),
-              // Secondary Grid
+              // One quiet choice; the rest is behind "More" so Done stays the obvious tap.
               Row(children: [
-                Expanded(
-                  child: _ThumbAction(
-                    icon: Icons.compress_rounded,
-                    label: o.smaller ? 'Small version active' : 'Smaller',
-                    onTap: s.busy || o.smaller ? null : cubit.smaller,
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: _ThumbAction(
-                    icon: Icons.battery_2_bar_rounded,
-                    label: s.lowEnergy ? 'Low energy: on' : 'Low energy',
-                    onTap: s.busy || s.lowEnergy ? null : cubit.lowEnergy,
-                  ),
-                ),
-                const SizedBox(width: 8),
                 Expanded(
                   child: _ThumbAction(
                     icon: Icons.snooze_rounded,
                     label: isLateNight ? 'Not tonight' : 'Not now',
                     onTap: s.busy ? null : cubit.notNow,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                SizedBox(
+                  height: 42,
+                  child: PopupMenuButton<String>(
+                    enabled: !s.busy,
+                    tooltip: 'More',
+                    onSelected: (v) => v == 'smaller' ? cubit.smaller() : cubit.lowEnergy(),
+                    itemBuilder: (_) => [
+                      PopupMenuItem(
+                        value: 'smaller',
+                        enabled: !o.smaller,
+                        child: Text(o.smaller ? 'Already the smallest version' : 'Make it smaller', style: G.text(14)),
+                      ),
+                      PopupMenuItem(
+                        value: 'low',
+                        enabled: !s.lowEnergy,
+                        child: Text(s.lowEnergy ? 'Low energy today: on' : 'Low energy today', style: G.text(14)),
+                      ),
+                    ],
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 14),
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(
+                        color: G.card,
+                        border: Border.all(color: G.lineSoft, width: 0.5),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Row(mainAxisSize: MainAxisSize.min, children: [
+                        Text('More', style: G.label(size: 11, color: G.muted, w: FontWeight.w500)),
+                        Icon(Icons.expand_more_rounded, size: 16, color: G.faint),
+                      ]),
+                    ),
                   ),
                 ),
               ]),
@@ -403,4 +429,71 @@ class _AdviceBox extends StatelessWidget {
           ]),
         ]),
       );
+}
+
+/// Empty Now: Ally's hello and the four ways to start (doc 17). Big buttons,
+/// one example each, and a line saying typing works too.
+class _StartHere extends StatelessWidget {
+  final bool fresh;
+  final NowState state;
+  final ValueChanged<Starter> onStarter;
+  const _StartHere({required this.fresh, required this.state, required this.onStarter});
+
+  @override
+  Widget build(BuildContext context) {
+    final String title;
+    final String body;
+    if (state.status == NowStatus.error) {
+      title = "I can't reach the server right now.";
+      body = 'You can still start something; I will catch up when it is back.';
+    } else if (fresh) {
+      title = "Hi, I'm Ally.";
+      body = "Tell me what you want to get done. I'll tell you what to do and when, one thing at a time. Pick one to start:";
+    } else if (state.options.isNotEmpty) {
+      title = "That's all I'd suggest right now.";
+      body = 'Rest is fine. Or add something:';
+    } else if (state.kind == 'REST') {
+      title = state.message.isEmpty ? 'Time to rest.' : state.message;
+      body = 'Want to add something for later?';
+    } else {
+      title = 'Nothing to do right now.';
+      body = 'Rest is fine. Or add something:';
+    }
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Text(title, style: G.voice(22, color: G.ink)),
+      const SizedBox(height: 6),
+      Text(body, style: G.text(14, color: G.muted, height: 1.45)),
+      const SizedBox(height: 18),
+      for (final st in nowStarters)
+        Padding(
+          padding: const EdgeInsets.only(bottom: 10),
+          child: InkWell(
+            onTap: () => onStarter(st),
+            borderRadius: BorderRadius.circular(4),
+            child: Container(
+              constraints: const BoxConstraints(minHeight: 60),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              decoration: BoxDecoration(
+                color: G.card,
+                border: Border.all(color: G.line, width: 0.5),
+                borderRadius: BorderRadius.circular(4),
+              ),
+              child: Row(children: [
+                Icon(st.icon, size: 22, color: G.accent),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Text(st.label, style: G.text(15.5, w: FontWeight.w600)),
+                    Text(st.example, style: G.text(12.5, color: G.faint)),
+                  ]),
+                ),
+                Icon(Icons.chevron_right_rounded, color: G.faint),
+              ]),
+            ),
+          ),
+        ),
+      const SizedBox(height: 6),
+      Text('Or just type or say anything below, like "gym at 7 every day".', style: G.text(13, color: G.muted, height: 1.4)),
+    ]);
+  }
 }

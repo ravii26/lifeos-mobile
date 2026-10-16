@@ -172,7 +172,7 @@ class SettingsScreen extends StatelessWidget {
           const SizedBox(height: 24),
           Center(
             child: Text(
-              'Ally · Personal Assistant · Nocturne Sanctuary',
+              'Ally · Personal assistant',
               style: G.label(size: 10, color: G.faint),
             ),
           ),

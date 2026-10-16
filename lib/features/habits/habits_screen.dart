@@ -64,7 +64,7 @@ class HabitsScreen extends StatelessWidget {
                       const SizedBox(width: 10),
                       Expanded(
                         child: Text(
-                          'No resets, no broken chains. Every 2-minute minimum counts and progress only accumulates.',
+                          'No resets, no broken chains. Every 2-minute version counts and progress only accumulates.',
                           style: G.voice(13.5, color: G.muted),
                         ),
                       ),

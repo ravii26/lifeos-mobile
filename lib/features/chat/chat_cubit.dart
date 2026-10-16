@@ -15,12 +15,15 @@ class ChatState extends Equatable {
   final String? error;
   // Set when the assistant hands off to the save → action flow.
   final String? openSave;
+  // A reminder was just set but the phone can't show it yet: ask, with the reason.
+  final bool askNotifications;
 
   const ChatState({
     this.messages = const [],
     this.sending = false,
     this.error,
     this.openSave,
+    this.askNotifications = false,
   });
 
   ChatState copyWith({
@@ -28,16 +31,18 @@ class ChatState extends Equatable {
     bool? sending,
     String? error,
     String? openSave,
+    bool? askNotifications,
   }) =>
       ChatState(
         messages: messages ?? this.messages,
         sending: sending ?? this.sending,
         error: error,
         openSave: openSave,
+        askNotifications: askNotifications ?? this.askNotifications,
       );
 
   @override
-  List<Object?> get props => [messages, sending, error, openSave];
+  List<Object?> get props => [messages, sending, error, openSave, askNotifications];
 }
 
 /// One chat that also acts. History lives on this device (last 60 messages)
@@ -113,6 +118,9 @@ class ChatCubit extends Cubit<ChatState> {
               : await NotificationService.instance.setNightlyTime(a.time);
         }
       }
+      final needsAlerts = reply.actions.any((a) =>
+          !a.undone && (a.type == 'REMINDER_SET' || (a.type == 'NUDGE_SET' && a.time != null)));
+      final ask = needsAlerts && !_notifyAnswered && await _alertsBlocked();
       final save = reply.actions.where((a) => a.type == 'OPEN_SAVE').firstOrNull;
       final list = [
         ...withUser,
@@ -125,7 +133,7 @@ class ChatCubit extends Cubit<ChatState> {
           capacity: reply.capacity,
         ),
       ];
-      emit(state.copyWith(messages: list, sending: false, openSave: save?.text));
+      emit(state.copyWith(messages: list, sending: false, openSave: save?.text, askNotifications: ask ? true : null));
       await _persist(list);
     } on ApiException catch (e) {
       if (e.statusCode == null) {
@@ -144,6 +152,25 @@ class ChatCubit extends Cubit<ChatState> {
   }
 
   final List<String> _pending = [];
+
+  // "Not now" on the notification card holds until the app is opened again.
+  bool _notifyAnswered = false;
+
+  Future<bool> _alertsBlocked() async {
+    final n = NotificationService.instance;
+    return !await n.notificationsAllowed() || !await n.canScheduleExact();
+  }
+
+  /// The notification card was answered. Reminders set before permission was
+  /// given are scheduled again now that they can be shown.
+  Future<void> notificationsHandled({required bool allowed}) async {
+    _notifyAnswered = true;
+    emit(state.copyWith(askNotifications: false));
+    if (allowed) {
+      await NotificationService.instance.refreshExactMode();
+      await _syncReminders();
+    }
+  }
 
   /// Sends messages written while offline (called when the app comes back).
   Future<void> retryPending() async {
@@ -247,6 +274,10 @@ class ChatCubit extends Cubit<ChatState> {
   }
 
   void saveHandled() => emit(state.copyWith());
+
+  /// A card changed what it holds (a goal plan was kept or undone): save the
+  /// history so it still shows that after the app is reopened.
+  Future<void> saveHistory() => _persist(state.messages);
 
   Future<void> clear() async {
     emit(const ChatState());

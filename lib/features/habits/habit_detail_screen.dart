@@ -117,7 +117,7 @@ class HabitDetailScreen extends StatelessWidget {
                           ? '${habit.targetMinutes}m focus'
                           : habit.kind == 'count'
                               ? '${habit.targetCount} count'
-                              : 'Daily minimum (2 min counts)',
+                              : 'Smallest version (2 min counts)',
                     ),
                   ],
                 ),

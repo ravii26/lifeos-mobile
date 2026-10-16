@@ -6,6 +6,7 @@ import '../../core/di/service_locator.dart';
 import '../../data/models/json.dart';
 import '../../data/repositories/life_repository.dart';
 import '../chat/memories_screen.dart';
+import '../chat/starters.dart';
 import '../guide/guide_style.dart';
 import '../guide/save_sheet.dart';
 import '../more/taught_notes_screen.dart';
@@ -80,6 +81,8 @@ class _NotesScreenState extends State<NotesScreen> {
     final filteredNotes = _search.isEmpty
         ? _notes
         : _notes.where((n) => '${n['title']} ${n['text'] ?? ''}'.toLowerCase().contains(_search.toLowerCase())).toList();
+    // Nothing taught or saved yet: one sentence and the ways to start.
+    final nothing = _notes.isEmpty && _saves.isEmpty;
     final filteredSaves = _search.isEmpty
         ? waiting
         : waiting.where((s) => '${s['title']}'.toLowerCase().contains(_search.toLowerCase())).toList();
@@ -100,14 +103,15 @@ class _NotesScreenState extends State<NotesScreen> {
                   const SizedBox(width: 8),
                   Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                     Text('Notes', style: G.voice(16, color: G.ink)),
-                    Text('What you taught Ally & saved content', style: G.label(size: 11, color: G.faint)),
+                    Text('What you taught Ally and what you saved', style: G.label(size: 11, color: G.faint)),
                   ]),
                 ]),
               ]),
               const SizedBox(height: 12),
 
-              // Flat Bedside Search Bar
-              Container(
+              if (nothing && _error == null) _EmptyNotes(onTeach: () => starterRequest.value = Starter.teach),
+              // Search, once there is something to search
+              if (!nothing) Container(
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
                 decoration: BoxDecoration(
                   color: G.inset,
@@ -144,57 +148,32 @@ class _NotesScreenState extends State<NotesScreen> {
                     ),
                 ]),
               ),
-              const SizedBox(height: 12),
+              if (!nothing) const SizedBox(height: 12),
 
               // Segment Filter Tabs
-              SingleChildScrollView(
+              if (!nothing) SingleChildScrollView(
                 scrollDirection: Axis.horizontal,
                 child: Row(children: [
                   _TabPill(
-                    label: 'Taught to Ally (${_notes.length})',
+                    label: 'Taught (${_notes.length})',
                     active: _tab == 0,
                     onTap: () => setState(() => _tab = 0),
                   ),
                   const SizedBox(width: 8),
                   _TabPill(
-                    label: 'Saves & Reels (${waiting.length})',
+                    label: 'Saved (${waiting.length})',
                     active: _tab == 1,
                     onTap: () => setState(() => _tab = 1),
                   ),
                   const SizedBox(width: 8),
                   _TabPill(
-                    label: 'About You (Day & Memories)',
+                    label: 'About you',
                     active: _tab == 2,
                     onTap: () => setState(() => _tab = 2),
                   ),
                 ]),
               ),
               const SizedBox(height: 14),
-
-              // Bedtime Affirmation Capsule
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                decoration: BoxDecoration(
-                  color: G.inset,
-                  border: Border.all(color: G.lineSoft, width: 0.5),
-                  borderRadius: BorderRadius.circular(4),
-                ),
-                child: Row(children: [
-                  Container(
-                    width: 5,
-                    height: 5,
-                    decoration: BoxDecoration(shape: BoxShape.circle, color: G.good),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      'Empty your head and sleep. No stress backlog.',
-                      style: G.voice(13, color: G.muted),
-                    ),
-                  ),
-                ]),
-              ),
-              const SizedBox(height: 16),
 
               if (_error != null)
                 Padding(
@@ -203,14 +182,13 @@ class _NotesScreenState extends State<NotesScreen> {
                 ),
 
               // TAB 0: Taught to Ally
-              if (_tab == 0) ...[
+              if (_tab == 0 && !nothing) ...[
                 Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-                  Text('Taught Notes', style: G.text(16, w: FontWeight.w600)),
-                  Text('Taught by you', style: G.label(size: 11, color: G.faint)),
+                  Text('Things you taught Ally', style: G.text(16, w: FontWeight.w600)),
                 ]),
                 const SizedBox(height: 2),
                 Text(
-                  'Answers Ally gives back to you in mornings & low moments without asking again.',
+                  "Ally answers from these, so you don't have to repeat yourself.",
                   style: G.label(size: 12, color: G.faint),
                 ),
                 const SizedBox(height: 12),
@@ -223,7 +201,7 @@ class _NotesScreenState extends State<NotesScreen> {
                       borderRadius: BorderRadius.circular(4),
                     ),
                     child: Text(
-                      'No taught notes yet. Teach Ally lists, routines or facts so it remembers them for you.',
+                      'Nothing taught yet. Tell Ally things like your breakfast options or your gym routine.',
                       style: G.voice(14, color: G.muted),
                     ),
                   ),
@@ -247,15 +225,10 @@ class _NotesScreenState extends State<NotesScreen> {
                               borderRadius: BorderRadius.circular(3),
                             ),
                             child: Text(
-                              'TEMPLATE: ${n['template'] ?? 'NOTE'}',
+                              _kindName['${n['template']}'] ?? 'Note',
                               style: G.label(size: 10, color: G.faint, w: FontWeight.w600),
                             ),
                           ),
-                          Row(children: [
-                            Container(width: 4, height: 4, decoration: BoxDecoration(shape: BoxShape.circle, color: G.good)),
-                            const SizedBox(width: 4),
-                            Text('Used by Ally', style: G.label(size: 10, color: G.good)),
-                          ]),
                         ]),
                         const SizedBox(height: 8),
                         Text('${n['title']}', style: G.text(15, w: FontWeight.w600)),
@@ -279,7 +252,7 @@ class _NotesScreenState extends State<NotesScreen> {
                   ),
                 const SizedBox(height: 6),
                 OutlinedButton.icon(
-                  onPressed: () => _push(const TaughtNotesScreen()),
+                  onPressed: () => starterRequest.value = Starter.teach,
                   style: OutlinedButton.styleFrom(
                     foregroundColor: G.accent,
                     side: BorderSide(color: G.accent.withValues(alpha: 0.4), width: 0.5),
@@ -287,19 +260,18 @@ class _NotesScreenState extends State<NotesScreen> {
                     padding: const EdgeInsets.symmetric(vertical: 12),
                   ),
                   icon: Icon(Icons.add_rounded, size: 18, color: G.accent),
-                  label: Text('Teach Ally something new (List, Routine, Playbook)', style: G.label(size: 11, color: G.accent, w: FontWeight.w600)),
+                  label: Text('Teach Ally something new', style: G.label(size: 11, color: G.accent, w: FontWeight.w600)),
                 ),
               ],
 
               // TAB 1: Saves & Reels
-              if (_tab == 1) ...[
+              if (_tab == 1 && !nothing) ...[
                 Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-                  Text('Saves waiting for a decision', style: G.text(16, w: FontWeight.w600)),
-                  Text('Turn watch into doing', style: G.label(size: 11, color: G.accent)),
+                  Text('Saved videos and links', style: G.text(16, w: FontWeight.w600)),
                 ]),
                 const SizedBox(height: 2),
                 Text(
-                  'Decide what each save is for. Keep only what serves you.',
+                  'Pick what each one is for: something to do, or something for a low day.',
                   style: G.label(size: 12, color: G.faint),
                 ),
                 const SizedBox(height: 12),
@@ -312,7 +284,7 @@ class _NotesScreenState extends State<NotesScreen> {
                       borderRadius: BorderRadius.circular(4),
                     ),
                     child: Text(
-                      'Nothing waiting. Share a video or reel to Ally and I will work out what it is for.',
+                      'Nothing saved. In YouTube or Instagram, tap Share and pick Ally.',
                       style: G.voice(14, color: G.muted),
                     ),
                   ),
@@ -330,34 +302,13 @@ class _NotesScreenState extends State<NotesScreen> {
                         Row(children: [
                           Icon(Icons.play_circle_outline_rounded, size: 16, color: G.carried),
                           const SizedBox(width: 6),
-                          Text('Saved Link · Video', style: G.label(size: 11, color: G.faint)),
+                          Text('Saved link', style: G.label(size: 11, color: G.faint)),
                         ]),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
-                          decoration: BoxDecoration(
-                            border: Border.all(color: G.lineSoft, width: 0.5),
-                            borderRadius: BorderRadius.circular(3),
-                          ),
-                          child: Text('Review', style: G.label(size: 10, color: G.faint)),
-                        ),
                       ]),
                       const SizedBox(height: 8),
                       Text('${s['title']}', style: G.text(15, w: FontWeight.w600, height: 1.3)),
-                      const SizedBox(height: 8),
-                      // Summary box
-                      Container(
-                        padding: const EdgeInsets.fromLTRB(10, 6, 10, 6),
-                        decoration: BoxDecoration(
-                          color: G.inset,
-                          border: Border(left: BorderSide(color: G.accent, width: 2)),
-                          borderRadius: const BorderRadius.horizontal(right: Radius.circular(3)),
-                        ),
-                        child: Text(
-                          'Tap to extract to-dos or move to Hard-days shelf.',
-                          style: G.voice(13, color: G.muted),
-                        ),
-                      ),
                       const SizedBox(height: 10),
+                      const SizedBox(height: 8),
                       Row(children: [
                         TextButton(
                           onPressed: () => _openSave(s),
@@ -366,85 +317,57 @@ class _NotesScreenState extends State<NotesScreen> {
                             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(3)),
                           ),
-                          child: Text('Choose action', style: G.label(size: 11, color: G.accent, w: FontWeight.w600)),
+                          child: Text('Decide what it is for', style: G.label(size: 11, color: G.accent, w: FontWeight.w600)),
                         ),
                       ]),
                     ]),
                   ),
 
-                // Hard-Days Shelf Section
-                const SizedBox(height: 8),
-                Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-                  Text('Hard-days Shelf', style: G.text(16, w: FontWeight.w600)),
-                  Text('Zero guilt zone', style: G.label(size: 11, color: G.carried)),
-                ]),
-                const SizedBox(height: 8),
-                InkWell(
-                  onTap: () => _push(const VaultScreen()),
-                  child: Container(
-                    padding: const EdgeInsets.all(14),
-                    decoration: BoxDecoration(
-                      color: G.card,
-                      border: Border.all(color: G.lineSoft, width: 0.5),
-                      borderRadius: BorderRadius.circular(4),
+                // For hard days: only when something is on it.
+                if (shelf > 0) ...[
+                  const SizedBox(height: 8),
+                  InkWell(
+                    onTap: () => _push(const VaultScreen()),
+                    child: Container(
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        color: G.card,
+                        border: Border.all(color: G.lineSoft, width: 0.5),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Row(children: [
+                        Icon(Icons.spa_outlined, size: 18, color: G.carried),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                            Text('For hard days ($shelf)', style: G.text(14, w: FontWeight.w500)),
+                            Text('Ally brings these back when you say you feel low.', style: G.text(12.5, color: G.muted)),
+                          ]),
+                        ),
+                        Icon(Icons.chevron_right_rounded, color: G.faint),
+                      ]),
                     ),
-                    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                      Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-                        Row(children: [
-                          Icon(Icons.spa_outlined, size: 18, color: G.carried),
-                          const SizedBox(width: 8),
-                          Text('Emotional comfort collection', style: G.text(14, w: FontWeight.w500)),
-                        ]),
-                        Text('$shelf items kept', style: G.label(size: 11, color: G.faint)),
-                      ]),
-                      const SizedBox(height: 8),
-                      Text(
-                        'Saved comfort videos & notes for when energy is low. Reels that make you smile without hustle pressure.',
-                        style: G.text(13, color: G.muted, height: 1.4),
-                      ),
-                      const SizedBox(height: 10),
-                      Wrap(spacing: 6, children: [
-                        for (final tag in ['#stuck', '#tired', '#reels-relief', '#quiet'])
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-                            decoration: BoxDecoration(
-                              color: G.inset,
-                              border: Border.all(color: G.lineSoft, width: 0.5),
-                              borderRadius: BorderRadius.circular(3),
-                            ),
-                            child: Text(tag, style: G.label(size: 10, color: G.faint)),
-                          ),
-                      ]),
-                      const SizedBox(height: 8),
-                      Container(height: 0.5, color: G.lineSoft),
-                      const SizedBox(height: 6),
-                      Text(
-                        '“Ally only surfaces these when you say you are feeling low. No tasks attached.”',
-                        style: G.voice(13, color: G.faint),
-                      ),
-                    ]),
                   ),
-                ),
+                ],
               ],
 
               // TAB 2: About You
-              if (_tab == 2) ...[
+              if (_tab == 2 && !nothing) ...[
                 Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-                  Text('About You', style: G.text(16, w: FontWeight.w600)),
-                  Text('Habits & Context', style: G.label(size: 11, color: G.faint)),
+                  Text('About you', style: G.text(16, w: FontWeight.w600)),
                 ]),
                 const SizedBox(height: 8),
                 _AboutCard(
                   icon: Icons.calendar_today_outlined,
-                  title: 'Your day & schedule',
-                  sub: 'How Ally thinks your days run, and your current active mode (Normal / Sick / Travel)',
+                  title: 'Your day',
+                  sub: 'When you wake, work and sleep, so Ally suggests things at the right time',
                   onTap: () => _push(const YourDayScreen()),
                 ),
                 const SizedBox(height: 10),
                 _AboutCard(
                   icon: Icons.psychology_outlined,
                   title: 'What Ally remembers',
-                  sub: 'Facts, preferences, sensitive notes you can view, edit, or tell Ally to forget',
+                  sub: 'Things you told Ally about yourself. See them, change them, or delete them',
                   onTap: () => _push(const MemoriesScreen()),
                 ),
               ],
@@ -516,5 +439,45 @@ class _AboutCard extends StatelessWidget {
             Icon(Icons.chevron_right_rounded, size: 18, color: G.faint),
           ]),
         ),
+      );
+}
+
+const _kindName = {'LIST': 'List', 'ROUTINE': 'Routine', 'PLAYBOOK': 'How-to', 'INFO': 'Info'};
+
+/// Notes with nothing in it yet: what it is for, and the two ways to fill it.
+class _EmptyNotes extends StatelessWidget {
+  final VoidCallback onTeach;
+  const _EmptyNotes({required this.onTeach});
+
+  @override
+  Widget build(BuildContext context) => Padding(
+        padding: const EdgeInsets.only(top: 28, bottom: 20),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text('Nothing here yet.', style: G.voice(20, color: G.ink)),
+          const SizedBox(height: 6),
+          Text(
+              'Teach Ally things it should know, like your breakfast options or a gym routine. '
+              'Or turn a video you saved into something to do.',
+              style: G.text(14, color: G.muted, height: 1.45)),
+          const SizedBox(height: 18),
+          FilledButton.icon(
+            onPressed: onTeach,
+            style: FilledButton.styleFrom(
+              backgroundColor: G.accent,
+              foregroundColor: G.bg,
+              minimumSize: const Size(0, 48),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+            ),
+            icon: const Icon(Icons.edit_note_rounded, size: 18),
+            label: Text('Teach Ally something', style: G.text(15, w: FontWeight.w600, color: G.bg)),
+          ),
+          const SizedBox(height: 8),
+          TextButton.icon(
+            onPressed: () => starterRequest.value = Starter.video,
+            style: TextButton.styleFrom(minimumSize: const Size(0, 48)),
+            icon: Icon(Icons.play_circle_outline_rounded, size: 18, color: G.accent),
+            label: Text('Turn a video into action', style: G.text(15, w: FontWeight.w600, color: G.accent)),
+          ),
+        ]),
       );
 }

@@ -29,8 +29,9 @@ lib/
   data/models/                  plain models with fromJson (json.dart helpers)
   data/repositories/            life_repository.dart: every API call lives here
   features/
-    shell/home_shell.dart       tabs Chat · Tasks · Habits · Life · More; provides LifeCubit, TonightCubit, ChatCubit
-    chat/                       chat screen + cubit (actions, undo, offline retry), memories screen
+    shell/home_shell.dart       tabs Now · Plan · Notes · You; provides LifeCubit, TonightCubit, NowCubit, ChatCubit
+    chat/                       chat screen + cubit (actions, undo, offline retry), memories screen,
+                                starters.dart (guided first-use chats → one message; ADR 0026)
     guide/                      today's card, tonight cubit, setup sheet, save sheet, guide_style.dart
     tasks/ habits/ areas/ goals/ vault/ more/ auth/ splash/ …
 ```
@@ -45,6 +46,9 @@ Removed from the UI (code kept, ADR 0012): home, companion, now, projects, learn
 - **Notifications are opt-in** (ADR 0006). Never schedule anything the user didn't ask for. Id ranges: habits `& 0x3fffffff`,
   chat reminders `0x40000000 | …` (each upcoming time of a repeat has its own id), nightly `9000`, morning `9001`, prep `9002`, test `9003`.
   Reminders are exact alarms when allowed and the next 7 times come from the server (ADR 0024); You → Reminders checks permissions.
+- **First use (ADR 0026):** never ask for setup or permissions up front. New guided flows go in `starters.dart` as
+  questions with chips that compose one plain chat message; pin each phrasing in the server's `assistant.starters.integration.test.ts`.
+  Empty places show one sentence and one button (`starterRequest.value = Starter.x` opens the guided chat on Now).
 - User-visible name is **Ally**. Never change `applicationId` / bundle ids.
 - The new screens use `features/guide/guide_style.dart` (`G` tokens). Visual design is final only in build step 8 (ADR 0011).
   Don't use the banned fonts listed in the root `AGENTS.md`.

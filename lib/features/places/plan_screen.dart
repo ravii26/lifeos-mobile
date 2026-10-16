@@ -8,6 +8,7 @@ import '../../core/api/api_exception.dart';
 import '../../core/di/service_locator.dart';
 import '../../data/models/json.dart';
 import '../../data/repositories/life_repository.dart';
+import '../chat/starters.dart';
 import '../guide/guide_style.dart';
 import '../habits/habit_detail_screen.dart';
 import '../habits/habits_screen.dart';
@@ -120,7 +121,7 @@ class _PlanScreenState extends State<PlanScreen> {
     final blocks = ((plan['suggested'] as List?) ?? const []).whereType<Json>().toList();
     if (blocks.isEmpty) return const [];
     return [
-      Text('Suggested for the rest of today', style: G.text(15, w: FontWeight.w600)),
+      Text('Ideas for the rest of today', style: G.text(15, w: FontWeight.w600)),
       const SizedBox(height: 2),
       Text("From your goals, deadlines and free time. Tick one when it's done.", style: G.label(size: 11, color: G.faint)),
       const SizedBox(height: 8),
@@ -192,9 +193,26 @@ class _PlanScreenState extends State<PlanScreen> {
 
   int _selectedTab = 0; // 0: Today, 1: Week, 2: Later
 
+  /// Nothing at all to plan yet: one sentence and one button instead of empty sections.
+  static bool _isEmpty(Map<String, dynamic> plan) {
+    List<Json> list(Object? v) => ((v as List?) ?? const []).whereType<Json>().toList();
+    final today = list(plan['today']?['blocks']).expand((b) => list(b['items']));
+    final week = list(plan['thisWeek']?['days']).expand((d) => list(d['items']));
+    final projects = plan['projects'] as Json? ?? const {};
+    return today.isEmpty &&
+        week.isEmpty &&
+        list(plan['thisWeek']?['carried']).isEmpty &&
+        list(plan['habits']).isEmpty &&
+        list(plan['suggested']).isEmpty &&
+        list(projects['office']).isEmpty &&
+        list(projects['personal']).isEmpty &&
+        ((plan['later'] as Json?)?['count'] as num? ?? 0) == 0;
+  }
+
   @override
   Widget build(BuildContext context) {
     final plan = _plan;
+    final empty = plan != null && _isEmpty(plan);
     final now = DateTime.now();
     final timeStr = DateFormat('h:mm a').format(now).toLowerCase();
 
@@ -220,8 +238,9 @@ class _PlanScreenState extends State<PlanScreen> {
               ]),
               const SizedBox(height: 12),
 
+              if (empty) const _EmptyPlan(),
               // Segmented Range Pill [Today | Week | Later]
-              Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+              if (!empty) Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
                 Container(
                   padding: const EdgeInsets.all(2),
                   decoration: BoxDecoration(
@@ -257,8 +276,7 @@ class _PlanScreenState extends State<PlanScreen> {
               const SizedBox(height: 10),
 
               // Day Flow Timeline Bar: Morning, Day, Evening, Night
-              DayStrip(now: now),
-              const SizedBox(height: 14),
+              if (!empty) ...[DayStrip(now: now), const SizedBox(height: 14)],
 
               if (_error != null) Text(_error!, style: G.text(14, color: G.muted)),
               if (plan == null && _error == null)
@@ -271,17 +289,18 @@ class _PlanScreenState extends State<PlanScreen> {
 
               if ((_stale?['total'] ?? 0) as num > 0) _stale_(),
 
-              if (plan != null && _selectedTab == 0) ..._suggested(plan),
-              if (plan != null && _selectedTab == 0) ..._todayFolded(plan),
-              if (plan != null && _selectedTab == 1) ..._weekFolded(plan),
-              if (plan != null && _selectedTab == 2) ..._laterFolded(plan),
+              if (plan != null && !empty && _selectedTab == 0) ..._suggested(plan),
+              if (plan != null && !empty && _selectedTab == 0) ..._todayFolded(plan),
+              if (plan != null && !empty && _selectedTab == 1) ..._weekFolded(plan),
+              if (plan != null && !empty && _selectedTab == 2) ..._laterFolded(plan),
 
-              // Quick Jump Thumb Strip
+              // See everything
+              if (!empty) ...[
               const SizedBox(height: 18),
               Container(height: 0.5, color: G.lineSoft),
               const SizedBox(height: 10),
               Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-                Text('Quick Jump', style: G.label(size: 11, color: G.faint)),
+                Text('See all', style: G.label(size: 11, color: G.faint)),
                 Row(children: [
                   _QuickPill(
                     label: 'Habits',
@@ -289,7 +308,7 @@ class _PlanScreenState extends State<PlanScreen> {
                   ),
                   const SizedBox(width: 6),
                   _QuickPill(
-                    label: 'Later',
+                    label: 'To-dos',
                     onTap: () => _openAll(() => TasksScreen(onOpenMore: () {}), 'All to-dos'),
                   ),
                   const SizedBox(width: 6),
@@ -300,6 +319,7 @@ class _PlanScreenState extends State<PlanScreen> {
                   ),
                 ]),
               ]),
+              ],
             ],
           ),
         ),
@@ -387,7 +407,7 @@ class _PlanScreenState extends State<PlanScreen> {
                   decoration: BoxDecoration(shape: BoxShape.circle, color: G.accent),
                 ),
                 const SizedBox(width: 6),
-                Text('NOW IN FOCUS', style: G.label(size: 10, color: G.accent, w: FontWeight.w600)),
+                Text('Next up', style: G.label(size: 10, color: G.accent, w: FontWeight.w600)),
               ]),
               if (activeItem['minutes'] != null)
                 Text('${activeItem['minutes']} min', style: G.label(size: 11, color: G.faint)),
@@ -428,21 +448,15 @@ class _PlanScreenState extends State<PlanScreen> {
                 icon: Icon(Icons.check_rounded, size: 16, color: G.good),
                 label: Text('Done', style: G.label(size: 11, color: G.good, w: FontWeight.w600)),
               ),
-              Row(children: [
-                TextButton(
-                  onPressed: () => _open(activeItem),
-                  child: Text('Make Smaller', style: G.label(size: 11, color: G.muted)),
-                ),
-                const SizedBox(width: 6),
-                TextButton(
-                  onPressed: () => _tick(activeItem),
-                  child: Text('Tomorrow morning', style: G.label(size: 11, color: G.carried)),
-                ),
-              ]),
+              TextButton(
+                onPressed: () => _open(activeItem),
+                child: Text('Open', style: G.label(size: 11, color: G.muted)),
+              ),
             ]),
           ]),
         )
-      else
+      // Nothing scheduled: say so only when there are no ideas above either.
+      else if (((plan['suggested'] as List?) ?? const []).isEmpty)
         Container(
           margin: const EdgeInsets.only(bottom: 10),
           padding: const EdgeInsets.all(14),
@@ -452,18 +466,18 @@ class _PlanScreenState extends State<PlanScreen> {
             borderRadius: BorderRadius.circular(4),
           ),
           child: Text(
-            'Nothing active for right now. Tell Ally in chat to plan something.',
+            'Nothing left for today.',
             style: G.voice(15, color: G.muted),
           ),
         ),
 
-      // SECTION 2: Folded Accordion - Settled Earlier Today
-      GFoldSection(
+      // Only sections that have something in them.
+      if (settledItems.isNotEmpty) GFoldSection(
         initiallyExpanded: false,
         header: Row(children: [
           Icon(Icons.check_circle_outline_rounded, size: 16, color: G.good),
           const SizedBox(width: 8),
-          Text('Settled Earlier Today', style: G.text(14, w: FontWeight.w500)),
+          Text('Done today', style: G.text(14, w: FontWeight.w500)),
           const SizedBox(width: 8),
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
@@ -471,7 +485,7 @@ class _PlanScreenState extends State<PlanScreen> {
               color: G.goodSoft,
               borderRadius: BorderRadius.circular(3),
             ),
-            child: Text('${settledItems.length} items',
+            child: Text('${settledItems.length}',
                 style: G.label(size: 10, color: G.good, w: FontWeight.w600)),
           ),
         ]),
@@ -492,7 +506,6 @@ class _PlanScreenState extends State<PlanScreen> {
                       style: G.text(13, color: G.faint).copyWith(decoration: TextDecoration.lineThrough),
                     ),
                   ),
-                  Text('settled', style: G.label(size: 10, color: G.good)),
                 ]),
               ),
           ],
@@ -500,8 +513,7 @@ class _PlanScreenState extends State<PlanScreen> {
       ),
       const SizedBox(height: 8),
 
-      // SECTION 3: Folded Accordion - Carried Over Gently
-      GFoldSection(
+      if (carriedItems.isNotEmpty) GFoldSection(
         initiallyExpanded: false,
         header: Row(children: [
           Container(
@@ -510,11 +522,9 @@ class _PlanScreenState extends State<PlanScreen> {
             decoration: BoxDecoration(shape: BoxShape.circle, color: G.carried),
           ),
           const SizedBox(width: 8),
-          Text('Carried Over Gently', style: G.text(14, w: FontWeight.w500)),
+          Text('From earlier days', style: G.text(14, w: FontWeight.w500)),
           const SizedBox(width: 8),
-          Text('${carriedItems.length} items', style: G.label(size: 11, color: G.carried)),
-          const Spacer(),
-          Text('Zero penalty', style: G.label(size: 10, color: G.faint)),
+          Text('${carriedItems.length}', style: G.label(size: 11, color: G.carried)),
         ]),
         content: Column(
           children: [
@@ -528,7 +538,6 @@ class _PlanScreenState extends State<PlanScreen> {
                 padding: const EdgeInsets.symmetric(vertical: 4),
                 child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
                   Expanded(child: Text('${i['title']}', style: G.text(13, color: G.muted))),
-                  Text('no penalty', style: G.label(size: 10, color: G.carried)),
                 ]),
               ),
           ],
@@ -536,13 +545,12 @@ class _PlanScreenState extends State<PlanScreen> {
       ),
       const SizedBox(height: 8),
 
-      // SECTION 4: Folded Accordion - Habit Continuity
-      GFoldSection(
+      if (habits.isNotEmpty) GFoldSection(
         initiallyExpanded: false,
         header: Row(children: [
           Icon(Icons.auto_awesome_rounded, size: 16, color: G.accent),
           const SizedBox(width: 8),
-          Text('Habit Continuity', style: G.text(14, w: FontWeight.w500)),
+          Text('Habits', style: G.text(14, w: FontWeight.w500)),
           const Spacer(),
           Text('${habits.length} habits', style: G.label(size: 11, color: G.faint)),
           const SizedBox(width: 6),
@@ -562,7 +570,7 @@ class _PlanScreenState extends State<PlanScreen> {
                   child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
                     Expanded(child: Text('${h['title']}', style: G.text(13, w: FontWeight.w500))),
                     Text(
-                      h['stage'] == 'AUTOMATIC' ? 'automatic' : '${h['consistency']} of 28 days',
+                      h['stage'] == 'AUTOMATIC' ? 'part of your day now' : 'done ${h['consistency']} of the last 28 days',
                       style: G.label(size: 11, color: G.faint),
                     ),
                   ]),
@@ -583,12 +591,14 @@ class _PlanScreenState extends State<PlanScreen> {
       if (carried.isNotEmpty) ...[
         Padding(
           padding: const EdgeInsets.only(top: 6, bottom: 4),
-          child: Text('Carried over, zero rush', style: G.label(size: 11, color: G.carried, w: FontWeight.w600)),
+          child: Text('From earlier days', style: G.label(size: 11, color: G.carried, w: FontWeight.w600)),
         ),
         for (final i in carried) _row(i),
         const SizedBox(height: 12),
       ],
-      for (final d in days) ...[
+      if (carried.isEmpty && days.every((d) => ((d['items'] as List?) ?? const []).isEmpty))
+        Text('Nothing planned for this week yet.', style: G.voice(15, color: G.muted)),
+      for (final d in days.where((d) => ((d['items'] as List?) ?? const []).isNotEmpty)) ...[
         Padding(
           padding: const EdgeInsets.only(top: 10, bottom: 4),
           child: Text(
@@ -608,17 +618,21 @@ class _PlanScreenState extends State<PlanScreen> {
     final later = ((plan['later'] as Json)['count'] as num).toInt();
 
     return [
-      Text('$later to-dos with no date. They wait; nothing is lost.',
-          style: G.voice(15, color: G.muted)),
-      const SizedBox(height: 14),
+      if (later > 0) ...[
+        Text('$later to-do${later == 1 ? '' : 's'} with no date. They wait; nothing is lost.',
+            style: G.voice(15, color: G.muted)),
+        const SizedBox(height: 14),
+      ],
+      if (later == 0 && office.isEmpty && personal.isEmpty)
+        Text('Nothing saved for later.', style: G.voice(15, color: G.muted)),
       if (office.isNotEmpty) ...[
-        Text('OFFICE GOALS', style: G.label(size: 11, color: G.faint, w: FontWeight.w600)),
+        Text('Work goals', style: G.label(size: 11, color: G.faint, w: FontWeight.w600)),
         const SizedBox(height: 4),
         for (final p in office) _goal(p),
         const SizedBox(height: 14),
       ],
       if (personal.isNotEmpty) ...[
-        Text('PERSONAL GOALS', style: G.label(size: 11, color: G.faint, w: FontWeight.w600)),
+        Text('Personal goals', style: G.label(size: 11, color: G.faint, w: FontWeight.w600)),
         const SizedBox(height: 4),
         for (final p in personal) _goal(p),
       ],
@@ -723,5 +737,33 @@ class _QuickPill extends StatelessWidget {
             ),
           ),
         ),
+      );
+}
+
+/// Plan with nothing in it yet: what this place is for, and one way to fill it.
+class _EmptyPlan extends StatelessWidget {
+  const _EmptyPlan();
+
+  @override
+  Widget build(BuildContext context) => Padding(
+        padding: const EdgeInsets.only(top: 40),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text('Nothing planned yet.', style: G.voice(20, color: G.ink)),
+          const SizedBox(height: 6),
+          Text('Your day, your week and your goals show up here once you tell Ally about them.',
+              style: G.text(14, color: G.muted, height: 1.45)),
+          const SizedBox(height: 18),
+          FilledButton.icon(
+            onPressed: () => starterRequest.value = Starter.goal,
+            style: FilledButton.styleFrom(
+              backgroundColor: G.accent,
+              foregroundColor: G.bg,
+              minimumSize: const Size(0, 48),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+            ),
+            icon: const Icon(Icons.flag_outlined, size: 18),
+            label: Text('Plan a goal', style: G.text(15, w: FontWeight.w600, color: G.bg)),
+          ),
+        ]),
       );
 }

@@ -415,7 +415,7 @@ class _GuideSetupState extends State<_GuideSetup> {
             controller: _minimum,
             style: G.text(14.5, color: G.ink),
             decoration:
-                _field('2-minute minimum, e.g. Open doc and write title'),
+                _field('Smallest version (2 minutes), e.g. open the doc and write the title'),
           ),
           if (_rows.isNotEmpty) ...[
             const SizedBox(height: 8),

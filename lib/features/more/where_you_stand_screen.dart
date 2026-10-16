@@ -49,7 +49,7 @@ class _WhereYouStandScreenState extends State<WhereYouStandScreen> {
       backgroundColor: G.bg,
       appBar: GTopBar(
         'Where you stand',
-        subtitle: 'Paced linearity and goal trajectories',
+        subtitle: 'How far along each goal is',
       ),
       body: RefreshIndicator(
         onRefresh: _load,

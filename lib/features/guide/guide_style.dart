@@ -371,7 +371,7 @@ class DayStrip extends StatelessWidget {
 
   static String partName(String p) => switch (p) {
         'MORNING' => 'Morning',
-        'OFFICE' => 'Office',
+        'OFFICE' => 'Day', // the strip says Day; not everyone works in an office
         'EVENING' => 'Evening',
         _ => 'Night',
       };

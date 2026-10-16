@@ -108,7 +108,7 @@ class _TonightCardState extends State<TonightCard> {
         Text(c.why, style: G.voice(14)),
         if (!c.isSmaller) ...[
           const SizedBox(height: 6),
-          Text('Tired? Minimum: ${c.minimum}', style: G.text(13, color: G.muted)),
+          Text('Tired? Smallest version: ${c.minimum}', style: G.text(13, color: G.muted)),
         ],
         const SizedBox(height: 10),
         Row(children: [
@@ -118,7 +118,7 @@ class _TonightCardState extends State<TonightCard> {
           if (!c.isSmaller) ...[
             const SizedBox(width: 6),
             Expanded(
-              child: _Small('Did the minimum', onTap: s.busy ? null : () => cubit.respond('MINIMUM')),
+              child: _Small('Did the small version', onTap: s.busy ? null : () => cubit.respond('MINIMUM')),
             ),
           ],
           PopupMenuButton<String>(
