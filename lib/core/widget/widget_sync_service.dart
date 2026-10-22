@@ -114,25 +114,54 @@ class WidgetSyncService {
   /// widget-triggered habit toggle (habit stats/streaks may have changed).
   Future<void> refreshFromNetwork() async {
     final habits = await _repo.habits();
-    DecisionResult? decision;
+    Map<String, dynamic>? now;
     try {
-      decision = await _repo.decisionsNow();
+      now = await _repo.now();
     } catch (_) {
-      // best-effort; keep whatever next-action was already cached
+      // best-effort; keep whatever pick was already cached
     }
     final focus = await ActiveFocusStore().read();
     final current = await _readCurrent() ?? WidgetSnapshot.empty();
+    final options = ((now?['options'] as List?) ?? const []).whereType<Map>().toList();
+    final pick = now?['kind'] == 'PICK' && options.isNotEmpty ? options.first : null;
     await _save(current.copyWith(
       updatedAt: DateTime.now(),
       focusActive: focus != null,
       focusLabel: focus?.label,
       focusStartedAt: focus?.startedAt,
-      nextActionType: decision?.primaryAction?.type,
-      nextActionRefId: decision?.primaryAction?.refId,
-      nextActionTitle: decision?.primaryAction?.title,
+      nextActionType: pick?['sourceType']?.toString(),
+      nextActionRefId: pick?['sourceId']?.toString(),
+      nextActionTitle: pick?['title']?.toString() ?? (now == null ? current.nextActionTitle : now['message']?.toString()),
+      nextMinutes: (pick?['minutes'] as num?)?.toInt(),
+      nextCount: (pick?['count'] as num?)?.toInt(),
       habits: _topHabits(habits),
-      upNext: _upNext(decision?.suggestions),
+      upNext: [
+        for (final o in options.skip(1).take(2)) WidgetSuggestion(title: '${o['title']}', urgency: 'MEDIUM'),
+      ],
     ));
+  }
+
+  /// No-network update when the app has just loaded Now: the widget shows
+  /// the same pick as the app.
+  Future<void> pushNow(Map<String, dynamic> now) async {
+    final current = await _readCurrent() ?? WidgetSnapshot.empty();
+    final options = ((now['options'] as List?) ?? const []).whereType<Map>().toList();
+    final pick = now['kind'] == 'PICK' && options.isNotEmpty ? options.first : null;
+    await _save(current.copyWith(
+      updatedAt: DateTime.now(),
+      nextActionType: pick?['sourceType']?.toString(),
+      nextActionRefId: pick?['sourceId']?.toString(),
+      nextActionTitle: pick?['title']?.toString() ?? now['message']?.toString(),
+      nextMinutes: (pick?['minutes'] as num?)?.toInt(),
+      nextCount: (pick?['count'] as num?)?.toInt(),
+      upNext: [for (final o in options.skip(1).take(2)) WidgetSuggestion(title: '${o['title']}', urgency: 'MEDIUM')],
+    ));
+  }
+
+  /// Done on the widget's pick: logged like Done on Now, then refreshed.
+  Future<void> nowDone(String type, String id, int? minutes, int? count) async {
+    await _repo.respondNow(type, id, 'DONE', minutes: minutes, count: count);
+    await refreshFromNetwork();
   }
 
   /// Wipes cached data on sign-out so a different user signing in on the
@@ -196,13 +225,20 @@ extension _FirstOrNull<T> on Iterable<T> {
 /// has no access to the main isolate's `getIt`, so it wires up its own copy.
 @pragma('vm:entry-point')
 void widgetBackgroundCallback(Uri? uri) async {
-  if (uri == null || uri.host != 'toggle-habit') return;
+  if (uri == null || (uri.host != 'toggle-habit' && uri.host != 'now-done')) return;
   final id = uri.queryParameters['id'];
   if (id == null) return;
   WidgetsFlutterBinding.ensureInitialized();
   await setupLocator();
   try {
-    await getIt<WidgetSyncService>().toggleHabit(id);
+    if (uri.host == 'now-done') {
+      final q = uri.queryParameters;
+      await getIt<WidgetSyncService>().nowDone(q['type'] ?? 'TASK', id, int.tryParse(q['m'] ?? ''), int.tryParse(q['c'] ?? ''));
+      await NotificationService.instance.init();
+      await NotificationService.instance.syncAgenda(await getIt<LifeRepository>().agenda());
+    } else {
+      await getIt<WidgetSyncService>().toggleHabit(id);
+    }
   } catch (_) {
     // best-effort; the widget will show stale state until the next refresh
   }
@@ -234,6 +270,8 @@ void widgetRefreshCallbackDispatcher() {
       final repo = getIt<LifeRepository>();
       await NotificationService.instance.syncReminders(await repo.reminders());
       await NotificationService.instance.syncHabitReminders(await repo.habits());
+      // Briefing, nudges and wrap-up carry today's real plan (ADR 0027).
+      await NotificationService.instance.syncAgenda(await repo.agenda());
     } catch (_) {
       // offline or signed out: what is already scheduled stays
     }

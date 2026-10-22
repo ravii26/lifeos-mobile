@@ -8,6 +8,7 @@ import '../../data/models/area.dart';
 import '../../data/models/tonight.dart';
 import '../../data/repositories/life_repository.dart';
 import 'guide_style.dart';
+import 'mood_picker.dart';
 
 /// What the person shared: a link/text, or a screenshot.
 class SaveSource {
@@ -224,6 +225,31 @@ class _SaveSheetState extends State<_SaveSheet> {
     }
   }
 
+  // The person picked when this should come back (their own words are fine).
+  Future<void> _setMoods(List<String> moods) async {
+    final p = _p;
+    if (p == null || moods.isEmpty) return;
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
+    try {
+      final fresh = await _repo.setSaveMoods(p.id, moods);
+      if (!mounted) return;
+      setState(() {
+        _p = fresh;
+        _busy = false;
+      });
+    } on ApiException catch (e) {
+      if (mounted) {
+        setState(() {
+          _error = e.message;
+          _busy = false;
+        });
+      }
+    }
+  }
+
   Future<void> _decide(String choice) async {
     final p = _p;
     if (p == null) return;
@@ -375,6 +401,8 @@ class _SaveSheetState extends State<_SaveSheet> {
                   : "Kept for days you feel ${p.feelings.join(', ')}. I'll bring it back then.",
               style: G.voice(19)),
           const SizedBox(height: 16),
+          MoodPicker(selected: p.feelings, busy: _busy, onChanged: _setMoods),
+          const SizedBox(height: 16),
           _summary(p),
           if (_error != null) Text(_error!, style: G.text(14, color: const Color(0xFFB3261E))),
           const SizedBox(height: 10),
@@ -485,7 +513,7 @@ class _SaveSheetState extends State<_SaveSheet> {
             onTap: _busy ? null : () => _decide('ACTION'),
           ),
           const SizedBox(height: 8),
-          GButton('This is for hard days', primary: false, onTap: _busy ? null : () => _correct('FEELING')),
+          GButton('Keep it for when I feel a certain way', primary: false, onTap: _busy ? null : () => _correct('FEELING')),
           TextButton(
             onPressed: _busy ? null : () => _decide('DROP'),
             child: Text("Let it go, I won't use it", style: G.text(15, color: G.muted, w: FontWeight.w700)),

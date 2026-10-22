@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:intl/intl.dart';
 import 'package:flutter/foundation.dart';
@@ -31,10 +32,31 @@ class NotificationService {
   final _answered = StreamController<void>.broadcast();
   Stream<void> get answered => _answered.stream;
 
+  /// A notification was tapped while the app runs: its payload kind
+  /// (WEEKLY_REVIEW opens the week in chat; anything else opens Now).
+  final _opened = StreamController<String>.broadcast();
+  Stream<String> get opened => _opened.stream;
+
   static const nightlyId = 9000;
   static const morningId = 9001;
   static const prepId = 9002;
   static const testId = 9003;
+
+  /// What Ally says on its own (ADR 0027): briefing, slot nudges, wrap-up,
+  /// Sunday review. 9100-9119, rescheduled whole from the server's agenda.
+  static const agendaBase = 9100;
+  static const _agendaSlots = 20;
+  static bool isAgendaId(int id) => id >= agendaBase && id < agendaBase + _agendaSlots;
+  static const _prefsLevel = 'ally_proactivity';
+
+  static const _agendaChannel = AndroidNotificationDetails(
+    'ally_proactive',
+    'From Ally',
+    channelDescription: 'Your briefing, nudges for what you planned, and the evening wrap-up',
+    importance: Importance.high,
+    priority: Priority.high,
+    styleInformation: BigTextStyleInformation(''),
+  );
 
   /// Android lets an app hold about 500 alarms; stay well under it.
   static const _maxReminderAlarms = 300;
@@ -183,7 +205,7 @@ class NotificationService {
     if (!_ready || kIsWeb) return;
     for (final p in await _plugin.pendingNotificationRequests()) {
       final isReminder = (p.id & 0x40000000) != 0;
-      if (p.id != nightlyId && p.id != morningId && p.id != prepId && p.id != testId && !isReminder) await _plugin.cancel(p.id);
+      if (p.id != nightlyId && p.id != morningId && p.id != prepId && p.id != testId && !isAgendaId(p.id) && !isReminder) await _plugin.cancel(p.id);
     }
     await _plugin.cancel(prepId);
     // Sick / travelling / on holiday: no habit or prep prompts at all.
@@ -212,6 +234,9 @@ class NotificationService {
       await _plugin.cancel(prepId);
       await _plugin.cancel(nightlyId);
       await _plugin.cancel(morningId);
+      for (var i = 0; i < _agendaSlots; i++) {
+        await _plugin.cancel(agendaBase + i);
+      }
     }
   }
 
@@ -261,15 +286,40 @@ class NotificationService {
     iOS: DarwinNotificationDetails(),
   );
 
-  Future<void> _schedule(int id, String title, String text, DateTime at) => _plugin.zonedSchedule(
+  // A reminder you can answer from the notification: Done (and for the
+  // follow-up, In 1 hour / Tomorrow).
+  static NotificationDetails _answerable({required bool followUp}) => NotificationDetails(
+        android: AndroidNotificationDetails('reminders', 'Reminders',
+            channelDescription: 'Reminders you asked for',
+            importance: Importance.high,
+            priority: Priority.high,
+            actions: [
+              const AndroidNotificationAction('FU_DONE', 'Done'),
+              if (followUp) const AndroidNotificationAction('FU_HOUR', 'In 1 hour'),
+              if (followUp) const AndroidNotificationAction('FU_TOMORROW', 'Tomorrow'),
+            ]),
+        iOS: const DarwinNotificationDetails(),
+      );
+
+  Future<void> _schedule(int id, String title, String text, DateTime at, {NotificationDetails? details, String? payload}) => _plugin.zonedSchedule(
         id,
         title,
         text,
         tz.TZDateTime.from(at, tz.local),
-        _reminderDetails,
+        details ?? _reminderDetails,
+        payload: payload,
         androidScheduleMode: _mode,
         uiLocalNotificationDateInterpretation: UILocalNotificationDateInterpretation.absoluteTime,
       );
+
+  // "Did you call mom?" 30 minutes after a reminder nobody answered.
+  static int _followUpNotifId(String id) => 0x40000000 | ((id.hashCode ^ 0x5bd1e995) & 0x3fffffff);
+  static const _followUpAfter = Duration(minutes: 30);
+
+  static String _reminderPayload(String kind, String id, String text, DateTime at) =>
+      jsonEncode({'k': kind, 'id': id, 't': text, 'at': at.toUtc().toIso8601String()});
+
+  Future<bool> _followUpsOn() async => ((await _readPref(_prefsLevel)) ?? 'NORMAL') == 'NORMAL';
 
   // The 2nd, 3rd… upcoming time of a repeating reminder (the 1st uses _reminderNotifId).
   static int _occurrenceNotifId(String id, int i) => 0x40000000 | ((id.hashCode * 31 + i * 7919) & 0x3fffffff);
@@ -277,6 +327,7 @@ class NotificationService {
   static List<int> _idsFor(Reminder r, int times) => [
         _reminderNotifId(r.id),
         _windowNotifId(r.id),
+        _followUpNotifId(r.id),
         for (var i = 1; i < times; i++) _occurrenceNotifId(r.id, i),
       ];
 
@@ -287,7 +338,18 @@ class NotificationService {
   Future<void> scheduleReminder(String id, String text, DateTime at, {DateTime? windowEnd, List<DateTime> later = const []}) async {
     if (!_ready || kIsWeb) return;
     final now = DateTime.now();
-    if (at.isAfter(now)) await _schedule(_reminderNotifId(id), 'Reminder', text, at);
+    if (at.isAfter(now)) {
+      await _schedule(_reminderNotifId(id), 'Reminder', text, at,
+          details: _answerable(followUp: false), payload: _reminderPayload('REMINDER', id, text, at));
+    }
+    // One follow-up for the next time, only at Normal (Quieter and Silent: just the reminder).
+    final follow = at.add(_followUpAfter);
+    if (windowEnd == null && follow.isAfter(now) && await _followUpsOn()) {
+      await _schedule(_followUpNotifId(id), 'Did you do it?', text, follow,
+          details: _answerable(followUp: true), payload: _reminderPayload('FOLLOWUP', id, text, at));
+    } else {
+      await _plugin.cancel(_followUpNotifId(id));
+    }
     for (var i = 0; i < later.length; i++) {
       if (later[i].isAfter(now)) await _schedule(_occurrenceNotifId(id, i + 1), 'Reminder', text, later[i]);
     }
@@ -302,6 +364,7 @@ class NotificationService {
 
   Future<void> cancelReminder(String id) async {
     await _plugin.cancel(_reminderNotifId(id));
+    await _plugin.cancel(_followUpNotifId(id));
     await _plugin.cancel(_windowNotifId(id));
     for (var i = 1; i < 7; i++) {
       await _plugin.cancel(_occurrenceNotifId(id, i));
@@ -359,76 +422,146 @@ class NotificationService {
   /// (or with nothing picked yet), tomorrow gets a plain "it's ready" nudge
   /// that opens the app, where the next pick is made.
   Future<void> scheduleNightly(Tonight tonight) async {
+    // Replaced by the agenda's briefing and wrap-up (ADR 0027): the person's
+    // nightly time is now the wrap-up time. Old nudges are cleared.
     if (!_ready || kIsWeb) return;
-    await _scheduleMorning(tonight);
-    final t = _parseTime(await nightlyTime());
-    if (t == null) {
-      await _plugin.cancel(nightlyId);
-      return;
-    }
-    final now = tz.TZDateTime.now(tz.local);
-    var when = tz.TZDateTime(tz.local, now.year, now.month, now.day, t.$1, t.$2);
-    final c = tonight.commitment;
-    final pendingTonight = c != null && c.isPending && when.isAfter(now);
-
     await _plugin.cancel(nightlyId);
-    if (pendingTonight) {
-      await _plugin.zonedSchedule(
-        nightlyId,
-        c.isSmaller ? 'Just the minimum tonight' : 'Tonight, one thing',
-        c.isSmaller ? c.minimum : '${c.title}\nMinimum: ${c.minimum}',
-        when,
-        NotificationDetails(
-          android: _nightlyChannel(withActions: true),
-          iOS: const DarwinNotificationDetails(categoryIdentifier: _nightlyCategory),
-        ),
-        payload: c.date,
-        androidScheduleMode: _mode,
-        uiLocalNotificationDateInterpretation:
-            UILocalNotificationDateInterpretation.absoluteTime,
-      );
-      return;
-    }
-    if (!when.isAfter(now) || (c != null && !c.isPending)) {
-      when = when.add(const Duration(days: 1));
-    }
-    await _plugin.zonedSchedule(
-      nightlyId,
-      'Tonight, one thing',
-      "Your next step is ready. It takes 2 minutes to start.",
-      when,
-      NotificationDetails(android: _nightlyChannel(withActions: false)),
-      androidScheduleMode: _mode,
-      uiLocalNotificationDateInterpretation:
-          UILocalNotificationDateInterpretation.absoluteTime,
-    );
+    await _plugin.cancel(morningId);
   }
 
-  /// Morning heads-up so the evening isn't a surprise. Shows today's pick
-  /// when one exists, otherwise a plain reminder for tomorrow morning.
-  Future<void> _scheduleMorning(Tonight tonight) async {
+  // ---- What Ally says on its own (ADR 0027) ----
+
+  /// Schedules the server's agenda as local notifications (replacing the
+  /// last one). Works offline once fetched; refreshed on open, after changes,
+  /// and hourly in the background.
+  Future<void> syncAgenda(Map<String, dynamic> agenda) async {
+    if (!_ready || kIsWeb) return;
+    await _writePref(_prefsLevel, agenda['level']?.toString() ?? 'NORMAL');
+    for (var i = 0; i < _agendaSlots; i++) {
+      await _plugin.cancel(agendaBase + i);
+    }
+    await _plugin.cancel(nightlyId);
     await _plugin.cancel(morningId);
-    final t = _parseTime(await morningTime());
-    if (t == null) return;
-    final now = tz.TZDateTime.now(tz.local);
-    var when = tz.TZDateTime(tz.local, now.year, now.month, now.day, t.$1, t.$2);
-    final c = tonight.commitment;
-    final today = c != null && c.isPending && when.isAfter(now);
-    if (!today && !when.isAfter(now)) when = when.add(const Duration(days: 1));
-    await _plugin.zonedSchedule(
-      morningId,
-      today ? "Today's one thing" : 'Your one thing for today is ready',
-      today ? '${c.title}\nMinimum: ${c.minimum}' : 'Open Ally to see it.',
-      when,
-      NotificationDetails(android: _nightlyChannel(withActions: false)),
-      androidScheduleMode: _mode,
-      uiLocalNotificationDateInterpretation:
-          UILocalNotificationDateInterpretation.absoluteTime,
-    );
+    if (await isPaused()) return;
+    final now = DateTime.now();
+    var slot = 0;
+    for (final raw in (agenda['items'] as List? ?? const [])) {
+      if (raw is! Map || slot >= _agendaSlots) continue;
+      final at = DateTime.tryParse('${raw['at']}')?.toLocal();
+      if (at == null || !at.isAfter(now)) continue;
+      final actions = <AndroidNotificationAction>[
+        for (final a in (raw['actions'] as List? ?? const []))
+          if (a is Map && a['id'] == 'DONE')
+            const AndroidNotificationAction('AG_DONE', 'Done')
+          else if (a is Map && a['id'] == 'SKIP')
+            const AndroidNotificationAction('AG_SKIP', 'Not now')
+          else if (a is Map && a['id'] == 'MOVE_LEFT')
+            const AndroidNotificationAction('AG_MOVE', 'Move to tomorrow'),
+      ];
+      await _schedule(
+        agendaBase + slot,
+        '${raw['title']}',
+        '${raw['body']}',
+        at,
+        details: NotificationDetails(
+          android: AndroidNotificationDetails(_agendaChannel.channelId, _agendaChannel.channelName,
+              channelDescription: _agendaChannel.channelDescription,
+              importance: Importance.high,
+              priority: Priority.high,
+              styleInformation: const BigTextStyleInformation(''),
+              actions: actions.isEmpty ? null : actions),
+          iOS: const DarwinNotificationDetails(),
+        ),
+        payload: jsonEncode({
+          'k': raw['kind'],
+          if (raw['sourceType'] != null) 's': raw['sourceType'],
+          if (raw['sourceId'] != null) 'id': raw['sourceId'],
+          if (raw['minutes'] != null) 'm': raw['minutes'],
+          if (raw['count'] != null) 'c': raw['count'],
+        }),
+      );
+      slot++;
+    }
+  }
+
+  /// The app was opened by tapping a notification: its kind, once.
+  Future<String?> launchKind() async {
+    if (!_ready || kIsWeb) return null;
+    final d = await _plugin.getNotificationAppLaunchDetails();
+    if (d?.didNotificationLaunchApp != true) return null;
+    return _kindOf(d!.notificationResponse?.payload);
+  }
+
+  static String? _kindOf(String? payload) {
+    if (payload == null || !payload.startsWith('{')) return null;
+    try {
+      return (jsonDecode(payload) as Map)['k']?.toString();
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Done / Not now on a slot nudge, Move to tomorrow on the wrap-up, and
+  /// Done / In 1 hour / Tomorrow on a reminder. Shared by the foreground
+  /// handler and the background isolate. True when it was one of these.
+  Future<bool> handleAllyAction(NotificationResponse r) async {
+    final action = r.actionId;
+    if (action == null || !(action.startsWith('AG_') || action.startsWith('FU_'))) return false;
+    Map<String, dynamic> p;
+    try {
+      p = Map<String, dynamic>.from(jsonDecode(r.payload ?? '{}') as Map);
+    } catch (_) {
+      return true;
+    }
+    final repo = getIt<LifeRepository>();
+    final id = p['id']?.toString();
+    try {
+      switch (action) {
+        case 'AG_DONE' || 'AG_SKIP':
+          if (id == null) return true;
+          await repo.respondNow('${p['s'] ?? 'TASK'}', id, action == 'AG_DONE' ? 'DONE' : 'SKIP',
+              minutes: (p['m'] as num?)?.toInt(), count: (p['c'] as num?)?.toInt());
+          if (action == 'AG_DONE') {
+            await _plugin.show(r.id ?? agendaBase, 'Counted.', 'Nice. The next thing is on Now when you want it.',
+                const NotificationDetails(android: _agendaChannel));
+          }
+        case 'AG_MOVE':
+          final m = await repo.wrapUpMove();
+          await _plugin.show(r.id ?? agendaBase, 'Done for today', '${m['message'] ?? 'Moved to tomorrow.'}',
+              const NotificationDetails(android: _agendaChannel));
+        case 'FU_DONE':
+          if (id == null) return true;
+          await repo.respondNow('TASK', id, 'DONE');
+          await _plugin.cancel(_followUpNotifId(id));
+        case 'FU_HOUR':
+          if (id == null) return true;
+          await _schedule(_followUpNotifId(id), 'Reminder', '${p['t'] ?? 'Reminder'}', DateTime.now().add(const Duration(hours: 1)),
+              details: _answerable(followUp: true), payload: r.payload);
+        case 'FU_TOMORROW':
+          if (id == null) return true;
+          final at = DateTime.tryParse('${p['at']}') ?? DateTime.now();
+          await repo.moveReminder(id, at.add(const Duration(days: 1)));
+          await _plugin.cancel(_followUpNotifId(id));
+      }
+    } on QueuedOfflineException {
+      // Saved for when the phone is back online.
+    } catch (_) {
+      return true;
+    }
+    // Keep the rest of the day's notifications true to what just changed.
+    try {
+      await syncAgenda(await repo.agenda());
+    } catch (_) {}
+    return true;
   }
 
   Future<void> _onResponse(NotificationResponse r) async {
-    if (await handleNightlyAction(r)) _answered.add(null);
+    if (r.actionId == null) {
+      final kind = _kindOf(r.payload);
+      if (kind != null) _opened.add(kind);
+      return;
+    }
+    if (await handleAllyAction(r) || await handleNightlyAction(r)) _answered.add(null);
   }
 
   /// Answers the nudge from its buttons. Returns true when an answer was
@@ -506,5 +639,7 @@ Future<void> nightlyNotificationBackground(NotificationResponse r) async {
   WidgetsFlutterBinding.ensureInitialized();
   if (!getIt.isRegistered<LifeRepository>()) await setupLocator();
   await NotificationService.instance.init();
-  await NotificationService.instance.handleNightlyAction(r);
+  if (!await NotificationService.instance.handleAllyAction(r)) {
+    await NotificationService.instance.handleNightlyAction(r);
+  }
 }

@@ -43,8 +43,8 @@ Removed from the UI (code kept, ADR 0012): home, companion, now, projects, learn
 - **Offline:** reads in `OfflineStore.cachedPaths` are cached automatically. Small mutations use
   `queueOffline: true` and must handle `QueuedOfflineException` optimistically (see `TonightCubit.respond`).
 - **Undo:** server responses carry `activityId`; offer Undo via `LifeRepository.undo(activityId)`.
-- **Notifications are opt-in** (ADR 0006). Never schedule anything the user didn't ask for. Id ranges: habits `& 0x3fffffff`,
-  chat reminders `0x40000000 | …` (each upcoming time of a repeat has its own id), nightly `9000`, morning `9001`, prep `9002`, test `9003`.
+- **Notifications:** reminders are what the person asked for; what Ally starts itself is proactive by default with Normal / Quieter / Silent (ADR 0027, replaces the opt-in rule of ADR 0006). Id ranges: habits `& 0x3fffffff`,
+  chat reminders `0x40000000 | …` (each upcoming time of a repeat has its own id), nightly `9000` / morning `9001` (retired, only cleared), prep `9002`, test `9003`, **agenda `9100`–`9119`** (briefing, slot nudges, wrap-up, Sunday review from `GET /now/agenda`, ADR 0027), reminder follow-ups in the reminder range. Refresh the agenda with `AgendaSync.now()` / `.soon()` after anything that changes the day.
   Reminders are exact alarms when allowed and the next 7 times come from the server (ADR 0024); You → Reminders checks permissions.
 - **First use (ADR 0026):** never ask for setup or permissions up front. New guided flows go in `starters.dart` as
   questions with chips that compose one plain chat message; pin each phrasing in the server's `assistant.starters.integration.test.ts`.

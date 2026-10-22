@@ -358,6 +358,7 @@ class _ChatScreenState extends State<ChatScreen> {
                             onUndoAll: () => context.read<ChatCubit>().undoAll(i),
                             onEdit: (ai, current) => _edit(i, ai, current),
                             onPick: (title) => _send('Done: $title'),
+                            onCommand: (text) => _send(text),
                             onSuggest: (t) => context.read<ChatCubit>().acceptSuggestion(i, t),
                             onMove: () => context.read<ChatCubit>().moveToLater(i),
                             onUndoMove: () => context.read<ChatCubit>().undoMove(i)),
@@ -409,6 +410,7 @@ class _Bubble extends StatelessWidget {
   final VoidCallback onUndoAll;
   final void Function(int actionIndex, String current) onEdit;
   final void Function(String title) onPick;
+  final void Function(String text) onCommand;
   final void Function(String title) onSuggest;
   final VoidCallback onMove;
   final VoidCallback onUndoMove;
@@ -417,6 +419,7 @@ class _Bubble extends StatelessWidget {
       required this.onUndoAll,
       required this.onEdit,
       required this.onPick,
+      required this.onCommand,
       required this.onSuggest,
       required this.onMove,
       required this.onUndoMove});
@@ -479,10 +482,12 @@ class _Bubble extends StatelessWidget {
                 onEdit: onEdit,
               ),
             for (var ai = 0; ai < m.actions.length; ai++)
-              if (m.actions[ai].type != 'ASK' && m.actions[ai].type != 'NOW_PICK' && m.actions[ai].type != 'STAND' && m.actions[ai].type != 'WEEK_CARD' && m.actions[ai].type != 'NOTES_USED' && m.actions[ai].type != 'COMFORT_SHOWN' && m.actions[ai].type != 'SEARCH_RESULTS' && m.actions[ai].type != 'GOAL_PLAN' && !(grouped && m.actions[ai].isCreation))
+              if (m.actions[ai].type != 'ASK' && m.actions[ai].type != 'LIST' && m.actions[ai].type != 'NOW_PICK' && m.actions[ai].type != 'STAND' && m.actions[ai].type != 'WEEK_CARD' && m.actions[ai].type != 'NOTES_USED' && m.actions[ai].type != 'COMFORT_SHOWN' && m.actions[ai].type != 'SEARCH_RESULTS' && m.actions[ai].type != 'GOAL_PLAN' && !(grouped && m.actions[ai].isCreation))
                 _Receipt(m.actions[ai], onUndo: () => onUndo(ai)),
             for (final a in m.actions)
               if (a.type == 'GOAL_PLAN' && a.proposal != null) GoalPlanCard(proposal: a.proposal!),
+            for (final a in m.actions)
+              if (a.type == 'LIST' && a.options.isNotEmpty) _ListCard(a, onCommand: onCommand),
             if (ask != null)
               Padding(
                 padding: const EdgeInsets.only(top: 8),
@@ -493,7 +498,8 @@ class _Bubble extends StatelessWidget {
                       backgroundColor: Colors.transparent,
                       side: BorderSide(color: G.line),
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
-                      onPressed: () => onPick(o.title),
+                      // "Remove habit: Gym session" is a command; "Pack gym bag" (which one did you finish?) is an answer.
+                      onPressed: () => o.command ? onCommand(o.title) : onPick(o.title),
                     ),
                 ]),
               ),
@@ -614,6 +620,11 @@ String _repeatLabel(String rule) {
         }
       ),
     'SCHEDULE_SET' => (Icons.schedule_rounded, 'Day updated for ${a.items.join(', ')}'),
+    'PREFERENCE_SET' => (Icons.tune_rounded, a.text),
+    'LOW_ENERGY' => (Icons.bedtime_outlined, a.kind == 'ON' ? 'Low energy today: on' : 'Low energy today: off'),
+    'ITEM_REMOVED' => (Icons.archive_outlined, '${a.text}: ${a.detail ?? 'removed'}'),
+    'ITEM_UPDATED' => (Icons.edit_calendar_outlined, '${a.text}: ${a.detail ?? 'updated'}'),
+    'UNDONE' => (Icons.undo_rounded, 'Undone: ${a.text}'),
     _ => (Icons.bolt_rounded, a.text),
   };
 }
@@ -1092,6 +1103,126 @@ class _NotifyCard extends StatelessWidget {
               child: Text('Allow notifications', style: G.text(14, w: FontWeight.w700, color: G.accent)),
             ),
           ]),
+        ]),
+      );
+}
+
+/// "Show my habits": every row opens a small menu of what can be done to it. Each choice sends an
+/// ordinary chat command, so it goes through the same code (and Undo) as typing it.
+class _ListCard extends StatelessWidget {
+  final ChatAction a;
+  final void Function(String text) onCommand;
+  const _ListCard(this.a, {required this.onCommand});
+
+  static String _word(String kind) => switch (kind) {
+        'HABIT' => 'habit',
+        'REMINDER' => 'reminder',
+        'PROJECT' => 'goal',
+        'NOTE' => 'note',
+        'AREA' => 'area',
+        _ => 'to-do',
+      };
+
+  // Quotes keep words like "from" and "to" inside a title from reading as part of the sentence.
+  static String _q(String t) => '"${t.replaceAll('"', "'")}"';
+
+  List<(String, String?)> _actions(AskOption o) {
+    final kind = o.kind ?? a.kind ?? 'TASK';
+    final w = _word(kind);
+    final t = _q(o.title);
+    if (a.kind == 'REMOVED') return [('Bring it back', 'Bring back $w: $t')];
+    return switch (kind) {
+      'HABIT' => [('Pause', 'Pause $w: $t'), ('Rename', null), ('Remove', 'Remove $w: $t')],
+      'PROJECT' => [
+          if (o.detail.contains('paused')) ('Resume', 'Bring back $w: $t') else ('Pause', 'Pause $w: $t'),
+          ('Rename', null),
+          ('Let go', 'Remove $w: $t'),
+        ],
+      'AREA' => [
+          ('Make it my main area', 'Make $t my main area'),
+          ('Make it secondary', 'Make $t secondary'),
+          ('Maintain only', 'Make $t maintain'),
+          ('Put it later', 'Make $t later'),
+          ('Rename', null),
+        ],
+      'NOTE' => [('Rename', null), ('Remove', 'Remove $w: $t')],
+      _ => [('Move to tomorrow', 'Set $w: $t to tomorrow'), ('Rename', null), ('Remove', 'Remove $w: $t')],
+    };
+  }
+
+  Future<void> _rename(BuildContext context, AskOption o) async {
+    final kind = o.kind ?? a.kind ?? 'TASK';
+    final c = TextEditingController(text: o.title);
+    final name = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: G.card,
+        title: Text('Rename', style: G.voice(18)),
+        content: TextField(controller: c, autofocus: true, textCapitalization: TextCapitalization.sentences, style: G.text(16)),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: Text('Cancel', style: G.text(15, color: G.muted))),
+          TextButton(onPressed: () => Navigator.pop(ctx, c.text.trim()), child: Text('Rename', style: G.text(15, w: FontWeight.w700))),
+        ],
+      ),
+    );
+    if (name != null && name.isNotEmpty && name != o.title) onCommand('Rename ${_word(kind)}: ${_q(o.title)} to $name');
+  }
+
+  void _open(BuildContext context, AskOption o) {
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: G.bg,
+      builder: (ctx) => SafeArea(
+        child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 18, 20, 8),
+            child: Text(o.title, style: G.voice(18), maxLines: 2, overflow: TextOverflow.ellipsis),
+          ),
+          for (final (label, command) in _actions(o))
+            ListTile(
+              title: Text(label, style: G.text(16)),
+              onTap: () {
+                Navigator.pop(ctx);
+                if (command == null) {
+                  _rename(context, o);
+                } else {
+                  onCommand(command);
+                }
+              },
+            ),
+          const SizedBox(height: 8),
+        ]),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) => Container(
+        width: double.infinity,
+        margin: const EdgeInsets.only(top: 8),
+        decoration: BoxDecoration(border: Border.all(color: G.lineSoft, width: 0.5), borderRadius: BorderRadius.circular(4)),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(12, 10, 12, 4),
+            child: Text(a.text, style: G.label(size: 11, color: G.faint)),
+          ),
+          for (final o in a.options)
+            InkWell(
+              onTap: () => _open(context, o),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                decoration: BoxDecoration(border: Border(top: BorderSide(color: G.lineSoft, width: 0.5))),
+                child: Row(children: [
+                  Expanded(
+                    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                      Text(o.title, style: G.text(15, w: FontWeight.w600)),
+                      if (o.detail.isNotEmpty) Text(o.detail, style: G.text(13, color: G.muted, height: 1.3)),
+                    ]),
+                  ),
+                  Icon(Icons.more_horiz, size: 18, color: G.faint),
+                ]),
+              ),
+            ),
         ]),
       );
 }

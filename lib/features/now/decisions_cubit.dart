@@ -2,8 +2,6 @@ import 'package:equatable/equatable.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../core/api/api_exception.dart';
-import '../../core/di/service_locator.dart';
-import '../../core/widget/widget_sync_service.dart';
 import '../../data/models/decision.dart';
 import '../../data/repositories/life_repository.dart';
 import '../shell/life_cubit.dart' show LoadStatus;
@@ -47,7 +45,6 @@ class DecisionsCubit extends Cubit<DecisionsState> {
       final r = await _repo.decisionsNow();
       emit(state.copyWith(status: LoadStatus.ready, result: r));
       // Best-effort: keep the home-screen widget's "next up" row in sync.
-      getIt<WidgetSyncService>().pushNextAction(r.primaryAction, r.suggestions);
     } on ApiException catch (e) {
       emit(state.copyWith(status: LoadStatus.error, error: e.message));
     }

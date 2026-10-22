@@ -911,6 +911,18 @@ class LifeRepository {
   Future<SaveProposal> setSavePurpose(String id, String purpose) async =>
       SaveProposal.fromJson(await _api.post('/guide/saves/$id/purpose', body: {'purpose': purpose}) as Json);
 
+  /// Common moods, and the ones this person made up for earlier saves (most used first).
+  Future<({List<String> suggested, List<String> mine})> saveMoods() async {
+    final m = (await _api.get('/guide/saves/moods')) as Map;
+    List<String> strings(Object? v) => [for (final x in (v as List? ?? const [])) x.toString()];
+    return (suggested: strings(m['suggested']), mine: strings(m['mine']));
+  }
+
+  /// Keep this save for when the person feels [moods] (their own words are fine).
+  /// A learning save becomes a hard-days save.
+  Future<SaveProposal> setSaveMoods(String id, List<String> moods) async =>
+      SaveProposal.fromJson(await _api.post('/guide/saves/$id/moods', body: {'moods': moods}) as Json);
+
   /// [choice] is ACTION | SHELF | DROP. For ACTION pass [actions] (one to three
   /// steps, each `as` TODO or HABIT) or a single [action]. Returns true when an
   /// action became tonight's one thing.
@@ -947,7 +959,7 @@ class LifeRepository {
       'message': message,
       'history': [
         for (final m in history.length > 10 ? history.sublist(history.length - 10) : history)
-          {'role': m.fromUser ? 'user' : 'assistant', 'text': m.text},
+          {'role': m.fromUser ? 'user' : 'assistant', 'text': m.text, if (m.refs.isNotEmpty) 'refs': m.refs.take(12).toList()},
       ],
     });
     return ChatReply.fromJson(data as Json);
@@ -986,6 +998,23 @@ class LifeRepository {
   /// One of the advice buttons on Now (SMALLER / TOMORROW / WEEKEND / LET_GO).
   Future<Json> nowAdvice(String sourceType, String sourceId, String choice) async =>
       (await _api.post('/now/advice', body: {'sourceType': sourceType, 'sourceId': sourceId, 'choice': choice})) as Json;
+
+  // ---- What Ally says on its own (ADR 0027) ----
+
+  /// Today's and tomorrow's briefing, slot nudges, wrap-up and Sunday review.
+  Future<Json> agenda() async => (await _api.get('/now/agenda')) as Json;
+
+  /// NORMAL | QUIETER | SILENT (new accounts: NORMAL).
+  Future<String> proactivity() async => asString(((await _api.get('/settings')) as Json)['proactivity'], 'NORMAL');
+
+  /// NORMAL | QUIETER | SILENT.
+  Future<void> setProactivity(String level) => _api.put('/now/proactivity', body: {'level': level});
+
+  /// The wrap-up's "Move to tomorrow". Returns {moved, activityId, message}.
+  Future<Json> wrapUpMove() async => (await _api.post('/now/wrapup/move')) as Json;
+
+  /// A reminder's follow-up "Tomorrow": the same time, one day later.
+  Future<void> moveReminder(String id, DateTime remindAt) => _api.patch('/tasks/$id', body: {'remindAt': remindAt.toUtc().toIso8601String()});
 
   // ---- Goal plans ----
 
@@ -1186,6 +1215,20 @@ class LifeRepository {
     });
     return UserSettings.fromJson(data as Json);
   }
+
+  // ---- How Ally works for this person (ADR 0028) ----
+  /// What Ally leads with and how direct it is; the server's defaults are ALL and BALANCED.
+  Future<({String focus, String directness})> allyPreferences() async {
+    final data = await _api.get('/settings');
+    final m = data is Map ? data : const {};
+    return (focus: (m['focus'] as String?) ?? 'ALL', directness: (m['directness'] as String?) ?? 'BALANCED');
+  }
+
+  Future<void> saveAllyPreferences({String? focus, String? directness}) =>
+      _api.patch('/settings', body: {
+        if (focus != null) 'focus': focus,
+        if (directness != null) 'directness': directness,
+      });
 
   // ---- Focus sessions ----
   /// [label] is a display-only title (e.g. the task's title) persisted

@@ -45,6 +45,10 @@ import org.json.JSONObject
 /** Key the app writes the whole snapshot under (see `WidgetSyncService`). */
 private const val SNAPSHOT_KEY = "lifeos_widget_snapshot"
 private val HABIT_ID_KEY = ActionParameters.Key<String>("habitId")
+private val NOW_TYPE_KEY = ActionParameters.Key<String>("nowType")
+private val NOW_ID_KEY = ActionParameters.Key<String>("nowId")
+private val NOW_MIN_KEY = ActionParameters.Key<String>("nowMinutes")
+private val NOW_COUNT_KEY = ActionParameters.Key<String>("nowCount")
 
 /** Reads the app's live theme (AppColors) out of the snapshot instead of a
  * hardcoded guess, so the widget re-skins itself with whatever accent/mode
@@ -96,6 +100,7 @@ class LifeOSWidget : GlanceAppWidget() {
                     }
                     MicButton(context, theme)
                 }
+                NowDoneButton(snapshot, theme)
                 if (!compact) {
                     Spacer(modifier = GlanceModifier.height(10.dp))
                     HabitsList(snapshot, theme)
@@ -107,7 +112,7 @@ class LifeOSWidget : GlanceAppWidget() {
     @Composable
     private fun HeaderRow(snapshot: JSONObject?, theme: WidgetTheme) {
         val focusActive = snapshot?.optBoolean("focusActive", false) ?: false
-        val eyebrow = if (focusActive) "FOCUSING" else "UP NEXT"
+        val eyebrow = if (focusActive) "Focusing" else "Now"
         val label = when {
             focusActive -> {
                 val name = snapshot?.optString("focusLabel", "")
@@ -115,7 +120,7 @@ class LifeOSWidget : GlanceAppWidget() {
             }
             else -> {
                 val next = snapshot?.optString("nextActionTitle", "")
-                if (!next.isNullOrEmpty()) next else "Nothing queued"
+                if (!next.isNullOrEmpty()) next else "Open Ally to plan your day"
             }
         }
         Column {
@@ -189,6 +194,32 @@ class LifeOSWidget : GlanceAppWidget() {
                     style = TextStyle(color = solid(theme.fgMuted), fontSize = 12.sp),
                 )
             }
+        }
+    }
+
+    /** Done on Now's pick (ADR 0027): logged in the background like Done in
+     * the app, without opening it. Only when there is a pick to answer. */
+    @Composable
+    private fun NowDoneButton(snapshot: JSONObject?, theme: WidgetTheme) {
+        val type = snapshot?.optString("nextActionType", "") ?: ""
+        val id = snapshot?.optString("nextActionRefId", "") ?: ""
+        val focusActive = snapshot?.optBoolean("focusActive", false) ?: false
+        if (focusActive || id.isEmpty() || id == "null" || type !in setOf("TASK", "HABIT", "PROJECT")) return
+        val minutes = if (snapshot?.isNull("nextMinutes") != false) "" else snapshot.optInt("nextMinutes").toString()
+        val count = if (snapshot?.isNull("nextCount") != false) "" else snapshot.optInt("nextCount").toString()
+        Spacer(modifier = GlanceModifier.height(8.dp))
+        Box(
+            modifier = GlanceModifier
+                .background(day = theme.accent, night = theme.accent)
+                .cornerRadius(14.dp)
+                .padding(horizontal = 14.dp, vertical = 6.dp)
+                .clickable(
+                    actionRunCallback<NowDoneAction>(
+                        actionParametersOf(NOW_TYPE_KEY to type, NOW_ID_KEY to id, NOW_MIN_KEY to minutes, NOW_COUNT_KEY to count),
+                    ),
+                ),
+        ) {
+            Text("Done", style = TextStyle(color = solid(theme.accentInk), fontSize = 13.sp, fontWeight = FontWeight.Medium))
         }
     }
 
@@ -274,6 +305,23 @@ class ToggleHabitAction : ActionCallback {
     ) {
         val habitId = parameters[HABIT_ID_KEY] ?: return
         val uri = Uri.parse("lifeos-widget://toggle-habit?id=$habitId")
+        HomeWidgetBackgroundIntent.getBroadcast(context, uri).send()
+    }
+}
+
+/** Done on the widget's Now pick: a background broadcast to the headless
+ * Dart isolate (`widgetBackgroundCallback`, host `now-done`). */
+class NowDoneAction : ActionCallback {
+    override suspend fun onAction(
+        context: Context,
+        glanceId: GlanceId,
+        parameters: ActionParameters,
+    ) {
+        val id = parameters[NOW_ID_KEY] ?: return
+        val type = parameters[NOW_TYPE_KEY] ?: "TASK"
+        val m = parameters[NOW_MIN_KEY] ?: ""
+        val c = parameters[NOW_COUNT_KEY] ?: ""
+        val uri = Uri.parse("lifeos-widget://now-done?type=$type&id=$id&m=$m&c=$c")
         HomeWidgetBackgroundIntent.getBroadcast(context, uri).send()
     }
 }

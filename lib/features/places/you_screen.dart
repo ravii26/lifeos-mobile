@@ -3,14 +3,15 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../core/api/api_exception.dart';
 import '../../core/di/service_locator.dart';
+import '../../core/notifications/agenda_sync.dart';
 import '../../data/models/user.dart';
 import '../../data/repositories/life_repository.dart';
 import '../areas/areas_screen.dart';
 import '../auth/bloc/auth_bloc.dart';
 import '../chat/memories_screen.dart';
 import '../chat/starters.dart';
-import '../guide/guide_setup_sheet.dart';
 import '../guide/guide_style.dart';
+import '../more/how_ally_works_screen.dart';
 import '../more/reminders_check_screen.dart';
 import '../more/settings_screen.dart';
 import '../more/your_day_screen.dart';
@@ -33,6 +34,7 @@ class _YouScreenState extends State<YouScreen> {
   List<Map<String, dynamic>> _projects = const [];
   String _mode = 'NORMAL';
   int? _kept;
+  String _level = 'NORMAL';
   bool _loading = false;
   String? _error;
 
@@ -55,12 +57,14 @@ class _YouScreenState extends State<YouScreen> {
         _repo.progress(),
         _repo.mode(),
         _repo.keptThisWeek(),
+        _repo.proactivity(),
       ]);
       if (!mounted) return;
       setState(() {
         _projects = results[0] as List<Map<String, dynamic>>;
         _mode = results[1] as String;
         _kept = results[2] as int;
+        _level = results[3] as String;
         _error = null;
       });
     } on ApiException catch (e) {
@@ -97,6 +101,48 @@ class _YouScreenState extends State<YouScreen> {
               ),
       ),
     )).then((_) => _load());
+  }
+
+  static String _levelLine(String level) => switch (level) {
+        'QUIETER' => 'Quieter: morning briefing, evening wrap-up and Sunday review',
+        'SILENT' => 'Silent: only the reminders you set',
+        _ => 'Normal: briefing, nudges for what you planned, follow-ups, wrap-up',
+      };
+
+  // Normal / Quieter / Silent (ADR 0027). Applies right away to what's scheduled.
+  Future<void> _chooseLevel() async {
+    final picked = await showModalBottomSheet<String>(
+      context: context,
+      backgroundColor: G.bg,
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 18, 20, 12),
+          child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text('How much should Ally speak on its own?', style: G.text(16, w: FontWeight.w600)),
+            const SizedBox(height: 4),
+            Text('Never during your night (from your sleep time to your wake time). Reminders you set always come.',
+                style: G.text(13, color: G.muted, height: 1.4)),
+            const SizedBox(height: 10),
+            for (final l in const ['NORMAL', 'QUIETER', 'SILENT'])
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: Icon(_level == l ? Icons.radio_button_checked : Icons.radio_button_off, color: G.accent),
+                title: Text(_levelLine(l).split(':').first, style: G.text(15, w: FontWeight.w600)),
+                subtitle: Text(_levelLine(l).split(': ').last, style: G.text(13, color: G.muted)),
+                onTap: () => Navigator.pop(ctx, l),
+              ),
+          ]),
+        ),
+      ),
+    );
+    if (picked == null || picked == _level) return;
+    setState(() => _level = picked);
+    try {
+      await _repo.setProactivity(picked);
+      await AgendaSync.now();
+    } on ApiException catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+    }
   }
 
   // The weekly card is only ever shown when asked for.
@@ -310,6 +356,12 @@ class _YouScreenState extends State<YouScreen> {
                 onTap: () => _push(const YourDayScreen()),
               ),
               _NavActionRow(
+                icon: Icons.tune_rounded,
+                title: 'How Ally works for you',
+                sub: 'What it helps with most, and how direct it is',
+                onTap: () => _push(const HowAllyWorksScreen()),
+              ),
+              _NavActionRow(
                 icon: Icons.psychology_outlined,
                 title: 'What Ally remembers',
                 sub: 'See, change or delete what you told Ally',
@@ -323,9 +375,9 @@ class _YouScreenState extends State<YouScreen> {
               ),
               _NavActionRow(
                 icon: Icons.notifications_none_rounded,
-                title: 'Check-ins',
-                sub: 'A short message from Ally at night or in the morning, if you want one',
-                onTap: () => openGuideSetup(context),
+                title: 'How much Ally speaks',
+                sub: _levelLine(_level),
+                onTap: _chooseLevel,
               ),
               _NavActionRow(
                 icon: Icons.settings_outlined,

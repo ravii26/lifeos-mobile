@@ -5,9 +5,11 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../core/api/api_exception.dart';
+import '../../core/notifications/agenda_sync.dart';
 import '../../core/notifications/notification_service.dart';
 import '../../data/models/chat.dart';
 import '../../data/repositories/life_repository.dart';
+import '../places/now_cubit.dart' show lowEnergyRequest;
 
 class ChatState extends Equatable {
   final List<ChatMessage> messages;
@@ -56,6 +58,7 @@ class ChatCubit extends Cubit<ChatState> {
     _restore();
     _syncReminders();
     _applyMode();
+    AgendaSync.now();
   }
 
   Future<void> _restore() async {
@@ -109,6 +112,24 @@ class ChatCubit extends Cubit<ChatState> {
       for (final a in reply.actions) {
         if (a.type == 'REMINDER_SET' && a.id != null && a.remindAt != null) {
           await NotificationService.instance.scheduleReminder(a.id!, a.text, a.remindAt!, windowEnd: a.windowEnd);
+        } else if (a.type == 'ITEM_UPDATED' && a.kind == 'TASK' && a.id != null && a.remindAt != null) {
+          // "Move it to Friday", "change it to 7 pm": the notification moves too.
+          await NotificationService.instance.cancelReminder(a.id!);
+          await NotificationService.instance.scheduleReminder(a.id!, a.text, a.remindAt!, windowEnd: a.windowEnd);
+        } else if (a.type == 'ITEM_UPDATED' && a.kind == 'HABIT') {
+          await NotificationService.instance.syncHabitReminders(await _repo.habits());
+        } else if (a.type == 'UNDONE' && a.kind == 'TASK' && a.id != null) {
+          await _syncReminders();
+        } else if (a.type == 'LOW_ENERGY') {
+          lowEnergyRequest.value = a.kind == 'ON';
+        } else if (a.type == 'PREFERENCE_SET') {
+          // "Be quieter" / "go silent": the briefing, nudges and wrap-up are rescheduled to match.
+          AgendaSync.now();
+        } else if (a.type == 'ITEM_REMOVED' && a.kind == 'TASK' && a.id != null) {
+          // "Delete my passport reminder": the alarm goes with it.
+          await NotificationService.instance.cancelReminder(a.id!);
+        } else if (a.type == 'ITEM_REMOVED' && a.kind == 'HABIT' || a.type == 'UNDONE' && a.kind == 'HABIT') {
+          await NotificationService.instance.syncHabitReminders(await _repo.habits());
         } else if (a.type == 'MODE_SET') {
           await _applyMode();
         } else if (a.type == 'NUDGE_SET') {
@@ -121,6 +142,8 @@ class ChatCubit extends Cubit<ChatState> {
       final needsAlerts = reply.actions.any((a) =>
           !a.undone && (a.type == 'REMINDER_SET' || (a.type == 'NUDGE_SET' && a.time != null)));
       final ask = needsAlerts && !_notifyAnswered && await _alertsBlocked();
+      // Anything changed: the day's briefing, nudges and wrap-up follow.
+      if (reply.actions.isNotEmpty) AgendaSync.soon();
       final save = reply.actions.where((a) => a.type == 'OPEN_SAVE').firstOrNull;
       final list = [
         ...withUser,
@@ -199,6 +222,12 @@ class ChatCubit extends Cubit<ChatState> {
         await NotificationService.instance.cancelReminder(a.id!);
       }
       if (a.type == 'MODE_SET') await _applyMode();
+      // Undoing a removal or a rename puts the alarms back the way they were.
+      if (a.type == 'PREFERENCE_SET') AgendaSync.now();
+      if (a.type == 'ITEM_REMOVED' || a.type == 'ITEM_UPDATED') {
+        if (a.kind == 'TASK') await _syncReminders();
+        if (a.kind == 'HABIT') await NotificationService.instance.syncHabitReminders(await _repo.habits());
+      }
       final actions = [...m.actions]..[actionIndex] = a.markUndone();
       final msgs = [...state.messages]..[messageIndex] = m.copyWith(actions: actions);
       emit(state.copyWith(messages: msgs));

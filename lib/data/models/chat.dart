@@ -6,7 +6,10 @@ class AskOption {
   final String title;
   final int minutes; // NOW_PICK: how long it takes now
   final bool smaller;
-  const AskOption(this.id, this.title, [this.minutes = 0, this.smaller = false]);
+  final String detail; // LIST: the second line of a row ("every day · at 7 am")
+  final String? kind; // LIST: what this row is, when the list mixes kinds (removed things)
+  final bool command; // ASK: the title is a command to send as written (not a "Done: …" answer)
+  const AskOption(this.id, this.title, [this.minutes = 0, this.smaller = false, this.detail = '', this.kind, this.command = false]);
 }
 
 /// More planned for today than there is free time: what could move to later.
@@ -60,6 +63,7 @@ class ChatAction {
   final String? detail; // HABIT_ADDED: time block; PROJECT_ADDED: deadline
   final List<AskOption> options; // ASK
   final Json? proposal; // GOAL_PLAN: the plan to keep, change or park
+  final String? goalText; // GOAL_PLAN: what was asked, so "make DSA 4 h" can re-plan it
 
   const ChatAction(
       {required this.type,
@@ -76,7 +80,8 @@ class ChatAction {
       this.tasks = 0,
       this.detail,
       this.options = const [],
-      this.proposal});
+      this.proposal,
+      this.goalText});
 
   ChatAction copyWith({String? text, bool? undone}) => ChatAction(
       type: type,
@@ -93,7 +98,8 @@ class ChatAction {
       tasks: tasks,
       detail: detail,
       options: options,
-      proposal: proposal);
+      proposal: proposal,
+      goalText: goalText);
 
   ChatAction markUndone() => copyWith(undone: true);
 
@@ -117,19 +123,43 @@ class ChatAction {
         remindAt: asDate(j['remindAt'])?.toLocal(),
         windowEnd: asDate(j['windowEnd'])?.toLocal(),
         repeatRule: asStringOrNull(j['repeatRule']),
-        kind: asStringOrNull(j['kind'] ?? j['mode'] ?? j['status']),
-        time: asStringOrNull(j['time']),
+        kind: asStringOrNull(j['kind'] ?? j['mode'] ?? j['status'] ?? j['itemType']),
+        time: asStringOrNull(j['time'] ?? j['reminderTime']),
         activityId: asStringOrNull(j['activityId']),
         undone: asBool(j['undone']),
         items: ((j['items'] ?? j['days']) as List? ?? const []).map((e) => e.toString()).toList(),
         tasks: (j['tasks'] as num?)?.toInt() ?? 0,
-        detail: asStringOrNull(j['deadline'] ?? j['timeBlock'] ?? j['until'] ?? j['what']),
+        detail: asStringOrNull(j['deadline'] ?? j['timeBlock'] ?? j['until'] ?? j['what'] ?? j['detail']),
         options: ((j['options'] as List?) ?? const [])
             .whereType<Json>()
-            .map((o) => AskOption(asString(o['id']), asString(o['title']), (o['minutes'] as num?)?.toInt() ?? 0, asBool(o['smaller'])))
+            .map((o) => AskOption(asString(o['id']), asString(o['title']), (o['minutes'] as num?)?.toInt() ?? 0, asBool(o['smaller']), asString(o['detail']), asStringOrNull(o['kind']), asBool(o['command'])))
             .toList(),
         proposal: j['proposal'] is Json ? j['proposal'] as Json : null,
+        goalText: asStringOrNull(j['goalText']),
       );
+
+  /// What "it" can mean in the next message: the thing this action made or
+  /// touched, sent with the chat history (ADR 0027). Null for anything else.
+  Json? get ref {
+    if (undone) return null;
+    final refType = switch (type) {
+      'TASK_ADDED' || 'REMINDER_SET' || 'TASK_COMPLETED' => 'TASK',
+      'HABIT_ADDED' || 'HABIT_LOGGED' => 'HABIT',
+      'PROJECT_ADDED' || 'PROGRESS_LOGGED' => 'PROJECT',
+      'NOTE_ADDED' || 'NOTE_UPDATED' => 'NOTE',
+      'ITEM_UPDATED' => kind,
+      'GOAL_PLAN' => 'GOAL_PLAN',
+      _ => null,
+    };
+    if (refType == null) return null;
+    return {
+      'type': refType,
+      if (id != null) 'id': id,
+      if (text.isNotEmpty) 'title': text.length > 300 ? text.substring(0, 300) : text,
+      if (activityId != null) 'activityId': activityId,
+      if (goalText != null) 'goalText': goalText,
+    };
+  }
 
   Json toJson() => {
         'type': type,
@@ -143,11 +173,23 @@ class ChatAction {
         if (activityId != null) 'activityId': activityId,
         if (undone) 'undone': true,
         if (proposal != null) 'proposal': proposal,
+        if (goalText != null) 'goalText': goalText,
         if (items.isNotEmpty) 'items': items,
         if (tasks > 0) 'tasks': tasks,
         if (detail != null) 'deadline': detail,
         if (options.isNotEmpty)
-          'options': [for (final o in options) {'id': o.id, 'title': o.title, 'minutes': o.minutes, 'smaller': o.smaller}],
+          'options': [
+            for (final o in options)
+              {
+                'id': o.id,
+                'title': o.title,
+                'minutes': o.minutes,
+                'smaller': o.smaller,
+                if (o.detail.isNotEmpty) 'detail': o.detail,
+                if (o.kind != null) 'kind': o.kind,
+                if (o.command) 'command': true,
+              }
+          ],
       };
 }
 
@@ -173,6 +215,9 @@ class ChatMessage {
       role: role,
       suggestions: suggestions ?? this.suggestions,
       capacity: capacity ?? this.capacity);
+
+  /// What this reply made or touched, newest last (for "move it", "undo that").
+  List<Json> get refs => fromUser ? const [] : [for (final a in actions) ?a.ref];
 
   Json toJson() => {
         'u': fromUser,

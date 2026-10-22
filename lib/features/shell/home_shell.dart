@@ -5,6 +5,8 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../core/di/service_locator.dart';
 import '../../core/intents/capture_intent_bus.dart';
+import '../../core/notifications/agenda_sync.dart';
+import '../../core/notifications/notification_service.dart';
 import '../../data/models/user.dart';
 import '../../data/repositories/life_repository.dart';
 import '../capture/capture_sheet.dart';
@@ -39,6 +41,7 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
   // event handlers can still open the Capture sheet with the Cubit in scope.
   BuildContext? _cubitContext;
   StreamSubscription<PendingCaptureIntent>? _captureIntentSub;
+  StreamSubscription<String>? _openedSub;
 
   @override
   void initState() {
@@ -50,6 +53,13 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
     getIt<LifeRepository>().recordBehavior('APP_OPEN').ignore();
 
     starterRequest.addListener(_toNow);
+    // What Ally says on its own follows every change (debounced), and a tapped
+    // notification opens the right place (ADR 0027).
+    placesRefresh.addListener(AgendaSync.soon);
+    _openedSub = NotificationService.instance.opened.listen(_onNotificationOpened);
+    NotificationService.instance.launchKind().then((k) {
+      if (k != null) WidgetsBinding.instance.addPostFrameCallback((_) => _onNotificationOpened(k));
+    }).ignore();
 
     final bus = getIt<CaptureIntentBus>();
     _captureIntentSub = bus.stream.listen(_handleCaptureIntent);
@@ -61,6 +71,16 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
     }
   }
 
+  /// The Sunday review opens the week in chat; anything else opens Now.
+  void _onNotificationOpened(String kind) {
+    if (!mounted) return;
+    setState(() => _index = 0);
+    final ctx = _cubitContext;
+    if (kind == 'WEEKLY_REVIEW' && ctx != null && ctx.mounted) {
+      ctx.read<ChatCubit>().send('How was my week?').ignore();
+    }
+  }
+
   void _toNow() {
     if (starterRequest.value != null && _index != 0) setState(() => _index = 0);
   }
@@ -68,6 +88,8 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
   @override
   void dispose() {
     starterRequest.removeListener(_toNow);
+    placesRefresh.removeListener(AgendaSync.soon);
+    _openedSub?.cancel();
     WidgetsBinding.instance.removeObserver(this);
     _captureIntentSub?.cancel();
     super.dispose();
@@ -86,6 +108,7 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
       context.read<ChatCubit>().retryPending();
       placesRefresh.value++;
     }).ignore();
+    AgendaSync.now();
   }
 
   void _handleCaptureIntent(PendingCaptureIntent intent) {

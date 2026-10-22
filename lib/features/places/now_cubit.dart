@@ -4,12 +4,16 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../core/api/api_client.dart' show QueuedOfflineException;
 import '../../core/api/api_exception.dart';
+import '../../core/widget/widget_sync_service.dart';
 import '../../data/models/json.dart';
 import '../../data/repositories/life_repository.dart';
 
 /// Bumped whenever something is done, skipped or changed, so Plan and You
 /// reload the next time they are looked at.
 final ValueNotifier<int> placesRefresh = ValueNotifier<int>(0);
+
+/// Chat says "low energy today" (true) or "back to full energy" (false); the Now card follows.
+final ValueNotifier<bool?> lowEnergyRequest = ValueNotifier<bool?>(null);
 
 /// One thing the right-now engine suggests, sized for the time there is.
 class NowOption extends Equatable {
@@ -138,7 +142,23 @@ class NowState extends Equatable {
 /// server cannot be reached.
 class NowCubit extends Cubit<NowState> {
   final LifeRepository _repo;
-  NowCubit(this._repo) : super(const NowState());
+  NowCubit(this._repo) : super(const NowState()) {
+    lowEnergyRequest.addListener(_onLowEnergyRequest);
+  }
+
+  void _onLowEnergyRequest() {
+    final on = lowEnergyRequest.value;
+    if (on == null) return;
+    lowEnergyRequest.value = null;
+    _lowEnergyDay = on ? DateTime.now() : null;
+    load();
+  }
+
+  @override
+  Future<void> close() {
+    lowEnergyRequest.removeListener(_onLowEnergyRequest);
+    return super.close();
+  }
 
   // "Low energy" holds for the rest of the day it was said on.
   DateTime? _lowEnergyDay;
@@ -152,6 +172,8 @@ class NowCubit extends Cubit<NowState> {
     if (state.options.isEmpty) emit(state.copyWith(status: NowStatus.loading));
     try {
       final data = await _repo.now(smallest: smallest || _lowToday, minutes: minutes);
+      // The home-screen widget shows the same pick (best effort, never blocks Now).
+      WidgetSyncService.instance?.pushNow(data).catchError((_) {});
       emit(NowState(
         status: NowStatus.ready,
         kind: asString(data['kind'], 'PICK'),

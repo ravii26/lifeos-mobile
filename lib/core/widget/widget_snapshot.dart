@@ -12,6 +12,9 @@ class WidgetSnapshot {
   final String? nextActionType; // TASK | HABIT | GOAL | AREA_FOCUS | REVIEW
   final String? nextActionRefId;
   final String? nextActionTitle;
+  // Now's pick (ADR 0027): what Done on the widget logs.
+  final int? nextMinutes;
+  final int? nextCount;
   final List<WidgetHabit> habits;
 
   /// Ranked suggestions after the primary action (What Now's suggestions[1:])
@@ -38,6 +41,8 @@ class WidgetSnapshot {
     this.nextActionType,
     this.nextActionRefId,
     this.nextActionTitle,
+    this.nextMinutes,
+    this.nextCount,
     this.habits = const [],
     this.upNext = const [],
     this.bgColor = 0xFF0A0B0D,
@@ -58,6 +63,8 @@ class WidgetSnapshot {
     Object? nextActionType = _unset,
     Object? nextActionRefId = _unset,
     Object? nextActionTitle = _unset,
+    Object? nextMinutes = _unset,
+    Object? nextCount = _unset,
     List<WidgetHabit>? habits,
     List<WidgetSuggestion>? upNext,
     int? bgColor,
@@ -83,6 +90,8 @@ class WidgetSnapshot {
         nextActionTitle: identical(nextActionTitle, _unset)
             ? this.nextActionTitle
             : nextActionTitle as String?,
+        nextMinutes: identical(nextMinutes, _unset) ? this.nextMinutes : nextMinutes as int?,
+        nextCount: identical(nextCount, _unset) ? this.nextCount : nextCount as int?,
         habits: habits ?? this.habits,
         upNext: upNext ?? this.upNext,
         bgColor: bgColor ?? this.bgColor,
@@ -100,6 +109,8 @@ class WidgetSnapshot {
         'nextActionType': nextActionType,
         'nextActionRefId': nextActionRefId,
         'nextActionTitle': nextActionTitle,
+        'nextMinutes': nextMinutes,
+        'nextCount': nextCount,
         'habits': habits.map((h) => h.toJson()).toList(),
         'upNext': upNext.map((s) => s.toJson()).toList(),
         'bgColor': bgColor,
@@ -119,6 +130,8 @@ class WidgetSnapshot {
         nextActionType: j['nextActionType'] as String?,
         nextActionRefId: j['nextActionRefId'] as String?,
         nextActionTitle: j['nextActionTitle'] as String?,
+        nextMinutes: (j['nextMinutes'] as num?)?.toInt(),
+        nextCount: (j['nextCount'] as num?)?.toInt(),
         habits: (j['habits'] as List? ?? const [])
             .map((e) => WidgetHabit.fromJson(e as Map<String, dynamic>))
             .toList(),
