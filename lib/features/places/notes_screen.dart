@@ -13,6 +13,7 @@ import '../more/taught_notes_screen.dart';
 import '../more/your_day_screen.dart';
 import '../shell/life_cubit.dart';
 import '../vault/vault_screen.dart';
+import 'note_cards.dart';
 import 'now_cubit.dart';
 
 /// Notes screen: what you taught Ally, what you saved, and what Ally knows about you.
@@ -76,7 +77,8 @@ class _NotesScreenState extends State<NotesScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final waiting = _saves.where((s) => s['shelved'] != true).toList();
+    final waiting = _saves.where((s) => s['shelved'] != true && s['later'] != true).toList();
+    final queue = _saves.where((s) => s['later'] == true).toList();
     final shelf = _saves.where((s) => s['shelved'] == true).length;
     final filteredNotes = _search.isEmpty
         ? _notes
@@ -161,7 +163,7 @@ class _NotesScreenState extends State<NotesScreen> {
                   ),
                   const SizedBox(width: 8),
                   _TabPill(
-                    label: 'Saved (${waiting.length})',
+                    label: 'Saved (${waiting.length + queue.length})',
                     active: _tab == 1,
                     onTap: () => setState(() => _tab = 1),
                   ),
@@ -206,6 +208,9 @@ class _NotesScreenState extends State<NotesScreen> {
                     ),
                   ),
                 for (final n in filteredNotes)
+                  if (isSpecialNote(n))
+                    SpecialNoteCard(n, onChanged: _load)
+                  else
                   InkWell(
                     onTap: () => _push(const TaughtNotesScreen()),
                     child: Container(
@@ -266,6 +271,10 @@ class _NotesScreenState extends State<NotesScreen> {
 
               // TAB 1: Saves & Reels
               if (_tab == 1 && !nothing) ...[
+                WatchLaterSection(items: queue, onChanged: () {
+                  placesRefresh.value++;
+                  _load();
+                }),
                 Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
                   Text('Saved videos and links', style: G.text(16, w: FontWeight.w600)),
                 ]),

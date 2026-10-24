@@ -64,6 +64,7 @@ class ChatAction {
   final List<AskOption> options; // ASK
   final Json? proposal; // GOAL_PLAN: the plan to keep, change or park
   final String? goalText; // GOAL_PLAN: what was asked, so "make DSA 4 h" can re-plan it
+  final String? url; // CONTACT: tel: or WhatsApp link the phone opens
 
   const ChatAction(
       {required this.type,
@@ -81,7 +82,8 @@ class ChatAction {
       this.detail,
       this.options = const [],
       this.proposal,
-      this.goalText});
+      this.goalText,
+      this.url});
 
   ChatAction copyWith({String? text, bool? undone}) => ChatAction(
       type: type,
@@ -99,7 +101,8 @@ class ChatAction {
       detail: detail,
       options: options,
       proposal: proposal,
-      goalText: goalText);
+      goalText: goalText,
+      url: url);
 
   ChatAction markUndone() => copyWith(undone: true);
 
@@ -136,6 +139,7 @@ class ChatAction {
             .toList(),
         proposal: j['proposal'] is Json ? j['proposal'] as Json : null,
         goalText: asStringOrNull(j['goalText']),
+        url: asStringOrNull(j['url']),
       );
 
   /// What "it" can mean in the next message: the thing this action made or
@@ -174,6 +178,7 @@ class ChatAction {
         if (undone) 'undone': true,
         if (proposal != null) 'proposal': proposal,
         if (goalText != null) 'goalText': goalText,
+        if (url != null) 'url': url,
         if (items.isNotEmpty) 'items': items,
         if (tasks > 0) 'tasks': tasks,
         if (detail != null) 'deadline': detail,

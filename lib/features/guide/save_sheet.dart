@@ -250,7 +250,7 @@ class _SaveSheetState extends State<_SaveSheet> {
     }
   }
 
-  Future<void> _decide(String choice) async {
+  Future<void> _decide(String choice, {String? list}) async {
     final p = _p;
     if (p == null) return;
     final picked = [
@@ -274,6 +274,8 @@ class _SaveSheetState extends State<_SaveSheet> {
         p.id,
         choice: choice,
         actions: choice == 'ACTION' ? picked : null,
+        minutes: choice == 'LATER' ? p.lengthMinutes : null,
+        list: list,
       );
       setState(() => _done = switch (choice) {
             'ACTION' when tonight => "It's tonight's one thing now. I'll remind you.",
@@ -281,6 +283,8 @@ class _SaveSheetState extends State<_SaveSheet> {
                 ? "Saved with a date. I'll bring it back when it's time."
                 : "On your list for this week. I'll pick it on a good night.",
             'SHELF' => "On your hard-days shelf. It'll be there when you need a lift.",
+            'LATER' => "In your watch later. I'll bring it up when you have time.",
+            'LIST' => 'Added to your ${(list ?? 'list').toLowerCase()} list.',
             _ => 'Let go. One less thing to carry.',
           });
       await Future<void>.delayed(const Duration(milliseconds: 1400));
@@ -291,6 +295,42 @@ class _SaveSheetState extends State<_SaveSheet> {
         _busy = false;
       });
     }
+  }
+
+  static String _choiceName(String c) => switch (c) {
+        'DO' => 'Do it',
+        'LATER' => 'Watch later',
+        'LIFT' => 'Lift me up',
+        'LIST' => 'Add to a list',
+        _ => 'Let it go',
+      };
+
+  /// Which list: a few usual ones, the suggested one first, or any name.
+  Future<void> _pickList() async {
+    final p = _p;
+    if (p == null) return;
+    final usual = <String>{if (p.listName != null) p.listName!, 'Movies', 'Books', 'Shopping', 'Places', 'Wishlist'}.toList();
+    final field = TextEditingController(text: p.listName ?? '');
+    final chosen = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: G.card,
+        title: Text('Which list?', style: G.text(17, w: FontWeight.w600)),
+        content: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Wrap(spacing: 6, runSpacing: 6, children: [
+            for (final name in usual) ActionChip(label: Text(name), onPressed: () => Navigator.pop(ctx, name)),
+          ]),
+          const SizedBox(height: 12),
+          TextField(controller: field, decoration: _field('Or type a list name')),
+        ]),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+          TextButton(onPressed: () => Navigator.pop(ctx, field.text.trim()), child: const Text('Add')),
+        ],
+      ),
+    );
+    field.dispose();
+    if (chosen != null && chosen.isNotEmpty) await _decide('LIST', list: chosen);
   }
 
   InputDecoration _field(String hint) => InputDecoration(
@@ -508,12 +548,22 @@ class _SaveSheetState extends State<_SaveSheet> {
             Text(_error!, style: G.text(14, color: const Color(0xFFB3261E))),
           ],
           const SizedBox(height: 22),
+          if (p.suggestedChoice != null && p.suggestionReason.isNotEmpty) ...[
+            Text('Ally suggests: ${_choiceName(p.suggestedChoice!)}. ${p.suggestionReason}', style: G.text(14, color: G.tintInk)),
+            const SizedBox(height: 10),
+          ],
           GButton(
             _steps.where((s) => s.selected).length > 1 ? 'Make these my actions' : 'Make it my action',
+            primary: p.suggestedChoice == null || p.suggestedChoice == 'DO',
             onTap: _busy ? null : () => _decide('ACTION'),
           ),
           const SizedBox(height: 8),
-          GButton('Keep it for when I feel a certain way', primary: false, onTap: _busy ? null : () => _correct('FEELING')),
+          GButton('Watch it later', primary: p.suggestedChoice == 'LATER', onTap: _busy ? null : () => _decide('LATER')),
+          const SizedBox(height: 8),
+          GButton(p.listName != null ? 'Add to my ${p.listName!.toLowerCase()} list' : 'Add to a list',
+              primary: p.suggestedChoice == 'LIST', onTap: _busy ? null : _pickList),
+          const SizedBox(height: 8),
+          GButton('Keep it for when I feel a certain way', primary: p.suggestedChoice == 'LIFT', onTap: _busy ? null : () => _correct('FEELING')),
           TextButton(
             onPressed: _busy ? null : () => _decide('DROP'),
             child: Text("Let it go, I won't use it", style: G.text(15, color: G.muted, w: FontWeight.w700)),

@@ -7,6 +7,7 @@ import '../../core/api/api_exception.dart';
 import '../../core/widget/widget_sync_service.dart';
 import '../../data/models/json.dart';
 import '../../data/repositories/life_repository.dart';
+import 'now_extras.dart';
 
 /// Bumped whenever something is done, skipped or changed, so Plan and You
 /// reload the next time they are looked at.
@@ -82,6 +83,7 @@ class NowState extends Equatable {
   final NowAdvice? advice;
   final bool focus; // a deadline has taken the rest of today (message says what waits)
   final bool lowEnergy; // "low energy today": smallest versions until tomorrow
+  final NowExtras extras; // counts, timer, routine, meal, watch later (Phase D)
 
   const NowState({
     this.status = NowStatus.loading,
@@ -97,6 +99,7 @@ class NowState extends Equatable {
     this.advice,
     this.focus = false,
     this.lowEnergy = false,
+    this.extras = NowExtras.empty,
   });
 
   NowOption? get current => index < options.length ? options[index] : null;
@@ -116,6 +119,7 @@ class NowState extends Equatable {
     bool clearUndo = false,
     bool clearAdvice = false,
     bool? lowEnergy,
+    NowExtras? extras,
   }) =>
       NowState(
         status: status ?? this.status,
@@ -131,10 +135,11 @@ class NowState extends Equatable {
         advice: clearAdvice ? null : advice,
         focus: focus,
         lowEnergy: lowEnergy ?? this.lowEnergy,
+        extras: extras ?? this.extras,
       );
 
   @override
-  List<Object?> get props => [status, kind, message, options, index, busy, error, note, undoId, prep, advice, focus, lowEnergy];
+  List<Object?> get props => [status, kind, message, options, index, busy, error, note, undoId, prep, advice, focus, lowEnergy, extras];
 }
 
 /// The card on Now: the right thing for right now, with Done / Smaller / Not now.
@@ -184,10 +189,59 @@ class NowCubit extends Cubit<NowState> {
         focus: data['focus'] is Json,
         undoId: state.undoId,
         lowEnergy: _lowToday,
+        extras: _extrasOf(data),
       ));
     } on ApiException catch (e) {
       emit(state.copyWith(status: state.options.isEmpty ? NowStatus.error : NowStatus.ready, error: e.message));
     }
+  }
+
+  // ---- Phase D: the quiet lines under the pick ----
+
+  final Set<String> _hiddenLater = {};
+
+  NowExtras _extrasOf(Json data) {
+    final e = NowExtras.fromJson(data);
+    final l = e.later;
+    if (l == null || !_hiddenLater.contains(l.id)) return e;
+    return NowExtras(counts: e.counts, timer: e.timer, routine: e.routine, meal: e.meal);
+  }
+
+  Future<void> _act(Future<void> Function() run) async {
+    if (state.busy) return;
+    emit(state.copyWith(busy: true));
+    try {
+      await run();
+      placesRefresh.value++;
+      await load();
+    } on QueuedOfflineException {
+      emit(state.copyWith(busy: false, note: 'Saved for when you are online.'));
+    } on ApiException catch (e) {
+      emit(state.copyWith(busy: false, error: e.message));
+    }
+  }
+
+  /// "Stop timer" goes through chat, so the same rules apply (a forgotten timer asks first).
+  Future<void> stopTimer() => _act(() async {
+        await _repo.chat('stop timer', const []);
+      });
+  Future<void> addCount(String habitId) => _act(() async {
+        await _repo.addCount(habitId);
+      });
+  Future<void> tickStep(String noteId, String item, bool done) => _act(() async {
+        await _repo.tickNote(noteId, item, done);
+      });
+  Future<void> resetRoutine(String noteId) => _act(() async {
+        await _repo.resetNote(noteId);
+      });
+  Future<void> watched(String saveId) => _act(() async {
+        await _repo.markSaveWatched(saveId);
+      });
+
+  /// "Not now" on the Watch later line: it stays out of the way until the app is opened again.
+  void hideLater(String id) {
+    _hiddenLater.add(id);
+    load();
   }
 
   Future<void> _answer(String action, {bool reload = true}) async {

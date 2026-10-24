@@ -6,6 +6,7 @@ import 'package:intl/intl.dart';
 import '../chat/starters.dart';
 import '../guide/guide_style.dart';
 import 'now_cubit.dart';
+import 'now_life_lines.dart';
 
 /// Now, the home place (ADR 0021): the day as a strip, the right thing as one
 /// sentence, one big Done, and two quiet words. Nothing here counts or scolds.
@@ -127,7 +128,7 @@ class NowCard extends StatelessWidget {
                 key: ValueKey(sentence),
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: showStarters
-                    ? [_StartHere(fresh: fresh, state: s, onStarter: onStarter!)]
+                    ? [_StartHere(fresh: fresh, state: s, onStarter: onStarter!), NowLifeLines(extras: s.extras, busy: s.busy)]
                     : [
                   // Greeting in Serif Italic
                   Text(greeting, style: G.voice(22, color: G.ink)),
@@ -202,6 +203,9 @@ class NowCard extends StatelessWidget {
                       ],
                     ]),
                   ),
+
+                  // Counts, a running timer, the routine for now, the next meal, Watch later.
+                  NowLifeLines(extras: s.extras, busy: s.busy),
 
                   // Tonight's prep note (if any)
                   if (s.prep.isNotEmpty) ...[

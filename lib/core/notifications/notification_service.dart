@@ -215,12 +215,15 @@ class NotificationService {
       final t = _parseTime(h.reminderTime);
       // A habit that has become automatic no longer gets reminders.
       if (t == null || !h.isActive || h.stage == 'AUTOMATIC') continue;
+      final counts = h.habitType.toUpperCase() == 'COUNT';
       await _scheduleDaily(
         id: h.id.hashCode & 0x3fffffff, // below the reminder id range
         title: h.title,
-        body: 'Time to log this habit.',
+        body: counts ? 'Tap +1 each time, right from here.' : 'Time to log this habit.',
         hour: t.$1,
         minute: t.$2,
+        // A count habit's reminder carries a +1 button: no need to open the app.
+        plusOneFor: counts ? h.id : null,
       );
     }
   }
@@ -506,7 +509,7 @@ class NotificationService {
   /// handler and the background isolate. True when it was one of these.
   Future<bool> handleAllyAction(NotificationResponse r) async {
     final action = r.actionId;
-    if (action == null || !(action.startsWith('AG_') || action.startsWith('FU_'))) return false;
+    if (action == null || !(action.startsWith('AG_') || action.startsWith('FU_') || action.startsWith('CT_'))) return false;
     Map<String, dynamic> p;
     try {
       p = Map<String, dynamic>.from(jsonDecode(r.payload ?? '{}') as Map);
@@ -525,6 +528,11 @@ class NotificationService {
             await _plugin.show(r.id ?? agendaBase, 'Counted.', 'Nice. The next thing is on Now when you want it.',
                 const NotificationDetails(android: _agendaChannel));
           }
+        case 'CT_PLUS':
+          if (id == null) return true;
+          final c = await repo.addCount(id);
+          await _plugin.show(r.id ?? agendaBase, '${c['line'] ?? 'Counted.'}', 'Tap +1 again whenever you want.',
+              const NotificationDetails(android: _agendaChannel));
         case 'AG_MOVE':
           final m = await repo.wrapUpMove();
           await _plugin.show(r.id ?? agendaBase, 'Done for today', '${m['message'] ?? 'Moved to tomorrow.'}',
@@ -603,6 +611,7 @@ class NotificationService {
     required String body,
     required int hour,
     required int minute,
+    String? plusOneFor,
   }) async {
     final now = tz.TZDateTime.now(tz.local);
     var when =
@@ -614,11 +623,20 @@ class NotificationService {
       title,
       body,
       when,
-      const NotificationDetails(android: _channel, iOS: DarwinNotificationDetails()),
+      plusOneFor == null
+          ? const NotificationDetails(android: _channel, iOS: DarwinNotificationDetails())
+          : const NotificationDetails(
+              android: AndroidNotificationDetails('habit_reminders', 'Habit reminders',
+                  channelDescription: 'Daily reminders to log your habits',
+                  importance: Importance.high,
+                  priority: Priority.high,
+                  actions: [AndroidNotificationAction('CT_PLUS', '+1')]),
+              iOS: DarwinNotificationDetails()),
       androidScheduleMode: _mode,
       uiLocalNotificationDateInterpretation:
           UILocalNotificationDateInterpretation.absoluteTime,
       matchDateTimeComponents: DateTimeComponents.time, // repeat daily
+      payload: plusOneFor == null ? null : jsonEncode({'k': 'COUNT', 'id': plusOneFor}),
     );
   }
 

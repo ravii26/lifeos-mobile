@@ -15,6 +15,7 @@ import '../more/how_ally_works_screen.dart';
 import '../more/voice_screen.dart';
 import '../more/reminders_check_screen.dart';
 import '../more/settings_screen.dart';
+import '../more/log_screen.dart';
 import '../more/your_day_screen.dart';
 import '../more/where_you_stand_screen.dart';
 import '../shell/life_cubit.dart';
@@ -349,6 +350,12 @@ class _YouScreenState extends State<YouScreen> {
                 title: _loading ? 'Loading your week…' : 'Your week',
                 sub: 'A short look back at the week, when you want it',
                 onTap: _week,
+              ),
+              _NavActionRow(
+                icon: Icons.query_stats_rounded,
+                title: 'Log and limits',
+                sub: 'Water, spending, sleep, weight and the caps you set',
+                onTap: () => _push(const LogScreen()),
               ),
               _NavActionRow(
                 icon: Icons.schedule_rounded,

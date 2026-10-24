@@ -167,6 +167,11 @@ class SaveProposal {
   final String summaryState; // NONE | PENDING | READY | UNAVAILABLE
   final List<String> summaryLines; // what the video says, when it was watched
   final bool shelved; // feeling saves wait on the shelf for that feeling
+  // What Ally suggests (DO | LATER | LIFT | LIST | LET_GO), why, which list, and how long it is.
+  final String? suggestedChoice;
+  final String suggestionReason;
+  final String? listName;
+  final int? lengthMinutes;
 
   const SaveProposal({
     required this.id,
@@ -186,6 +191,10 @@ class SaveProposal {
     this.summaryState = 'NONE',
     this.summaryLines = const [],
     this.shelved = false,
+    this.suggestedChoice,
+    this.suggestionReason = '',
+    this.listName,
+    this.lengthMinutes,
   });
 
   bool get looksLikeMotivation => kind == 'MOTIVATION';
@@ -210,6 +219,10 @@ class SaveProposal {
       summaryState: asString((j['summary'] as Json?)?['state'], 'NONE'),
       summaryLines: (((j['summary'] as Json?)?['lines'] as List?) ?? const []).map((e) => e.toString()).toList(),
       shelved: asBool(j['shelved']),
+      suggestedChoice: asStringOrNull(p['suggestedChoice']),
+      suggestionReason: asString(p['suggestionReason']),
+      listName: asStringOrNull(p['listName']),
+      lengthMinutes: p['lengthMinutes'] == null ? null : asInt(p['lengthMinutes']),
     );
   }
 }

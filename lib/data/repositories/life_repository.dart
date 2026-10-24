@@ -933,9 +933,13 @@ class LifeRepository {
       String? minimum,
       String? areaId,
       String? when,
+      int? minutes,
+      String? list,
       List<Map<String, String>>? actions}) async {
     final data = await _api.post('/guide/saves/$id/decide', body: {
       'choice': choice,
+      if (minutes != null) 'minutes': minutes,
+      if (list != null) 'list': list,
       if (action != null) 'action': action,
       if (minimum != null) 'minimum': minimum,
       if (areaId != null) 'areaId': areaId,
@@ -944,6 +948,30 @@ class LifeRepository {
     });
     return asBool((data as Json)['setAsTonight']);
   }
+
+  // ---- Phase D: counts, the Log, lists and Watch later ----
+
+  /// Counts today, limits, spending, sleep, weight and the latest Log entries.
+  Future<Json> logOverview() async => (await _api.get('/log/overview')) as Json;
+
+  /// +n on a count habit ("Water 3 of 8"). Returns { count, target, line, activityId }.
+  Future<Json> addCount(String habitId, {int n = 1}) async =>
+      (await _api.post('/log/count', body: {'habitId': habitId, 'n': n})) as Json;
+
+  /// Removes one Log entry. Returns the Undo id.
+  Future<String?> removeLogEntry(String id) async =>
+      asStringOrNull(((await _api.delete('/log/entries/$id')) as Json)['activityId']);
+
+  /// Ticks (or unticks) one item of a list or routine. Ticking never deletes.
+  Future<Json> tickNote(String id, String item, bool done) async =>
+      (await _api.post('/ally-notes/$id/tick', body: {'item': item, 'done': done})) as Json;
+
+  /// Starts a routine again (untick all), or with [clear] drops what was ticked.
+  Future<Json> resetNote(String id, {bool clear = false}) async =>
+      (await _api.post('/ally-notes/$id/reset', body: {'clear': clear})) as Json;
+
+  /// "I watched it": it leaves Watch later.
+  Future<void> markSaveWatched(String id) => _api.post('/guide/saves/$id/watched');
 
   /// The nightly nudge time, or null when the person hasn't turned it on.
   Future<void> setNightlyTime(String? hhmm) =>

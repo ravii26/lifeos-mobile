@@ -8,6 +8,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:speech_to_text/speech_to_text.dart';
 
 import '../../core/di/service_locator.dart';
+import '../../core/links/open_link.dart';
 import '../../core/notifications/notification_service.dart';
 import '../../core/system/system_settings.dart';
 import '../../core/voice/voice_service.dart';
@@ -745,6 +746,7 @@ String _repeatLabel(String rule) {
     'NOTE_UPDATED' => (Icons.sticky_note_2_outlined, 'Updated note: ${a.text}'),
     'PROGRESS_LOGGED' => (Icons.trending_up_rounded, 'Logged: ${a.detail ?? a.text}'),
     'LOG_ADDED' => (Icons.edit_note_rounded, a.text),
+    'CONTACT' => (a.kind == 'CALL' ? Icons.call_outlined : Icons.chat_outlined, a.text),
     'LIMIT_SET' => (Icons.speed_rounded, a.text),
     'LIMIT_USED' => (Icons.timelapse_rounded, a.detail ?? a.text),
     'TIMER_STARTED' => (Icons.timer_outlined, a.text),
@@ -913,6 +915,14 @@ class _Receipt extends StatelessWidget {
                   color: G.muted,
                   w: FontWeight.w700).copyWith(decoration: a.undone ? TextDecoration.lineThrough : null)),
         ),
+        if (a.type == 'CONTACT' && a.url != null)
+          GestureDetector(
+            onTap: () => openLink(context, a.url!),
+            child: Padding(
+              padding: const EdgeInsets.only(left: 10),
+              child: Text(a.kind == 'CALL' ? 'Call' : 'Open WhatsApp', style: G.text(13, w: FontWeight.w700, color: G.accent)),
+            ),
+          ),
         if (a.activityId != null && !a.undone)
           GestureDetector(
             onTap: onUndo,
