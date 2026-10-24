@@ -744,6 +744,12 @@ String _repeatLabel(String rule) {
       ),
     'NOTE_UPDATED' => (Icons.sticky_note_2_outlined, 'Updated note: ${a.text}'),
     'PROGRESS_LOGGED' => (Icons.trending_up_rounded, 'Logged: ${a.detail ?? a.text}'),
+    'LOG_ADDED' => (Icons.edit_note_rounded, a.text),
+    'LIMIT_SET' => (Icons.speed_rounded, a.text),
+    'LIMIT_USED' => (Icons.timelapse_rounded, a.detail ?? a.text),
+    'TIMER_STARTED' => (Icons.timer_outlined, a.text),
+    'TIMER_STOPPED' => (Icons.stop_circle_outlined, a.text),
+    'COUNT_ADDED' => (Icons.add_circle_outline_rounded, '${a.text}: ${a.detail ?? ''}'),
     'BUSY_SET' => (
         Icons.event_busy_outlined,
         a.detail == null ? 'Free again' : 'Busy until ${time(DateTime.parse(a.detail!).toLocal())}: nothing from me till then'
