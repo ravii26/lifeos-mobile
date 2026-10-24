@@ -101,14 +101,16 @@ class ChatCubit extends Cubit<ChatState> {
     } catch (_) {}
   }
 
-  Future<void> send(String text) async {
+  /// Sends a message. Returns Ally's reply text (null when offline or on an error) so Talk mode can
+  /// read it out; [spoken] asks the server to write a reply that sounds right when heard.
+  Future<String?> send(String text, {bool spoken = false}) async {
     final message = text.trim();
-    if (message.isEmpty || state.sending) return;
+    if (message.isEmpty || state.sending) return null;
     final history = state.messages;
     final withUser = [...history, ChatMessage(fromUser: true, text: message)];
     emit(state.copyWith(messages: withUser, sending: true));
     try {
-      final reply = await _repo.chat(message, history);
+      final reply = await _repo.chat(message, history, spoken: spoken);
       for (final a in reply.actions) {
         if (a.type == 'REMINDER_SET' && a.id != null && a.remindAt != null) {
           await NotificationService.instance.scheduleReminder(a.id!, a.text, a.remindAt!, windowEnd: a.windowEnd);
@@ -158,6 +160,7 @@ class ChatCubit extends Cubit<ChatState> {
       ];
       emit(state.copyWith(messages: list, sending: false, openSave: save?.text, askNotifications: ask ? true : null));
       await _persist(list);
+      return reply.reply;
     } on ApiException catch (e) {
       if (e.statusCode == null) {
         // Offline or the server is waking: keep the message and send it later.
@@ -168,10 +171,11 @@ class ChatCubit extends Cubit<ChatState> {
         ];
         emit(state.copyWith(messages: list, sending: false));
         await _persist(list);
-        return;
+        return null;
       }
       emit(state.copyWith(sending: false, error: e.message));
     }
+    return null;
   }
 
   final List<String> _pending = [];

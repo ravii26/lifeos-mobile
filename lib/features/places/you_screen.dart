@@ -12,6 +12,7 @@ import '../chat/memories_screen.dart';
 import '../chat/starters.dart';
 import '../guide/guide_style.dart';
 import '../more/how_ally_works_screen.dart';
+import '../more/voice_screen.dart';
 import '../more/reminders_check_screen.dart';
 import '../more/settings_screen.dart';
 import '../more/your_day_screen.dart';
@@ -360,6 +361,12 @@ class _YouScreenState extends State<YouScreen> {
                 title: 'How Ally works for you',
                 sub: 'What it helps with most, and how direct it is',
                 onTap: () => _push(const HowAllyWorksScreen()),
+              ),
+              _NavActionRow(
+                icon: Icons.graphic_eq_rounded,
+                title: "Ally's voice",
+                sub: 'The phone voice, or a more natural one that works offline',
+                onTap: () => _push(const VoiceScreen()),
               ),
               _NavActionRow(
                 icon: Icons.psychology_outlined,

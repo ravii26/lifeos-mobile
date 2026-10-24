@@ -11,6 +11,7 @@ import '../models/chat.dart';
 import '../models/decision.dart';
 import '../models/document.dart';
 import '../models/goal.dart';
+import '../models/know.dart';
 import '../models/graph_data.dart';
 import '../models/habit.dart';
 import '../models/identity.dart';
@@ -954,9 +955,10 @@ class LifeRepository {
   }
 
   // ---- Chat (assistant that acts) ----
-  Future<ChatReply> chat(String message, List<ChatMessage> history) async {
+  Future<ChatReply> chat(String message, List<ChatMessage> history, {bool spoken = false}) async {
     final data = await _api.post('/assistant/chat', body: {
       'message': message,
+      if (spoken) 'spoken': true,
       'history': [
         for (final m in history.length > 10 ? history.sublist(history.length - 10) : history)
           {'role': m.fromUser ? 'user' : 'assistant', 'text': m.text, if (m.refs.isNotEmpty) 'refs': m.refs.take(12).toList()},
@@ -1215,6 +1217,12 @@ class LifeRepository {
     });
     return UserSettings.fromJson(data as Json);
   }
+
+  // ---- Getting to know the person (ADR 0034): one short question at a time, no AI ----
+  Future<KnowCardData> knowNext() async => KnowCardData.fromJson(await _api.get('/know') as Json);
+
+  Future<KnowReply> knowAnswer(String id, {String? answer, bool skip = false}) async =>
+      KnowReply.fromJson(await _api.post('/know', body: {'id': id, if (answer != null) 'answer': answer, if (skip) 'skip': true}) as Json);
 
   // ---- How Ally works for this person (ADR 0028) ----
   /// What Ally leads with and how direct it is; the server's defaults are ALL and BALANCED.

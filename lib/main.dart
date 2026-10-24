@@ -71,7 +71,8 @@ class LifeOSApp extends StatelessWidget {
             final decisions = context.read<DecisionsCubit>();
             if (auth.status == AuthStatus.authenticated) {
               appearance.load();
-              decisions.refresh();
+              // Not refreshed here any more: the old "What Now" briefing runs an AI call (about
+              // 3,000 tokens, ~Rs 0.13) and no screen shows it. The companion asks for it when opened.
             } else if (auth.status == AuthStatus.unauthenticated) {
               appearance.reset();
               decisions.reset();

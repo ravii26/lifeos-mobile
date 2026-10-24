@@ -66,6 +66,10 @@ dependencies:
   url_launcher: ^6.3.3
   # "Your data": hand the export file to the system share sheet (save to Files / Drive).
   share_plus: ^12.0.2
+  sherpa_onnx: ^1.13.8
+  audioplayers: ^6.8.1
+  archive: ^4.5.2
+  path_provider: ^2.1.6
 
 dev_dependencies:
   flutter_test:

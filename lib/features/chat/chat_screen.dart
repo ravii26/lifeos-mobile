@@ -10,16 +10,19 @@ import 'package:speech_to_text/speech_to_text.dart';
 import '../../core/di/service_locator.dart';
 import '../../core/notifications/notification_service.dart';
 import '../../core/system/system_settings.dart';
+import '../../core/voice/voice_service.dart';
 import '../../data/models/chat.dart';
 import '../../data/repositories/life_repository.dart';
 import '../guide/guide_style.dart';
 import '../guide/save_sheet.dart';
+import '../places/know_card.dart';
 import '../places/now_card.dart';
 import '../places/now_cubit.dart';
 import '../guide/tonight_cubit.dart';
 import 'chat_cubit.dart';
 import 'goal_plan_card.dart';
 import 'starters.dart';
+import 'talk_controller.dart';
 
 /// Home tab: one chat. Talk normally; it answers in the right role and does
 /// things (adds/completes tasks, logs habits, sets reminders) as it goes.
@@ -35,6 +38,134 @@ class _ChatScreenState extends State<ChatScreen> {
   final _scroll = ScrollController();
   final _speech = SpeechToText();
   bool _listening = false;
+  // The recognizer is set up once; typing-by-voice and Talk mode each say what to do on its events.
+  bool _speechReady = false;
+  void Function(String status)? _onSpeechStatus;
+  void Function(String message)? _onSpeechError;
+
+  Future<bool> _ensureSpeech() async {
+    if (_speechReady) return true;
+    _speechReady = await _speech.initialize(
+      onStatus: (st) => _onSpeechStatus?.call(st),
+      onError: (e) => _onSpeechError?.call(e.errorMsg),
+    );
+    return _speechReady;
+  }
+
+  // Talk mode: Ally listens, answers aloud, and listens again (see talk_controller.dart).
+  late final TalkController _talk = TalkController(
+    listenOnce: _talkListen,
+    cancelListening: () => _speech.cancel(),
+    ask: (said) => context.read<ChatCubit>().send(said, spoken: true),
+    speak: (text) async {
+      await VoiceService.instance.speak(text);
+      // A short pause so the microphone does not catch the end of Ally's own voice.
+      await Future<void>.delayed(const Duration(milliseconds: 450));
+    },
+    stopSpeaking: () => VoiceService.instance.stop(),
+  )..addListener(_onTalkChanged);
+
+  void _onTalkChanged() {
+    if (!mounted) return;
+    setState(() {});
+    final note = _talk.note;
+    if (!_talk.active && note != null) {
+      final why = _talkIssue.isEmpty ? '' : ' (${_talkIssue.replaceFirst('error_', '').replaceAll('_', ' ')})';
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$note$why')));
+    }
+  }
+
+  // Why the last Talk round heard nothing, in the recognizer's own words (shown when Talk mode ends).
+  String _talkIssue = '';
+
+  Future<String?> _talkListen(void Function(String) onPartial) async {
+    if (_listening) await _toggleVoice();
+    if (!await _ensureSpeech()) throw 'Voice recognition is not available on this phone.';
+    // Let the recognizer settle after the last round (or after Ally's own voice) before opening it again.
+    if (_speech.isListening) await _speech.cancel();
+    await Future<void>.delayed(const Duration(milliseconds: 350));
+
+    final done = Completer<String?>();
+    var last = '';
+    var started = false; // events that arrive before this round really started belong to the last one
+    var began = DateTime.now();
+    var lastWords = DateTime.now();
+    var loudest = -100.0;
+    Timer? watch;
+    _talkIssue = '';
+    void finish() {
+      watch?.cancel();
+      if (!done.isCompleted) done.complete(last);
+    }
+
+    // The plugin's own "stop after a pause" counts from the moment listening starts, which cut Ally
+    // off before this phone's offline recognizer had produced a word. So the pause is measured here:
+    // up to 9 s for the first words, then about 2 s of quiet after the last word ends the turn.
+    watch = Timer.periodic(const Duration(milliseconds: 300), (_) {
+      final now = DateTime.now();
+      final quiet = last.isNotEmpty && now.difference(lastWords) > const Duration(milliseconds: 2200);
+      final nothing = last.isEmpty && started && now.difference(began) > const Duration(seconds: 9);
+      if (quiet || nothing) {
+        watch?.cancel();
+        debugPrint('Ally talk: ending the turn (${quiet ? 'quiet after words' : 'no words'}), loudest sound $loudest');
+        _speech.stop();
+      }
+    });
+
+    _onSpeechStatus = (st) {
+      debugPrint('Ally talk: status $st (heard "$last")');
+      if (st == 'listening') {
+        started = true;
+        began = DateTime.now();
+      }
+      if (!started) return;
+      // "Finished listening" can arrive a moment before the final words do, so wait for them.
+      if (st == 'done' || st == 'notListening') Future<void>.delayed(const Duration(milliseconds: 1300), finish);
+    };
+    _onSpeechError = (msg) {
+      debugPrint('Ally talk: error $msg (loudest sound $loudest)');
+      _talkIssue = msg;
+      if (msg == 'error_permission') {
+        watch?.cancel();
+        if (!done.isCompleted) done.completeError('Ally does not have permission to use the microphone. Turn it on in Android settings.');
+      } else {
+        Future<void>.delayed(const Duration(milliseconds: 300), finish);
+      }
+    };
+    try {
+      await _speech.listen(
+        onResult: (r) {
+          last = r.recognizedWords;
+          lastWords = DateTime.now();
+          debugPrint('Ally talk: ${r.finalResult ? 'final' : 'partial'} "$last"');
+          onPartial(last);
+          if (r.finalResult) finish();
+        },
+        onSoundLevelChange: (level) {
+          if (level > loudest) loudest = level;
+        },
+        listenOptions: SpeechListenOptions(
+          partialResults: true,
+          listenFor: const Duration(seconds: 60),
+          pauseFor: const Duration(seconds: 15), // our own timer above decides when the turn ends
+          localeId: _lang,
+        ),
+      );
+    } catch (e) {
+      watch.cancel();
+      throw 'The microphone could not start ($e).';
+    }
+    return done.future;
+  }
+
+  Future<void> _toggleTalk() async {
+    if (_talk.active) {
+      await _talk.stop();
+      return;
+    }
+    _markStarted();
+    await _talk.start();
+  }
   // en_IN for English / Hinglish typed words, hi_IN for spoken Hindi (Ally reads both).
   String _lang = 'en_IN';
   String _dictBase = '';
@@ -186,6 +317,9 @@ class _ChatScreenState extends State<ChatScreen> {
   @override
   void dispose() {
     starterRequest.removeListener(_onStarterRequest);
+    _talk.removeListener(_onTalkChanged);
+    _talk.stop();
+    _talk.dispose();
     _speech.cancel();
     _input.dispose();
     _scroll.dispose();
@@ -221,14 +355,13 @@ class _ChatScreenState extends State<ChatScreen> {
       if (mounted) setState(() => _listening = false);
       return;
     }
-    final ok = await _speech.initialize(
-      onStatus: (st) {
-        if ((st == 'done' || st == 'notListening') && mounted) setState(() => _listening = false);
-      },
-      onError: (_) {
-        if (mounted) setState(() => _listening = false);
-      },
-    );
+    _onSpeechStatus = (st) {
+      if ((st == 'done' || st == 'notListening') && mounted) setState(() => _listening = false);
+    };
+    _onSpeechError = (_) {
+      if (mounted) setState(() => _listening = false);
+    };
+    final ok = await _ensureSpeech();
     if (!ok) {
       if (mounted) {
         ScaffoldMessenger.of(context)
@@ -322,6 +455,8 @@ class _ChatScreenState extends State<ChatScreen> {
               // Before you say anything, Now is the whole screen. Once you talk, it
               // folds to one line and the conversation takes the space.
               if (!guiding) NowCard(compact: talking, fresh: !_started, onStarter: _startGuide),
+              // One short question at a time, only once the person has started using Ally (never on top of the first-use starters).
+              if (!guiding && _started) const KnowCard(),
               if (guiding)
                 Expanded(
                   child: _GuidePanel(
@@ -374,12 +509,15 @@ class _ChatScreenState extends State<ChatScreen> {
               // the empty Now already shows the big starters.
               if (!guiding && (talking || nowPicking))
                 _Suggestions(controller: _input, onStarter: _startGuide, onSay: _send),
+              if (_talk.active) _TalkBar(talk: _talk, onStop: _toggleTalk),
               _Composer(
                 controller: _input,
                 hint: guiding ? step.hint : null,
                 sending: s.sending,
                 onSend: _send,
                 listening: _listening,
+                talking: _talk.active,
+                onTalk: _toggleTalk,
                 lang: _lang,
                 onMic: _toggleVoice,
                 onLang: _switchLang,
@@ -823,6 +961,8 @@ class _Composer extends StatelessWidget {
   final void Function([String?]) onSend;
   final VoidCallback onSave;
   final bool listening;
+  final bool talking;
+  final VoidCallback onTalk;
   final String lang;
   final VoidCallback onMic;
   final VoidCallback onLang;
@@ -833,6 +973,8 @@ class _Composer extends StatelessWidget {
       required this.onSend,
       required this.onSave,
       required this.listening,
+      required this.talking,
+      required this.onTalk,
       required this.lang,
       required this.onMic,
       required this.onLang});
@@ -902,6 +1044,18 @@ class _Composer extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 4),
+            // Talk mode: speak, hear Ally answer aloud, speak again.
+            InkWell(
+              onTap: onTalk,
+              child: SizedBox(
+                height: 38,
+                width: 34,
+                child: Tooltip(
+                  message: talking ? 'Stop talking' : 'Talk with Ally',
+                  child: Icon(Icons.record_voice_over_outlined, size: 18, color: talking ? G.accent : G.faint),
+                ),
+              ),
+            ),
             // Link-Save Icon
             InkWell(
               onTap: onSave,
@@ -1225,4 +1379,44 @@ class _ListCard extends StatelessWidget {
             ),
         ]),
       );
+}
+
+/// Shown above the box while Talk mode runs: what Ally is doing now, what it heard, and Stop.
+class _TalkBar extends StatelessWidget {
+  final TalkController talk;
+  final VoidCallback onStop;
+  const _TalkBar({required this.talk, required this.onStop});
+
+  @override
+  Widget build(BuildContext context) {
+    final (label, hint) = switch (talk.state) {
+      TalkState.listening => ('Listening…', talk.heard.isEmpty ? (talk.missed ? "I didn't catch that. Say it again." : 'Say it, then pause.') : talk.heard),
+      TalkState.thinking => ('Thinking…', talk.heard),
+      TalkState.speaking => ('Speaking…', 'Tap Stop to interrupt.'),
+      TalkState.off => ('Talk mode', ''),
+    };
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.fromLTRB(16, 4, 16, 0),
+      padding: const EdgeInsets.fromLTRB(12, 8, 6, 8),
+      decoration: BoxDecoration(
+        color: G.accent.withValues(alpha: 0.08),
+        border: Border.all(color: G.accent.withValues(alpha: 0.4), width: 0.5),
+        borderRadius: BorderRadius.circular(4),
+      ),
+      child: Row(children: [
+        Expanded(
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(label, style: G.label(size: 11, color: G.accent, w: FontWeight.w700)),
+            if (hint.isNotEmpty)
+              Text(hint, maxLines: 2, overflow: TextOverflow.ellipsis, style: G.text(13, color: G.muted, height: 1.35)),
+          ]),
+        ),
+        TextButton(
+          onPressed: onStop,
+          child: Text('Stop', style: G.text(14, w: FontWeight.w700, color: G.accent)),
+        ),
+      ]),
+    );
+  }
 }
