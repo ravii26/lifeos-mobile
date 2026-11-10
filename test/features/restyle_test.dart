@@ -16,6 +16,9 @@ import 'package:lifeos_mobile/features/capture/capture_sheet.dart';
 import 'package:lifeos_mobile/features/chat/chat_screen.dart' show AiLimitCard;
 import 'package:lifeos_mobile/features/places/life_notes_screen.dart';
 import 'package:lifeos_mobile/features/places/note_cards.dart';
+import 'package:lifeos_mobile/features/places/you_screen.dart';
+import 'package:lifeos_mobile/data/models/user.dart';
+import 'package:lifeos_mobile/features/chat/starters.dart';
 import 'package:lifeos_mobile/features/focus/focus_screen.dart';
 import 'package:lifeos_mobile/features/habits/habit_detail_screen.dart';
 import 'package:lifeos_mobile/features/more/settings_screen.dart';
@@ -33,6 +36,15 @@ class _Repo implements LifeRepository {
 
   @override
   Future<String> mode() async => 'NORMAL';
+
+  @override
+  Future<List<Map<String, dynamic>>> progress() async => [];
+
+  @override
+  Future<int> keptThisWeek() async => 0;
+
+  @override
+  Future<String> proactivity() async => 'NORMAL';
 
   @override
   Future<List<Map<String, dynamic>>> daySchedule() async => [
@@ -117,12 +129,12 @@ void main() {
     ],
   );
 
-  Future<void> show(WidgetTester t, Widget page) async {
+  Future<void> show(WidgetTester t, Widget page, {LifeState? life}) async {
     // Narrow like a small phone, tall so a long page is fully built and checked.
     t.view.physicalSize = const Size(360, 1800);
     t.view.devicePixelRatio = 1;
     addTearDown(t.view.reset);
-    final cubit = _Cubit(state);
+    final cubit = _Cubit(life ?? state);
     addTearDown(cubit.close);
     await t.pumpWidget(MaterialApp(home: BlocProvider<LifeCubit>.value(value: cubit, child: page)));
     await t.pump();
@@ -244,5 +256,34 @@ void main() {
     expect(ChatReply.fromJson({'reply': 'x', 'aiLimit': true}).aiLimit, isTrue);
     expect(ChatMessage.fromJson(const ChatMessage(fromUser: false, text: 'x', aiLimit: true).toJson()).aiLimit, isTrue);
     expect(ChatMessage.fromJson(const ChatMessage(fromUser: false, text: 'x').toJson()).aiLimit, isFalse);
+  });
+
+  test('a life counts as empty only when nothing is in it', () {
+    const ready = LifeState(status: LoadStatus.ready);
+    expect(lifeIsEmpty(projects: const [], life: ready, kept: 0), isTrue);
+    expect(lifeIsEmpty(projects: const [], life: const LifeState(), kept: 0), isFalse, reason: 'still loading');
+    expect(lifeIsEmpty(projects: const [], life: ready, kept: 2), isFalse);
+    expect(lifeIsEmpty(projects: const [{'id': 'g'}], life: ready, kept: 0), isFalse);
+    expect(lifeIsEmpty(projects: const [], life: LifeState(status: LoadStatus.ready, tasks: [_task()]), kept: 0), isFalse);
+  });
+
+  testWidgets('a new person sees what matters to you, and can start', (t) async {
+    const user = AppUser(id: 'u', email: 'a@b.c', name: 'A');
+    await show(t, const Scaffold(body: YouScreen(user: user)), life: const LifeState(status: LoadStatus.ready));
+    expect(find.text('What matters to you?'), findsOneWidget);
+    expect(find.text('In focus'), findsNothing);
+    final before = talkRequest.value;
+    await t.tap(find.text('Tell Ally'));
+    expect(talkRequest.value, before + 1);
+    await t.tap(find.text('Help me plan a goal'));
+    expect(starterRequest.value, Starter.goal);
+    starterRequest.value = null;
+  });
+
+  testWidgets('someone with things in their life sees the full page', (t) async {
+    const user = AppUser(id: 'u', email: 'a@b.c', name: 'A');
+    await show(t, const Scaffold(body: YouScreen(user: user)), life: LifeState(status: LoadStatus.ready, tasks: [_task()]));
+    expect(find.text('What matters to you?'), findsNothing);
+    expect(find.text('In focus'), findsOneWidget);
   });
 }

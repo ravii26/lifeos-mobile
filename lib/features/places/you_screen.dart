@@ -40,6 +40,15 @@ double? goalProgress(Map<String, dynamic> project) {
   return percent is num ? (percent / 100).clamp(0.0, 1.0).toDouble() : null;
 }
 
+/// Nothing in the person's life yet: no goals, parts of life, to-dos or habits, nothing done.
+bool lifeIsEmpty({required List<Map<String, dynamic>> projects, required LifeState life, required int kept}) =>
+    life.status == LoadStatus.ready &&
+    projects.isEmpty &&
+    life.areas.isEmpty &&
+    life.tasks.isEmpty &&
+    life.habits.isEmpty &&
+    kept == 0;
+
 /// My life: this week's mood of the calendar, what's in focus, and everything else one tap away.
 class YouScreen extends StatefulWidget {
   final AppUser user;
@@ -56,6 +65,7 @@ class _YouScreenState extends State<YouScreen> {
   int? _kept;
   String _level = 'NORMAL';
   String? _error;
+  bool _loaded = false; // the first load has come back, so an empty life is really empty
 
   @override
   void initState() {
@@ -85,6 +95,7 @@ class _YouScreenState extends State<YouScreen> {
         _kept = results[2] as int;
         _level = results[3] as String;
         _error = null;
+        _loaded = true;
       });
     } on ApiException catch (e) {
       if (mounted) setState(() => _error = e.message);
@@ -211,6 +222,43 @@ class _YouScreenState extends State<YouScreen> {
       ('Parked', () => _push(const ParkedScreen())),
       ('My week', () => _push(const WeekScreen())),
     ];
+    final empty = _loaded && lifeIsEmpty(projects: _projects, life: context.watch<LifeCubit>().state, kept: _kept ?? 0);
+    final header = Row(children: [
+      Expanded(child: Text('My life', style: G.text(44, w: FontWeight.w600, height: 1.05, letterSpacing: -1.3))),
+      IconButton(
+        tooltip: 'Settings',
+        onPressed: _openSettings,
+        icon: Icon(Icons.tune_rounded, color: G.ink),
+        style: IconButton.styleFrom(backgroundColor: G.card, minimumSize: const Size(46, 46)),
+      ),
+    ]);
+    if (empty) {
+      return ColoredBox(
+        color: G.bg,
+        child: SafeArea(
+          bottom: false,
+          child: RefreshIndicator(
+            onRefresh: _load,
+            child: ListView(
+              padding: const EdgeInsets.fromLTRB(22, 18, 22, 20),
+              children: [
+                header,
+                const SizedBox(height: 56),
+                const AllyOrb(size: 72),
+                const SizedBox(height: 26),
+                Text('What matters to you?', style: G.text(40, w: FontWeight.w600, height: 1.08, letterSpacing: -1.1)),
+                const SizedBox(height: 12),
+                Text('Tell me one thing you want, and your life starts to fill in here.', style: G.text(20, color: G.muted, height: 1.4)),
+                const SizedBox(height: 30),
+                GPill('Tell Ally', primary: true, onTap: () => talkRequest.value++),
+                const SizedBox(height: 10),
+                GPill('Help me plan a goal', onTap: () => starterRequest.value = Starter.goal),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
     return ColoredBox(
       color: G.bg,
       child: SafeArea(
@@ -220,15 +268,7 @@ class _YouScreenState extends State<YouScreen> {
           child: ListView(
             padding: const EdgeInsets.fromLTRB(22, 18, 22, 20),
             children: [
-              Row(children: [
-                Expanded(child: Text('My life', style: G.text(44, w: FontWeight.w600, height: 1.05, letterSpacing: -1.3))),
-                IconButton(
-                  tooltip: 'Settings',
-                  onPressed: _openSettings,
-                  icon: Icon(Icons.tune_rounded, color: G.ink),
-                  style: IconButton.styleFrom(backgroundColor: G.card, minimumSize: const Size(46, 46)),
-                ),
-              ]),
+              header,
               if ((_kept ?? 0) > 0)
                 Padding(
                   padding: const EdgeInsets.only(top: 4),
