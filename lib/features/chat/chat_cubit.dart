@@ -157,6 +157,7 @@ class ChatCubit extends Cubit<ChatState> {
           suggestions: reply.suggestions,
           capacity: reply.capacity,
           aiDown: reply.aiDown,
+          aiLimit: reply.aiLimit,
         ),
       ];
       emit(state.copyWith(messages: list, sending: false, openSave: save?.text, askNotifications: ask ? true : null));

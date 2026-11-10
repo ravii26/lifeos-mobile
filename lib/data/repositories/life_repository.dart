@@ -1098,6 +1098,9 @@ class LifeRepository {
     return (data as List).whereType<Map<String, dynamic>>().toList();
   }
 
+  /// You just called or messaged someone from People, so Ally knows when you last spoke.
+  Future<void> personContacted(String id) => _api.post('/ally-notes/$id/contacted');
+
   /// Replace a taught note's title / items / text. Returns the Undo id.
   Future<String?> updateAllyNote(String id, {String? title, List<String>? items, String? text}) async {
     final data = await _api.patch('/ally-notes/$id', body: {

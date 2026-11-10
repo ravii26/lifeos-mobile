@@ -26,6 +26,51 @@ String dialNumber(String phone) {
   return phone.trim().startsWith('+') ? '+$digits' : digits;
 }
 
+/// When you last called or messaged this person from People, if ever.
+DateTime? lastContactOf(Map<String, dynamic> note) {
+  final meta = note['meta'] is Json ? note['meta'] as Json : const <String, dynamic>{};
+  return DateTime.tryParse('${meta['lastContact'] ?? ''}')?.toLocal();
+}
+
+/// "today", "yesterday", "5 days ago", "3 weeks ago", "2 months ago".
+String agoText(DateTime then, DateTime now) {
+  final days = DateUtils.dateOnly(now).difference(DateUtils.dateOnly(then)).inDays;
+  if (days <= 0) return 'today';
+  if (days == 1) return 'yesterday';
+  if (days < 14) return '$days days ago';
+  if (days < 60) return '${days ~/ 7} weeks ago';
+  return '${days ~/ 30} months ago';
+}
+
+/// The person you have gone longest without speaking to, once it has been three
+/// weeks. Only people you have called or messaged from here count, so it never guesses.
+Map<String, dynamic>? quietPerson(List<Map<String, dynamic>> people, DateTime now) {
+  Map<String, dynamic>? quiet;
+  DateTime? oldest;
+  for (final p in people) {
+    final last = lastContactOf(p);
+    if (last == null || now.difference(last).inDays < 21) continue;
+    if (oldest == null || last.isBefore(oldest)) {
+      oldest = last;
+      quiet = p;
+    }
+  }
+  return quiet;
+}
+
+String? phoneOf(Map<String, dynamic> note) {
+  final meta = note['meta'] is Json ? note['meta'] as Json : const <String, dynamic>{};
+  return asStringOrNull(meta['phone']);
+}
+
+/// Opens the call or WhatsApp, and remembers that you got in touch.
+void contactPerson(BuildContext context, Map<String, dynamic> note, {required bool whatsApp, VoidCallback? then}) {
+  final phone = phoneOf(note);
+  if (phone == null) return;
+  openLink(context, whatsApp ? 'https://wa.me/${dialNumber(phone).replaceAll(RegExp(r'\D'), '')}' : 'tel:${dialNumber(phone)}');
+  getIt<LifeRepository>().personContacted('${note['id']}').then((_) => then?.call()).catchError((_) {});
+}
+
 class SpecialNoteCard extends StatelessWidget {
   final Map<String, dynamic> note;
   final VoidCallback onChanged;
@@ -33,7 +78,7 @@ class SpecialNoteCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if ('${note['collection']}' == 'People') return _PersonCard(note);
+    if ('${note['collection']}' == 'People') return _PersonCard(note, onChanged: onChanged);
     if ('${note['collection']}' == 'Diet') return _DietCard(note);
     return _ChecklistCard(note, onChanged: onChanged);
   }
@@ -168,7 +213,8 @@ class _ChecklistCardState extends State<_ChecklistCard> {
 
 class _PersonCard extends StatelessWidget {
   final Map<String, dynamic> note;
-  const _PersonCard(this.note);
+  final VoidCallback onChanged;
+  const _PersonCard(this.note, {required this.onChanged});
 
   @override
   Widget build(BuildContext context) {
@@ -187,19 +233,23 @@ class _PersonCard extends StatelessWidget {
         Expanded(
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Text('${note['title']}', style: G.text(19, height: 1.25)),
-            Text(birthday == null ? (phone == null ? 'Nothing saved yet' : 'Number saved') : 'Birthday $birthday',
+            Text(
+                [
+                  birthday == null ? (phone == null ? 'Nothing saved yet' : 'Number saved') : 'Birthday $birthday',
+                  if (lastContactOf(note) != null) 'Spoke ${agoText(lastContactOf(note)!, DateTime.now())}',
+                ].join('. '),
                 style: G.text(15, color: G.muted, height: 1.25)),
           ]),
         ),
         if (phone != null) ...[
           IconButton(
             tooltip: 'Call',
-            onPressed: () => openLink(context, 'tel:${dialNumber(phone)}'),
+            onPressed: () => contactPerson(context, note, whatsApp: false, then: onChanged),
             icon: Icon(Icons.call_outlined, color: G.accent),
           ),
           IconButton(
             tooltip: 'WhatsApp',
-            onPressed: () => openLink(context, 'https://wa.me/${dialNumber(phone).replaceAll(RegExp(r'\D'), '')}'),
+            onPressed: () => contactPerson(context, note, whatsApp: true, then: onChanged),
             icon: Icon(Icons.chat_outlined, color: G.accent),
           ),
         ],

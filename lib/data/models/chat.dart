@@ -206,6 +206,7 @@ class ChatMessage {
   final List<String> suggestions; // habits Ally offers, added only on a tap
   final ChatCapacity? capacity;
   final bool aiDown; // every AI provider failed, so this is the plain fallback answer
+  final bool aiLimit; // today's free AI is used up, so this was answered without it
   const ChatMessage(
       {required this.fromUser,
       required this.text,
@@ -213,7 +214,8 @@ class ChatMessage {
       this.role,
       this.suggestions = const [],
       this.capacity,
-      this.aiDown = false});
+      this.aiDown = false,
+      this.aiLimit = false});
 
   ChatMessage copyWith({List<ChatAction>? actions, List<String>? suggestions, ChatCapacity? capacity}) => ChatMessage(
       fromUser: fromUser,
@@ -222,7 +224,8 @@ class ChatMessage {
       role: role,
       suggestions: suggestions ?? this.suggestions,
       capacity: capacity ?? this.capacity,
-      aiDown: aiDown);
+      aiDown: aiDown,
+      aiLimit: aiLimit);
 
   /// What this reply made or touched, newest last (for "move it", "undo that").
   List<Json> get refs => fromUser ? const [] : [for (final a in actions) ?a.ref];
@@ -235,10 +238,12 @@ class ChatMessage {
         if (suggestions.isNotEmpty) 's': suggestions,
         if (capacity != null) 'c': capacity!.toJson(),
         if (aiDown) 'd': true,
+        if (aiLimit) 'l': true,
       };
 
   factory ChatMessage.fromJson(Json j) => ChatMessage(
         aiDown: asBool(j['d']),
+        aiLimit: asBool(j['l']),
         fromUser: asBool(j['u']),
         text: asString(j['t']),
         actions: ((j['a'] as List?) ?? const [])
@@ -258,7 +263,8 @@ class ChatReply {
   final List<String> suggestions;
   final ChatCapacity? capacity;
   final bool aiDown;
-  const ChatReply(this.reply, this.actions, this.role, [this.suggestions = const [], this.capacity, this.aiDown = false]);
+  final bool aiLimit;
+  const ChatReply(this.reply, this.actions, this.role, [this.suggestions = const [], this.capacity, this.aiDown = false, this.aiLimit = false]);
 
   factory ChatReply.fromJson(Json j) => ChatReply(
         asString(j['reply']),
@@ -271,6 +277,7 @@ class ChatReply {
             .toList(),
         j['capacity'] is Json ? ChatCapacity.fromJson(j['capacity'] as Json) : null,
         asBool(j['aiDown']),
+        asBool(j['aiLimit']),
       );
 }
 

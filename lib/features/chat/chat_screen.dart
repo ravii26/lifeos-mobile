@@ -764,6 +764,7 @@ class _Bubble extends StatelessWidget {
                 child: Text(m.text, style: G.text(23, w: FontWeight.w500, height: 1.25, letterSpacing: -0.3)),
               ),
               if (isCrisisReply(m.text)) const _HelpNow(),
+              if (m.aiLimit) const AiLimitCard(),
               if (m.aiDown)
                 Container(
                   margin: const EdgeInsets.only(top: 10),
@@ -1582,4 +1583,36 @@ class _TalkBar extends StatelessWidget {
       ]),
     );
   }
+}
+
+/// Today's free AI is used up. Says what still works, and that it comes back tomorrow.
+class AiLimitCard extends StatelessWidget {
+  const AiLimitCard({super.key});
+
+  static const stillFree = ['Reminders', 'Your Now card', '+1 water, lists and timers'];
+
+  @override
+  Widget build(BuildContext context) => Container(
+        margin: const EdgeInsets.only(top: 12),
+        padding: const EdgeInsets.all(18),
+        width: double.infinity,
+        decoration: BoxDecoration(color: G.card, borderRadius: BorderRadius.circular(24)),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text("That's today's free chats.", style: G.text(25, w: FontWeight.w600, height: 1.15, letterSpacing: -0.4)),
+          const SizedBox(height: 8),
+          Text('These still work, free and unlimited:', style: G.text(17, color: G.muted, height: 1.35)),
+          const SizedBox(height: 8),
+          for (final s in stillFree)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 3),
+              child: Row(children: [
+                Icon(Icons.check_rounded, size: 20, color: G.accent),
+                const SizedBox(width: 10),
+                Expanded(child: Text(s, style: G.text(18, height: 1.3))),
+              ]),
+            ),
+          const SizedBox(height: 10),
+          Text("I'll be back to full thinking tomorrow.", style: G.text(17, color: G.muted, height: 1.35)),
+        ]),
+      );
 }

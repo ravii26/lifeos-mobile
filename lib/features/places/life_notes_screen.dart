@@ -67,6 +67,8 @@ class _LifeNotesScreenState extends State<LifeNotesScreen> {
             const SizedBox(height: 18),
             if (_error != null) Text(_error!, style: G.text(17, color: G.muted, height: 1.4)),
             if (notes == null && _error == null) Text('Loading…', style: G.text(18, color: G.muted)),
+            if (widget.page == LifeNotes.people && notes != null)
+              if (quietPerson(notes, DateTime.now()) case final quiet?) _WhileCard(quiet, onChanged: _load),
             for (final n in notes ?? const <Map<String, dynamic>>[]) SpecialNoteCard(n, onChanged: _load),
             if (notes != null && notes.isEmpty) Text(hint, style: G.text(19, color: G.muted, height: 1.4)),
             if (notes != null) ...[
@@ -79,6 +81,40 @@ class _LifeNotesScreenState extends State<LifeNotesScreen> {
           ],
         ),
       ),
+    );
+  }
+}
+
+/// "It's been a while": the one person you have gone longest without speaking to.
+class _WhileCard extends StatelessWidget {
+  final Map<String, dynamic> person;
+  final VoidCallback onChanged;
+  const _WhileCard(this.person, {required this.onChanged});
+
+  @override
+  Widget build(BuildContext context) {
+    final last = lastContactOf(person)!;
+    final hasPhone = phoneOf(person) != null;
+    return Container(
+      margin: const EdgeInsets.only(bottom: 18),
+      padding: const EdgeInsets.all(20),
+      width: double.infinity,
+      decoration: BoxDecoration(color: G.accent, borderRadius: BorderRadius.circular(30)),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text("It's been a while", style: G.text(16, color: G.onInk, height: 1.2)),
+        const SizedBox(height: 6),
+        Text('${person['title']}', style: G.text(34, w: FontWeight.w600, color: G.onInk, height: 1.1, letterSpacing: -0.8)),
+        const SizedBox(height: 6),
+        Text('You last spoke ${agoText(last, DateTime.now())}.', style: G.text(18, color: G.onInk, height: 1.35)),
+        if (hasPhone) ...[
+          const SizedBox(height: 16),
+          Row(children: [
+            Expanded(child: GPill('Call', primary: true, onTap: () => contactPerson(context, person, whatsApp: false, then: onChanged))),
+            const SizedBox(width: 8),
+            Expanded(child: GPill('WhatsApp', onTap: () => contactPerson(context, person, whatsApp: true, then: onChanged))),
+          ]),
+        ],
+      ]),
     );
   }
 }

@@ -11,7 +11,11 @@ import 'package:lifeos_mobile/data/models/vault_item.dart';
 import 'package:lifeos_mobile/data/repositories/life_repository.dart';
 import 'package:lifeos_mobile/features/areas/area_detail_screen.dart';
 import 'package:lifeos_mobile/features/areas/areas_screen.dart';
+import 'package:lifeos_mobile/data/models/chat.dart';
 import 'package:lifeos_mobile/features/capture/capture_sheet.dart';
+import 'package:lifeos_mobile/features/chat/chat_screen.dart' show AiLimitCard;
+import 'package:lifeos_mobile/features/places/life_notes_screen.dart';
+import 'package:lifeos_mobile/features/places/note_cards.dart';
 import 'package:lifeos_mobile/features/focus/focus_screen.dart';
 import 'package:lifeos_mobile/features/habits/habit_detail_screen.dart';
 import 'package:lifeos_mobile/features/more/settings_screen.dart';
@@ -55,6 +59,14 @@ class _Repo implements LifeRepository {
           'title': 'Breakfasts',
           'template': 'LIST',
           'items': ['Poha', 'Oats'],
+        },
+        {
+          'id': 'p',
+          'collection': 'People',
+          'title': 'Rahul',
+          'template': 'INFO',
+          'items': <String>[],
+          'meta': {'phone': '9876543210', 'lastContact': DateTime.now().subtract(const Duration(days: 22)).toIso8601String()},
         },
       ];
 
@@ -199,5 +211,38 @@ void main() {
     await t.enterText(find.byType(TextField), 'DELETE');
     await t.pump();
     expect(t.widget<OutlinedButton>(button).onPressed, isNotNull);
+  });
+
+  test('people: how long ago, and who has gone quiet', () {
+    final now = DateTime(2026, 11, 11, 10);
+    expect(agoText(DateTime(2026, 11, 11, 8), now), 'today');
+    expect(agoText(DateTime(2026, 11, 10, 23), now), 'yesterday');
+    expect(agoText(DateTime(2026, 11, 6), now), '5 days ago');
+    expect(agoText(DateTime(2026, 10, 20), now), '3 weeks ago');
+    expect(agoText(DateTime(2026, 8, 1), now), '3 months ago');
+    Map<String, dynamic> person(String name, DateTime? last) => {'title': name, if (last != null) 'meta': {'lastContact': last.toIso8601String()}};
+    final people = [person('Amit', DateTime(2026, 11, 10)), person('Rahul', DateTime(2026, 10, 1)), person('Priya', DateTime(2026, 10, 15)), person('New', null)];
+    expect(quietPerson(people, now)?['title'], 'Rahul');
+    expect(quietPerson([person('Amit', DateTime(2026, 11, 1))], now), isNull);
+    expect(quietPerson([person('New', null)], now), isNull);
+  });
+
+  testWidgets('people shows who it has been a while with', (t) async {
+    await show(t, const LifeNotesScreen(page: LifeNotes.people));
+    expect(find.text("It's been a while"), findsOneWidget);
+    expect(find.text('You last spoke 3 weeks ago.'), findsOneWidget);
+    expect(find.text('Call'), findsOneWidget);
+  });
+
+  testWidgets('the daily limit card fits and says what still works', (t) async {
+    await show(t, const Scaffold(body: AiLimitCard()));
+    expect(find.text("That's today's free chats."), findsOneWidget);
+    expect(find.text('Reminders'), findsOneWidget);
+  });
+
+  test('a reply over the daily limit is remembered as one', () {
+    expect(ChatReply.fromJson({'reply': 'x', 'aiLimit': true}).aiLimit, isTrue);
+    expect(ChatMessage.fromJson(const ChatMessage(fromUser: false, text: 'x', aiLimit: true).toJson()).aiLimit, isTrue);
+    expect(ChatMessage.fromJson(const ChatMessage(fromUser: false, text: 'x').toJson()).aiLimit, isFalse);
   });
 }
