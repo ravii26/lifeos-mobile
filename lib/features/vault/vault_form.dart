@@ -103,11 +103,11 @@ class _VaultFormState extends State<VaultForm> {
   @override
   Widget build(BuildContext context) {
     return FormSheet(
-      title: _isEdit ? 'Edit vault item' : 'New vault item',
+      title: _isEdit ? 'Edit this' : 'Add to the Vault',
       children: [
-        formField(_title, 'Title', autofocus: !_isEdit),
+        formField(_title, 'Give it a name', autofocus: !_isEdit),
         const SizedBox(height: 10),
-        formField(_content, 'Content — the quote, win or protocol…', lines: 4),
+        formField(_content, 'The words, win or plan you want to keep', lines: 4),
         const SizedBox(height: 16),
         formLabel('Type'),
         chipWrap([
@@ -127,13 +127,13 @@ class _VaultFormState extends State<VaultForm> {
         formLabel('Link (optional)'),
         formField(_url, 'https://…', keyboard: TextInputType.url),
         const SizedBox(height: 14),
-        formLabel('Trigger tags (comma-separated)'),
-        formField(_tags, 'e.g. low-energy, doubt'),
+        formLabel('When should it come back? (commas between)'),
+        formField(_tags, 'Like tired, doubting myself'),
         const SizedBox(height: 22),
-        saveButton(_saving, _save, _isEdit ? 'Save changes' : 'Add to vault'),
+        saveButton(_saving, _save, _isEdit ? 'Save changes' : 'Keep it'),
         if (_isEdit) ...[
           const SizedBox(height: 6),
-          deleteRow(context, 'Delete item', () async {
+          deleteRow(context, 'Delete this', () async {
             if (await confirmDelete(
                 context, '“${widget.item!.title}” will be removed.')) {
               await getIt<LifeRepository>().deleteVaultItem(widget.item!.id);

@@ -9,63 +9,60 @@ import 'package:google_fonts/google_fonts.dart';
 /// [dark] is set once at the app root (see main.dart) and the tree is rebuilt
 /// when it changes.
 ///
-/// Nocturne Sanctuary design system — see stitch_ally_personal_assistant_design/.
+/// Plum look: one peach card for the one thing, ivory for the main action.
+/// Dark only for now, so [dark] starts true and the night values are what ship.
 class G {
-  static bool dark = false;
+  static bool dark = true;
 
   static Color _p(int light, int night) => Color(dark ? night : light);
 
   // — Surfaces —
-  /// Base canvas: #111214 (night) / #F2F2EF (day)
-  static Color get bg => _p(0xFFF2F2EF, 0xFF111214);
+  /// Base canvas: plum background
+  static Color get bg => _p(0xFFF2F2EF, 0xFF1C1026);
 
-  /// Slightly raised surface: surface-container-low
-  static Color get card => _p(0xFFF9F9F7, 0xFF1B1C1E);
+  /// Raised surface: cards and second-choice buttons
+  static Color get card => _p(0xFFF9F9F7, 0xFF2F1D3D);
 
-  /// surface-container
-  static Color get surface => _p(0xFFEFEFED, 0xFF1F2022);
+  /// Same level as a card
+  static Color get surface => _p(0xFFEFEFED, 0xFF2F1D3D);
 
-  /// surface-container-high
-  static Color get surfaceHigh => _p(0xFFE8E8E6, 0xFF292A2C);
+  /// One step up: soft plum
+  static Color get surfaceHigh => _p(0xFFE8E8E6, 0xFF4A2A58);
 
-  /// surface-container-lowest
-  static Color get inset => _p(0xFFF5F5F3, 0xFF0D0E10);
+  /// Set into the background
+  static Color get inset => _p(0xFFF5F5F3, 0xFF2B1A39);
 
   // — Text —
-  /// on-surface: #ECE9E1 (night) / #15140F (day)
-  static Color get ink => _p(0xFF15140F, 0xFFE3E2E4);
+  /// Ivory body text
+  static Color get ink => _p(0xFF15140F, 0xFFFBF1EC);
 
-  /// on-surface-variant: muted secondary text
-  static Color get muted => _p(0xFF5B5A53, 0xFFC5C5D3);
+  /// Supporting text
+  static Color get muted => _p(0xFF5B5A53, 0xFFD9C8D6);
 
-  /// outline: even more muted
-  static Color get faint => _p(0xFF8B8B82, 0xFF8F909D);
+  /// Quietest text that still reads on plum
+  static Color get faint => _p(0xFF8B8B82, 0xFFBCA9BE);
 
   // — Hairlines —
-  /// outline-variant hairline: #2A2B2E (night)
-  static Color get line => _p(0xFFD9D8D1, 0xFF454652);
+  static Color get line => _p(0xFFD9D8D1, 0xFF4A2A58);
 
   /// Softer hairline for section dividers
-  static Color get lineSoft => _p(0xFFE9E8E2, 0xFF2A2B2E);
+  static Color get lineSoft => _p(0xFFE9E8E2, 0xFF2F1D3D);
 
   // — Semantic —
-  /// Calm Slate-Indigo — primary accent: #8FA2FF
-  static Color get accent => _p(0xFF2B44D0, 0xFFB9C3FF);
+  /// Peach: the one thing that matters on a screen
+  static Color get accent => _p(0xFF2B44D0, 0xFFF6C9B2);
 
-  /// Primary container (slightly stronger): #8FA2FF
-  static Color get accentStrong => _p(0xFF2B44D0, 0xFF8FA2FF);
+  static Color get accentStrong => _p(0xFF2B44D0, 0xFFF6C9B2);
 
-  /// Sage Canopy — completed/resolved: #92D5A7 (secondary)
-  static Color get good => _p(0xFF3E7F57, 0xFF92D5A7);
+  /// Finished and kept: peach too, so a tick never looks like a score
+  static Color get good => _p(0xFF3E7F57, 0xFFF6C9B2);
 
-  /// Sage background: secondary-container
-  static Color get goodSoft => _p(0xFFE1EBE3, 0xFF07522E);
+  static Color get goodSoft => _p(0xFFE1EBE3, 0xFF4A2A58);
 
-  /// Carried-Over Ochre — deferred/carried: #FFBB80 (tertiary)
-  static Color get carried => _p(0xFFA4642E, 0xFFFFB780);
+  static Color get carried => _p(0xFFA4642E, 0xFFF6C9B2);
 
-  /// The ink colour on accent-filled buttons (on-primary)
-  static Color get onInk => _p(0xFFF2F2EF, 0xFF111214);
+  /// The ink colour on peach and ivory fills
+  static Color get onInk => _p(0xFFF2F2EF, 0xFF2A1420);
 
   // — Backward-compatibility aliases (old G getters used across the codebase) —
   /// Alias for [card] — slightly raised surface.
@@ -92,7 +89,7 @@ class G {
   /// Instrument Sans — Ally's voice for headlines.
   static TextStyle display(double size,
           {Color? color, FontWeight w = FontWeight.w400}) =>
-      GoogleFonts.instrumentSans(
+      GoogleFonts.outfit(
           fontSize: size,
           fontWeight: FontWeight.w400,
           color: color ?? ink,
@@ -105,7 +102,7 @@ class G {
           FontWeight w = FontWeight.w400,
           double height = 1.5,
           double letterSpacing = 0}) =>
-      GoogleFonts.instrumentSans(
+      GoogleFonts.outfit(
           fontSize: size,
           fontWeight: w,
           color: color ?? ink,
@@ -114,7 +111,7 @@ class G {
 
   /// Ally's own voice: plain sans, used for the one sentence that matters.
   static TextStyle voice(double size, {Color? color}) =>
-      GoogleFonts.instrumentSans(
+      GoogleFonts.outfit(
           fontSize: size,
           color: color ?? muted,
           height: size >= 28 ? 1.17 : 1.4,
@@ -126,8 +123,9 @@ class G {
           Color? color,
           FontWeight w = FontWeight.w500,
           double letterSpacing = 0.04}) =>
-      GoogleFonts.instrumentSans(
-          fontSize: size,
+      GoogleFonts.outfit(
+          // Older screens ask for 10 and 11, which is too small to read comfortably.
+          fontSize: size < 13 ? 13 : size,
           fontWeight: w,
           color: color ?? faint,
           height: 1.2,
@@ -135,7 +133,7 @@ class G {
 
   /// Large numeral: light weight, tight tracking.
   static TextStyle numeral(double size, {Color? color}) =>
-      GoogleFonts.instrumentSans(
+      GoogleFonts.outfit(
           fontSize: size,
           fontWeight: FontWeight.w400,
           color: color ?? ink,
@@ -145,7 +143,136 @@ class G {
 
 // ─── Shared Components ────────────────────────────────────────────────────────
 
-/// The primary button: filled ink, 6px corners, no shadow.
+/// Ally's mark: three circles, peach at the centre.
+class AllyOrb extends StatelessWidget {
+  final double size;
+  const AllyOrb({super.key, this.size = 54});
+
+  Widget _ring(double scale, Color color, [Widget? child]) => Container(
+        width: size * scale,
+        height: size * scale,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(shape: BoxShape.circle, color: color),
+        child: child,
+      );
+
+  @override
+  Widget build(BuildContext context) =>
+      _ring(1, G.inset, _ring(0.72, G.surfaceHigh, _ring(0.44, G.accent)));
+}
+
+/// A rounded button. [primary] is the single main action on a screen.
+class GPill extends StatelessWidget {
+  final String label;
+  final VoidCallback? onTap;
+  final bool primary;
+  const GPill(this.label, {super.key, this.onTap, this.primary = false});
+
+  @override
+  Widget build(BuildContext context) {
+    final height = primary ? 66.0 : 54.0;
+    return SizedBox(
+      height: height,
+      child: TextButton(
+        onPressed: onTap,
+        style: TextButton.styleFrom(
+          backgroundColor: primary ? G.ink : G.card,
+          disabledBackgroundColor: (primary ? G.ink : G.card).withValues(alpha: 0.5),
+          foregroundColor: primary ? G.onInk : G.ink,
+          padding: const EdgeInsets.symmetric(horizontal: 10),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(height / 2)),
+        ),
+        // Three pills share a row on a 360-wide phone: shrink the word, never cut it.
+        child: FittedBox(
+          fit: BoxFit.scaleDown,
+          child: Text(
+            label,
+            maxLines: 1,
+            style: G.text(primary ? 20 : 17,
+                w: primary ? FontWeight.w600 : FontWeight.w500,
+                color: primary ? G.onInk : G.ink,
+                height: 1.2),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Top bar of a pushed page: only the back arrow and any actions. The page's
+/// big title ([GTitle]) sits in the body and scrolls with it.
+PreferredSizeWidget gBar({List<Widget>? actions}) => AppBar(
+      backgroundColor: G.bg,
+      surfaceTintColor: G.bg,
+      foregroundColor: G.ink,
+      elevation: 0,
+      actions: actions,
+    );
+
+/// A page's big title and, optionally, one plain line under it.
+class GTitle extends StatelessWidget {
+  final String text;
+  final String? sub;
+  final double size;
+  const GTitle(this.text, {super.key, this.sub, this.size = 44});
+
+  @override
+  Widget build(BuildContext context) => Padding(
+        padding: const EdgeInsets.only(bottom: 20),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text(text, style: G.text(size, w: FontWeight.w600, height: 1.05, letterSpacing: -size * 0.03)),
+          if (sub != null) ...[
+            const SizedBox(height: 10),
+            Text(sub!, style: G.text(18, color: G.muted, height: 1.35)),
+          ],
+        ]),
+      );
+}
+
+/// A raised rounded card. Tappable when [onTap] or [onLongPress] is given.
+class GCard extends StatelessWidget {
+  final Widget child;
+  final EdgeInsets padding;
+  final EdgeInsets margin;
+  final Color? color;
+  final VoidCallback? onTap;
+  final VoidCallback? onLongPress;
+  const GCard({
+    super.key,
+    required this.child,
+    this.padding = const EdgeInsets.all(18),
+    this.margin = const EdgeInsets.only(bottom: 10),
+    this.color,
+    this.onTap,
+    this.onLongPress,
+  });
+
+  @override
+  Widget build(BuildContext context) => Padding(
+        padding: margin,
+        child: Material(
+          color: color ?? G.card,
+          borderRadius: BorderRadius.circular(24),
+          clipBehavior: Clip.antiAlias,
+          child: InkWell(
+            onTap: onTap,
+            onLongPress: onLongPress,
+            child: Padding(padding: padding, child: SizedBox(width: double.infinity, child: child)),
+          ),
+        ),
+      );
+}
+
+/// One plain sentence in a card for a list with nothing in it.
+class GEmpty extends StatelessWidget {
+  final String text;
+  const GEmpty(this.text, {super.key});
+
+  @override
+  Widget build(BuildContext context) => GCard(child: Text(text, style: G.text(18, color: G.muted, height: 1.35)));
+}
+
+/// The primary button: a full-width ivory pill, or a quiet one.
 class GButton extends StatelessWidget {
   final String label;
   final VoidCallback? onTap;
@@ -157,33 +284,32 @@ class GButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      height: 48,
+      height: 56,
       width: double.infinity,
       child: TextButton(
         onPressed: onTap,
         style: TextButton.styleFrom(
-          backgroundColor: primary
-              ? G.accentStrong.withValues(alpha: 0.18)
-              : Colors.transparent,
-          foregroundColor: primary ? G.accent : G.muted,
-          side: BorderSide(
-              color: primary
-                  ? G.accentStrong.withValues(alpha: 0.3)
-                  : G.line.withValues(alpha: 0.5)),
+          backgroundColor: primary ? G.ink : G.card,
+          disabledBackgroundColor: (primary ? G.ink : G.card).withValues(alpha: 0.5),
+          foregroundColor: primary ? G.onInk : G.ink,
           shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
         ),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             if (icon != null) ...[
-              Icon(icon, size: 18, color: primary ? G.accent : G.muted),
+              Icon(icon, size: 20, color: primary ? G.onInk : G.ink),
               const SizedBox(width: 8),
             ],
-            Text(
-              label,
-              style: G.text(15,
-                  w: FontWeight.w500, color: primary ? G.accent : G.muted),
+            Flexible(
+              child: Text(
+                label,
+                maxLines: 2,
+                textAlign: TextAlign.center,
+                style: G.text(18,
+                    w: FontWeight.w500, color: primary ? G.onInk : G.ink, height: 1.2),
+              ),
             ),
           ],
         ),
@@ -220,20 +346,16 @@ class GTopBar extends StatelessWidget implements PreferredSizeWidget {
   });
 
   @override
-  Size get preferredSize => const Size.fromHeight(56);
+  Size get preferredSize => const Size.fromHeight(64);
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      decoration: BoxDecoration(
-        color: G.bg,
-        border:
-            Border(bottom: BorderSide(color: G.lineSoft, width: 0.5)),
-      ),
+      color: G.bg,
       child: SafeArea(
         bottom: false,
         child: SizedBox(
-          height: 56,
+          height: 64,
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
             child: Row(
@@ -243,13 +365,11 @@ class GTopBar extends StatelessWidget implements PreferredSizeWidget {
                   leading!
                 else if (showBack || Navigator.of(context).canPop())
                   IconButton(
-                    icon: Icon(Icons.arrow_back_rounded, size: 20, color: G.ink),
-                    padding: EdgeInsets.zero,
-                    constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                    icon: Icon(Icons.arrow_back_rounded, size: 24, color: G.ink),
                     onPressed: () => Navigator.of(context).maybePop(),
                   )
                 else
-                  Icon(Icons.bedtime_outlined, size: 20, color: G.accent),
+                  const AllyOrb(size: 26),
                 const SizedBox(width: 10),
                 // Title + subtitle
                 Expanded(
@@ -258,11 +378,14 @@ class GTopBar extends StatelessWidget implements PreferredSizeWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(title,
-                          style: G.voice(15.5,
-                              color: G.ink)),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: G.text(21, w: FontWeight.w500, height: 1.2)),
                       if (subtitle != null)
                         Text(subtitle!,
-                            style: G.label(size: 11, color: G.faint)),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: G.text(15, color: G.muted, height: 1.25)),
                     ],
                   ),
                 ),
@@ -462,12 +585,13 @@ class GRow extends StatelessWidget {
   Widget build(BuildContext context) => InkWell(
         onTap: onTap,
         child: Container(
+          constraints: const BoxConstraints(minHeight: 60),
           padding: const EdgeInsets.symmetric(vertical: 13),
           decoration: BoxDecoration(
             border: Border(
-                top: BorderSide(color: G.lineSoft, width: 0.5),
+                top: BorderSide(color: G.surfaceHigh),
                 bottom: last
-                    ? BorderSide(color: G.lineSoft, width: 0.5)
+                    ? BorderSide(color: G.surfaceHigh)
                     : BorderSide.none),
           ),
           child:
@@ -476,18 +600,17 @@ class GRow extends StatelessWidget {
               child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(title, style: G.text(15, w: FontWeight.w500)),
+                    Text(title, style: G.text(19, height: 1.3)),
                     if (sub.isNotEmpty)
                       Padding(
                           padding: const EdgeInsets.only(top: 2),
                           child: Text(sub,
-                              style: G.text(13,
-                                  color: G.muted, height: 1.4))),
+                              style: G.text(16,
+                                  color: G.muted, height: 1.35))),
                   ]),
             ),
             const SizedBox(width: 12),
-            Text(action,
-                style: G.label(size: 12, color: G.accent)),
+            Text(action, style: G.text(16, color: G.accent, height: 1.2)),
           ]),
         ),
       );
@@ -499,8 +622,8 @@ class GHeading extends StatelessWidget {
   const GHeading(this.text, {super.key});
   @override
   Widget build(BuildContext context) => Padding(
-      padding: const EdgeInsets.only(top: 24, bottom: 6),
-      child: Text(text, style: G.label(size: 11, color: G.faint)));
+      padding: const EdgeInsets.only(top: 22, bottom: 10),
+      child: Text(text, style: G.text(17, color: G.muted, height: 1.25)));
 }
 
 /// Folded accordion section — Nocturne Plan screen pattern.
@@ -554,13 +677,13 @@ class _GFoldSectionState extends State<GFoldSection>
       decoration: BoxDecoration(
         color: G.inset.withValues(alpha: 0.5),
         border: Border.all(color: G.lineSoft, width: 0.5),
-        borderRadius: BorderRadius.circular(4),
+        borderRadius: BorderRadius.circular(18),
       ),
       child: Column(
         children: [
           InkWell(
             onTap: _toggle,
-            borderRadius: BorderRadius.circular(4),
+            borderRadius: BorderRadius.circular(18),
             child: Padding(
               padding:
                   const EdgeInsets.symmetric(horizontal: 12, vertical: 10),

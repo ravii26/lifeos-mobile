@@ -102,16 +102,12 @@ class _LogScreenState extends State<LogScreen> {
   static String _one(num n) => (n.round() == n ? n.round() : (n * 10).round() / 10).toString();
 
   Widget _section(String title, List<Widget> children) => Container(
-        margin: const EdgeInsets.only(bottom: 14),
-        padding: const EdgeInsets.all(14),
+        margin: const EdgeInsets.only(bottom: 10),
+        padding: const EdgeInsets.fromLTRB(18, 16, 14, 16),
         width: double.infinity,
-        decoration: BoxDecoration(
-          color: G.card,
-          border: Border.all(color: G.lineSoft, width: 0.5),
-          borderRadius: BorderRadius.circular(4),
-        ),
+        decoration: BoxDecoration(color: G.card, borderRadius: BorderRadius.circular(22)),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text(title, style: G.label(size: 11, color: G.faint, w: FontWeight.w600)),
+          Text(title, style: G.text(16, color: G.muted, height: 1.2)),
           const SizedBox(height: 8),
           ...children,
         ]),
@@ -130,71 +126,88 @@ class _LogScreenState extends State<LogScreen> {
 
     return Scaffold(
       backgroundColor: G.bg,
-      appBar: const GTopBar('Log and limits', subtitle: 'Numbers you told Ally', showBack: true),
+      appBar: AppBar(backgroundColor: G.bg, surfaceTintColor: G.bg, foregroundColor: G.ink, elevation: 0),
       body: RefreshIndicator(
         onRefresh: _load,
         child: ListView(
-          padding: const EdgeInsets.fromLTRB(16, 16, 16, 40),
+          padding: const EdgeInsets.fromLTRB(22, 0, 22, 28),
           children: [
+            Text('Log and limits', style: G.text(44, w: FontWeight.w600, height: 1.05, letterSpacing: -1.3)),
+            const SizedBox(height: 16),
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-              decoration: BoxDecoration(color: G.inset, border: Border.all(color: G.lineSoft, width: 0.5), borderRadius: BorderRadius.circular(4)),
+              padding: const EdgeInsets.only(left: 20, right: 6),
+              constraints: const BoxConstraints(minHeight: 62),
+              decoration: BoxDecoration(color: G.card, borderRadius: BorderRadius.circular(31)),
               child: Row(children: [
                 Expanded(
                   child: TextField(
                     controller: _say,
                     onSubmitted: (_) => _send(),
-                    style: G.text(14),
+                    style: G.text(17, height: 1.3),
+                    cursorColor: G.accent,
                     decoration: InputDecoration(
-                      hintText: 'Say it: spent 250 on lunch · slept 7 hours · weight 74',
-                      hintStyle: G.label(size: 12, color: G.faint),
+                      hintText: 'Spent 250 on lunch',
+                      hintStyle: G.text(17, color: G.faint, height: 1.3),
+                      filled: false,
                       border: InputBorder.none,
+                      enabledBorder: InputBorder.none,
+                      focusedBorder: InputBorder.none,
                     ),
                   ),
                 ),
-                IconButton(onPressed: _busy ? null : _send, icon: Icon(Icons.send_rounded, color: G.accent, size: 20)),
+                IconButton(
+                  tooltip: 'Add to log',
+                  onPressed: _busy ? null : _send,
+                  icon: Icon(Icons.arrow_upward_rounded, color: G.onInk, size: 22),
+                  style: IconButton.styleFrom(backgroundColor: G.accent, minimumSize: const Size(50, 50)),
+                ),
               ]),
             ),
             const SizedBox(height: 14),
-            if (_error != null) Text(_error!, style: G.text(14, color: G.carried)),
+            if (_error != null) Text(_error!, style: G.text(17, color: G.muted, height: 1.4)),
             if (d == null && _error == null) Center(child: Padding(padding: const EdgeInsets.all(30), child: CircularProgressIndicator(color: G.accent, strokeWidth: 1.5))),
             if (d != null) ...[
               if (counts.isNotEmpty)
-                _section('TODAY', [
+                _section('Today', [
                   for (final c in counts)
                     Row(children: [
-                      Expanded(child: Text(c['target'] == null ? '${c['title']}: ${c['count']}' : '${c['title']}: ${c['count']} of ${c['target']}', style: G.text(14, w: FontWeight.w500))),
-                      IconButton(onPressed: () => _plus('${c['id']}'), icon: Icon(Icons.add_circle_outline_rounded, color: G.good), tooltip: '+1'),
+                      Expanded(child: Text(c['target'] == null ? '${c['title']}: ${c['count']}' : '${c['title']}: ${c['count']} of ${c['target']}', style: G.text(19, height: 1.25))),
+                      IconButton(
+                        tooltip: 'Add one',
+                        onPressed: () => _plus('${c['id']}'),
+                        icon: Icon(Icons.add_rounded, color: G.onInk),
+                        style: IconButton.styleFrom(backgroundColor: G.accent, minimumSize: const Size(46, 46)),
+                      ),
                     ]),
                 ]),
               if (limits.isNotEmpty)
-                _section('LIMITS', [
-                  for (final l in limits) Padding(padding: const EdgeInsets.symmetric(vertical: 4), child: Text('${l['line']}', style: G.text(14, height: 1.35))),
+                _section('My limits', [
+                  for (final l in limits) Padding(padding: const EdgeInsets.symmetric(vertical: 4), child: Text('${l['line']}', style: G.text(18, height: 1.35))),
                 ]),
-              _section('MONEY THIS MONTH', [
-                Text(asInt(money?['entries']) == 0 ? 'Nothing logged yet.' : _inr(asDouble(money?['monthTotal'])), style: G.text(22, w: FontWeight.w600)),
+              _section('Money this month', [
+                Text(asInt(money?['entries']) == 0 ? 'Nothing logged yet.' : _inr(asDouble(money?['monthTotal'])), style: G.text(asInt(money?['entries']) == 0 ? 18 : 34, w: asInt(money?['entries']) == 0 ? FontWeight.w400 : FontWeight.w600, height: 1.2)),
                 for (final c in categories.take(4))
-                  Padding(padding: const EdgeInsets.only(top: 4), child: Text('${c['category']}  ${_inr(asDouble(c['total']))}', style: G.text(13, color: G.muted))),
+                  Padding(padding: const EdgeInsets.only(top: 4), child: Text('${c['category']}  ${_inr(asDouble(c['total']))}', style: G.text(16, color: G.muted, height: 1.3))),
               ]),
-              _section('SLEEP, LAST 7 DAYS', [
+              _section('Sleep, last 7 days', [
                 Text(
                   asInt(sleep?['nights']) == 0
                       ? 'Nothing logged yet.'
                       : 'Average ${_one(asDouble(sleep?['average']))} h over ${sleep?['nights']} nights. Latest ${_one(asDouble(sleep?['latest']))} h.',
-                  style: G.text(14, height: 1.35),
+                  style: G.text(18, height: 1.35),
                 ),
               ]),
-              _section('WEIGHT', [
+              _section('Weight', [
                 Text(
                   weight?['latest'] == null
                       ? 'Nothing logged yet.'
                       : '${_one(asDouble(weight?['latest']))} kg'
                           '${asInt(weight?['readings']) > 1 ? ', ${(asDouble(weight?['latest']) - asDouble(weight?['first'])) <= 0 ? 'down' : 'up'} ${_one((asDouble(weight?['latest']) - asDouble(weight?['first'])).abs())} kg since ${weight?['firstDate']}' : ''}',
-                  style: G.text(14, height: 1.35),
+                  style: G.text(18, height: 1.35),
                 ),
               ]),
               if (recent.isNotEmpty)
-                _section('LATEST ENTRIES', [
+                _section('Latest entries', [
                   for (final e in recent)
                     Padding(
                       padding: const EdgeInsets.symmetric(vertical: 2),
@@ -202,10 +215,10 @@ class _LogScreenState extends State<LogScreen> {
                         Expanded(
                           child: Text(
                             '${e['date']}  ${e['series']}  ${e['series'] == 'money' ? _inr(asDouble(e['value'])) : '${_one(asDouble(e['value']))} ${e['unit']}'}${e['label'] != null ? '  ${e['label']}' : ''}',
-                            style: G.text(13, color: G.muted),
+                            style: G.text(16, color: G.muted, height: 1.3),
                           ),
                         ),
-                        IconButton(visualDensity: VisualDensity.compact, tooltip: 'Remove', onPressed: () => _remove(e), icon: Icon(Icons.close_rounded, size: 16, color: G.faint)),
+                        IconButton(tooltip: 'Remove', onPressed: () => _remove(e), icon: Icon(Icons.close_rounded, size: 20, color: G.muted)),
                       ]),
                     ),
                 ]),

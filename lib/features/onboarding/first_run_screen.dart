@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../core/api/api_exception.dart';
 import '../../core/di/service_locator.dart';
 import '../../data/repositories/life_repository.dart';
+import '../../widgets/form_kit.dart' show gFieldStyle;
 import '../guide/guide_style.dart';
 import '../more/reminders_check_screen.dart';
 
@@ -76,22 +77,19 @@ class _FirstRunScreenState extends State<FirstRunScreen> {
       backgroundColor: G.bg,
       body: SafeArea(
         child: ListView(
-          padding: const EdgeInsets.fromLTRB(24, 28, 24, 32),
+          padding: const EdgeInsets.fromLTRB(22, 28, 22, 28),
           children: [
-            Text('Hi, I\'m Ally.', style: G.display(30)),
-            const SizedBox(height: 8),
-            Text('Three quick questions so I can fit things into your real day. Skip anything you like.',
-                style: G.text(15, color: G.muted, height: 1.45)),
-            const GHeading('1. WHEN DO YOU WAKE UP AND SLEEP?'),
+            const GTitle("Hi, I'm Ally.", sub: 'Three quick questions so I can fit things into your real day. Skip anything you like.'),
+            const GHeading('When do you wake up and sleep?'),
             Row(children: [
               Expanded(child: _TimeField(label: 'Wake up', time: _wake, onTap: () => _pick(_wake, (t) => _wake = t))),
-              const SizedBox(width: 12),
+              const SizedBox(width: 10),
               Expanded(child: _TimeField(label: 'Sleep', time: _sleep, onTap: () => _pick(_sleep, (t) => _sleep = t))),
             ]),
-            const GHeading('2. OFFICE OR WORK HOURS?'),
+            const GHeading('Do you have work hours?'),
             Row(children: [
-              Expanded(child: Text('I go to work / office', style: G.text(15))),
-              Switch(value: _works, onChanged: (v) => setState(() => _works = v)),
+              Expanded(child: Text('I go to work or an office', style: G.text(18, height: 1.3))),
+              Switch(value: _works, activeThumbColor: G.onInk, activeTrackColor: G.accent, onChanged: (v) => setState(() => _works = v)),
             ]),
             if (_works) ...[
               const SizedBox(height: 8),
@@ -109,35 +107,34 @@ class _FirstRunScreenState extends State<FirstRunScreen> {
               const SizedBox(height: 12),
               Row(children: [
                 Expanded(child: _TimeField(label: 'Starts', time: _officeStart, onTap: () => _pick(_officeStart, (t) => _officeStart = t))),
-                const SizedBox(width: 12),
+                const SizedBox(width: 10),
                 Expanded(child: _TimeField(label: 'Ends', time: _officeEnd, onTap: () => _pick(_officeEnd, (t) => _officeEnd = t))),
               ]),
             ],
-            const GHeading('3. WHAT DO YOU WANT HELP WITH FIRST?'),
+            const GHeading('What do you want help with first?'),
             TextField(
               controller: _help,
               minLines: 2,
               maxLines: 4,
-              style: G.text(15),
-              decoration: InputDecoration(
-                hintText: 'e.g. drink more water, follow my diet, prepare for interviews',
-                hintStyle: G.text(14, color: G.faint),
-                filled: true,
-                fillColor: G.card,
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: G.lineSoft)),
-              ),
+              cursorColor: G.accent,
+              style: G.text(18, height: 1.3),
+              decoration: gFieldStyle('Like drinking more water, or preparing for interviews'),
             ),
-            const SizedBox(height: 6),
-            Text('I\'ll take this as your first message and suggest what to set up. Nothing is saved without your OK.',
-                style: G.label(size: 11, color: G.faint)),
+            const SizedBox(height: 8),
+            Text("I'll take this as your first message. Nothing is saved without your OK.",
+                style: G.text(15, color: G.muted, height: 1.3)),
             if (_error != null) ...[
               const SizedBox(height: 12),
-              Text(_error!, style: G.text(13, color: G.carried)),
+              Text(_error!, style: G.text(16, color: G.accent, height: 1.3)),
             ],
             const SizedBox(height: 24),
-            GButton(_saving ? 'Saving…' : 'Continue', onTap: _saving ? null : _save),
-            const SizedBox(height: 8),
-            GButton('Skip for now', primary: false, onTap: _saving ? null : () => Navigator.of(context).pop()),
+            GPill(_saving ? 'Saving…' : 'Continue', primary: true, onTap: _saving ? null : _save),
+            const SizedBox(height: 4),
+            TextButton(
+              onPressed: _saving ? null : () => Navigator.of(context).pop(),
+              style: TextButton.styleFrom(foregroundColor: G.ink, minimumSize: const Size(64, 48)),
+              child: Text('Skip for now', style: G.text(17, height: 1.2)),
+            ),
           ],
         ),
       ),
@@ -152,22 +149,15 @@ class _TimeField extends StatelessWidget {
   const _TimeField({required this.label, required this.time, required this.onTap});
 
   @override
-  Widget build(BuildContext context) => InkWell(
+  Widget build(BuildContext context) => GCard(
+        margin: EdgeInsets.zero,
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         onTap: onTap,
-        borderRadius: BorderRadius.circular(8),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-          decoration: BoxDecoration(
-            color: G.card,
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: G.lineSoft),
-          ),
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(label, style: G.label(size: 11, color: G.faint)),
-            const SizedBox(height: 2),
-            Text(time.format(context), style: G.text(18, w: FontWeight.w500)),
-          ]),
-        ),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text(label, style: G.text(15, color: G.muted, height: 1.25)),
+          const SizedBox(height: 2),
+          FittedBox(fit: BoxFit.scaleDown, alignment: Alignment.centerLeft, child: Text(time.format(context), style: G.text(25, w: FontWeight.w500, height: 1.2))),
+        ]),
       );
 }
 
@@ -182,15 +172,11 @@ class _DayChip extends StatelessWidget {
         onTap: onTap,
         customBorder: const CircleBorder(),
         child: Container(
-          width: 40,
-          height: 40,
+          width: 44,
+          height: 44,
           alignment: Alignment.center,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            color: on ? G.accentStrong.withValues(alpha: 0.18) : Colors.transparent,
-            border: Border.all(color: on ? G.accent : G.line),
-          ),
-          child: Text(letter, style: G.text(14, w: FontWeight.w600, color: on ? G.accent : G.muted)),
+          decoration: BoxDecoration(shape: BoxShape.circle, color: on ? G.accent : G.card),
+          child: Text(letter, style: G.text(16, w: FontWeight.w600, color: on ? G.onInk : G.muted, height: 1.2)),
         ),
       );
 }

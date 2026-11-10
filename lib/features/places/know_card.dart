@@ -90,31 +90,28 @@ class _KnowCardState extends State<KnowCard> {
     if (q == null && _message == null) return const SizedBox.shrink();
     return Container(
       width: double.infinity,
-      margin: const EdgeInsets.fromLTRB(24, 8, 24, 4),
-      padding: const EdgeInsets.fromLTRB(14, 12, 14, 10),
-      decoration: BoxDecoration(
-        color: G.card,
-        border: Border.all(color: G.lineSoft, width: 0.5),
-        borderRadius: BorderRadius.circular(4),
-      ),
+      margin: const EdgeInsets.only(top: 14),
+      padding: const EdgeInsets.fromLTRB(18, 16, 18, 10),
+      decoration: BoxDecoration(color: G.card, borderRadius: BorderRadius.circular(22)),
       child: q == null
-          ? Text(_message!, style: G.text(14, color: G.muted, height: 1.4))
+          ? Text(_message!, style: G.text(17, color: G.muted, height: 1.35))
           : Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text('A quick question${_data!.total > 0 ? ' · ${_data!.answered} of ${_data!.total} answered' : ''}', style: G.label(size: 11, color: G.faint)),
+              Text('One quick question', style: G.text(16, color: G.accent, height: 1.2)),
               const SizedBox(height: 6),
-              Text(q.text, style: G.voice(17, color: G.ink)),
-              const SizedBox(height: 2),
-              Text(q.why, style: G.text(12, color: G.muted, height: 1.35)),
-              if (_message != null) Padding(padding: const EdgeInsets.only(top: 8), child: Text(_message!, style: G.text(13, color: G.accent, height: 1.4))),
+              Text(q.text, style: G.text(25, w: FontWeight.w600, height: 1.14, letterSpacing: -0.4)),
+              const SizedBox(height: 5),
+              Text(q.why, style: G.text(16, color: G.muted, height: 1.35)),
+              if (_message != null) Padding(padding: const EdgeInsets.only(top: 8), child: Text(_message!, style: G.text(16, color: G.accent, height: 1.35))),
               if (q.options.isNotEmpty) ...[
                 const SizedBox(height: 10),
                 Wrap(spacing: 8, runSpacing: 8, children: [
                   for (final o in q.options)
                     ActionChip(
-                      label: Text(o, style: G.text(14, w: FontWeight.w600)),
-                      backgroundColor: Colors.transparent,
-                      side: BorderSide(color: G.line),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+                      label: Text(o, style: G.text(16, height: 1.2)),
+                      backgroundColor: G.surfaceHigh,
+                      side: BorderSide.none,
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                      shape: const StadiumBorder(),
                       onPressed: _busy ? null : () => _send(answer: o),
                     ),
                 ]),
@@ -126,11 +123,11 @@ class _KnowCardState extends State<KnowCard> {
                     child: TextField(
                       controller: _text,
                       enabled: !_busy,
-                      style: G.text(14),
+                      style: G.text(17, height: 1.3),
                       textInputAction: TextInputAction.send,
                       textCapitalization: TextCapitalization.sentences,
                       onSubmitted: (v) => _send(answer: v),
-                      decoration: InputDecoration(hintText: q.hint ?? 'Or type your own', hintStyle: G.text(13, color: G.faint), isDense: true),
+                      decoration: InputDecoration(hintText: q.hint ?? 'Or type your own', hintStyle: G.text(17, color: G.faint, height: 1.3), isDense: true),
                     ),
                   ),
                   IconButton(onPressed: _busy ? null : () => _send(answer: _text.text), icon: Icon(Icons.arrow_upward_rounded, size: 20, color: G.accent)),
@@ -140,7 +137,7 @@ class _KnowCardState extends State<KnowCard> {
                 alignment: Alignment.centerRight,
                 child: TextButton(
                   onPressed: _busy ? null : () => _send(skip: true),
-                  child: Text('Not now', style: G.text(13, color: G.muted)),
+                  child: Text('Skip for now', style: G.text(16, color: G.ink, height: 1.2)),
                 ),
               ),
             ]),

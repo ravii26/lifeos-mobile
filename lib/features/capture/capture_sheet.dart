@@ -1,18 +1,16 @@
 import 'dart:io';
-import 'dart:ui';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:speech_to_text/speech_to_text.dart';
 
 import '../../core/di/service_locator.dart';
-import '../../core/theme/app_colors.dart';
 import '../../data/models/capture.dart';
 import '../../data/models/topic.dart';
 import '../../data/repositories/life_repository.dart';
-import '../../widgets/bits.dart';
+import '../../widgets/form_kit.dart' show gFieldStyle;
+import '../guide/guide_style.dart';
 import '../shell/life_cubit.dart';
 
 /// Quick-capture brain dump — posts to /captures, shows pending inbox with
@@ -148,19 +146,19 @@ class _CaptureSheetState extends State<CaptureSheet> {
   Future<void> _captureImage() async {
     final source = await showModalBottomSheet<ImageSource>(
       context: context,
-      backgroundColor: AppColors.surface1,
+      backgroundColor: G.bg,
       builder: (ctx) => SafeArea(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             ListTile(
-              leading: Icon(Icons.camera_alt_outlined, color: AppColors.tx),
-              title: Text('Take a photo', style: TextStyle(color: AppColors.tx)),
+              leading: Icon(Icons.camera_alt_outlined, color: G.ink),
+              title: Text('Take a photo', style: G.text(18, height: 1.3)),
               onTap: () => Navigator.pop(ctx, ImageSource.camera),
             ),
             ListTile(
-              leading: Icon(Icons.photo_library_outlined, color: AppColors.tx),
-              title: Text('Choose from gallery', style: TextStyle(color: AppColors.tx)),
+              leading: Icon(Icons.photo_library_outlined, color: G.ink),
+              title: Text('Choose from gallery', style: G.text(18, height: 1.3)),
               onTap: () => Navigator.pop(ctx, ImageSource.gallery),
             ),
           ],
@@ -195,9 +193,9 @@ class _CaptureSheetState extends State<CaptureSheet> {
   static const _captureTypes = ['TASK', 'HABIT', 'NOTE', 'RESOURCE', 'VAULT'];
 
   String _dest(String type) => switch (type) {
-        'TASK' => 'Tasks',
+        'TASK' => 'To-dos',
         'HABIT' => 'Habits',
-        'NOTE' => 'a Notebook',
+        'NOTE' => 'Notes',
         'RESOURCE' => 'Resources',
         'VAULT' => 'the Vault',
         _ => type,
@@ -207,8 +205,6 @@ class _CaptureSheetState extends State<CaptureSheet> {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
       content: Text(msg),
-      backgroundColor: error ? AppColors.danger : AppColors.surface4,
-      behavior: SnackBarBehavior.floating,
     ));
   }
 
@@ -232,7 +228,7 @@ class _CaptureSheetState extends State<CaptureSheet> {
     final cubit = context.read<LifeCubit>();
     final type = await cubit.convertCapture(c.id, areaId: areaId, topicId: topicId);
     if (type != null) {
-      _snack('Added to ${_dest(type)} ✓');
+      _snack('Added to ${_dest(type)}');
     } else {
       _snack(cubit.state.error ?? 'Could not convert', error: true);
       cubit.clearError();
@@ -242,14 +238,14 @@ class _CaptureSheetState extends State<CaptureSheet> {
   Future<String?> _pickArea() {
     final areas = context.read<LifeCubit>().state.areas;
     if (areas.isEmpty) {
-      _snack('Create an Area first to file this here', error: true);
+      _snack('Add a part of life first, then file this there.', error: true);
       return Future.value(null);
     }
     return showModalBottomSheet<String>(
       context: context,
-      backgroundColor: AppColors.surface1,
+      backgroundColor: G.bg,
       builder: (ctx) => _PickerSheet(
-        title: 'File under which area?',
+        title: 'Which part of life?',
         items: [for (final a in areas) (a.id, a.name)],
       ),
     );
@@ -270,7 +266,7 @@ class _CaptureSheetState extends State<CaptureSheet> {
     }
     return showModalBottomSheet<String>(
       context: context,
-      backgroundColor: AppColors.surface1,
+      backgroundColor: G.bg,
       builder: (ctx) => _PickerSheet(
         title: 'File under which topic?',
         items: [for (final t in topics) (t.id, t.title)],
@@ -282,9 +278,9 @@ class _CaptureSheetState extends State<CaptureSheet> {
   Future<void> _reclassify(Capture c) async {
     final picked = await showModalBottomSheet<String>(
       context: context,
-      backgroundColor: AppColors.surface1,
+      backgroundColor: G.bg,
       builder: (ctx) => _PickerSheet(
-        title: 'Reclassify as…',
+        title: 'Where should it go?',
         items: [for (final t in _captureTypes) (t, _dest(t))],
         selected: c.type,
       ),
@@ -299,349 +295,205 @@ class _CaptureSheetState extends State<CaptureSheet> {
     final bottomInset = MediaQuery.of(context).viewInsets.bottom;
     return Padding(
       padding: EdgeInsets.only(bottom: bottomInset),
-      child: ClipRRect(
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 28, sigmaY: 28),
-          child: Container(
-            decoration: BoxDecoration(
-              color: AppColors.glassBg2,
-              border: Border(top: BorderSide(color: AppColors.glassBorder)),
+      child: Container(
+        decoration: BoxDecoration(
+          color: G.bg,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(30)),
+        ),
+        padding: const EdgeInsets.fromLTRB(22, 12, 22, 24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Center(
+              child: Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(color: G.surfaceHigh, borderRadius: BorderRadius.circular(2)),
+              ),
             ),
-            padding: const EdgeInsets.fromLTRB(16, 10, 16, 28),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Center(
-                  child: Container(
-                    width: 40,
-                    height: 5,
-                    decoration: BoxDecoration(
-                      color: AppColors.line3,
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 14),
-                Row(
-                  children: [
-                    Icon(Icons.bolt, color: AppColors.accent, size: 20),
-                    const SizedBox(width: 8),
-                    Text('Brain dump',
-                        style: GoogleFonts.instrumentSans(
-                            fontSize: 18,
-                            fontWeight: FontWeight.w700,
-                            color: AppColors.tx)),
-                  ],
-                ),
-                const SizedBox(height: 4),
-                Text(
-                    'Capture anything — Ally sorts it for you.',
-                    style: TextStyle(fontSize: 12.5, color: AppColors.tx3)),
-                const SizedBox(height: 14),
-                Container(
-                  decoration: BoxDecoration(
-                    color: AppColors.inset,
+            const SizedBox(height: 18),
+            Text("What's on your mind?", style: G.text(32, w: FontWeight.w600, height: 1.1, letterSpacing: -0.7)),
+            const SizedBox(height: 6),
+            Text('Say it or type it. Ally sorts it for you.', style: G.text(17, color: G.muted, height: 1.35)),
+            const SizedBox(height: 16),
+            TextField(
+              controller: _text,
+              autofocus: true,
+              maxLines: 3,
+              minLines: 2,
+              cursorColor: G.accent,
+              style: G.text(18, height: 1.3),
+              decoration: gFieldStyle('Anything at all'),
+            ),
+            if (_pendingImage != null) ...[
+              const SizedBox(height: 10),
+              Row(
+                children: [
+                  ClipRRect(
                     borderRadius: BorderRadius.circular(14),
-                    border: Border.all(color: AppColors.line2),
-                  ),
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
-                  child: TextField(
-                    controller: _text,
-                    autofocus: true,
-                    maxLines: 3,
-                    minLines: 2,
-                    style: TextStyle(fontSize: 15, color: AppColors.tx),
-                    decoration: const InputDecoration(
-                      border: InputBorder.none,
-                      enabledBorder: InputBorder.none,
-                      focusedBorder: InputBorder.none,
-                      filled: false,
-                      hintText: "What's on your mind?",
+                    child: Image.file(
+                      File(_pendingImage!.$1),
+                      width: 48,
+                      height: 48,
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, __, ___) => Container(
+                        width: 48,
+                        height: 48,
+                        color: G.card,
+                        child: Icon(Icons.image_outlined, size: 22, color: G.muted),
+                      ),
                     ),
                   ),
-                ),
-                if (_pendingImage != null) ...[
-                  const SizedBox(height: 10),
-                  Row(
-                    children: [
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(10),
-                        child: Image.file(
-                          File(_pendingImage!.$1),
-                          width: 40,
-                          height: 40,
-                          fit: BoxFit.cover,
-                          errorBuilder: (_, __, ___) => Container(
-                            width: 40,
-                            height: 40,
-                            color: AppColors.surface3,
-                            child: Icon(Icons.image_outlined,
-                                size: 18, color: AppColors.tx3),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text('Shared image attached',
-                            style: TextStyle(
-                                fontSize: 12.5, color: AppColors.tx3)),
-                      ),
-                      IconButton(
-                        onPressed: _removePendingImage,
-                        icon: Icon(Icons.close, color: AppColors.tx4, size: 18),
-                        tooltip: 'Remove image',
-                      ),
-                    ],
+                  const SizedBox(width: 10),
+                  Expanded(child: Text('Image attached', style: G.text(16, color: G.muted, height: 1.3))),
+                  IconButton(
+                    onPressed: _removePendingImage,
+                    icon: Icon(Icons.close_rounded, color: G.ink, size: 24),
+                    tooltip: 'Remove image',
                   ),
                 ],
-                if (_listening) ...[
-                  const SizedBox(height: 10),
-                  Row(
-                    children: [
-                      Container(
-                        width: 9,
-                        height: 9,
-                        decoration: BoxDecoration(
-                          color: AppColors.accent,
-                          shape: BoxShape.circle,
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Text('Listening — speak now, tap mic to stop',
-                          style: TextStyle(
-                              fontSize: 12.5,
-                              fontWeight: FontWeight.w600,
-                              color: AppColors.accent)),
-                    ],
-                  ),
+              ),
+            ],
+            if (_listening) ...[
+              const SizedBox(height: 10),
+              Row(
+                children: [
+                  Container(width: 10, height: 10, decoration: BoxDecoration(color: G.accent, shape: BoxShape.circle)),
+                  const SizedBox(width: 10),
+                  Expanded(child: Text('Listening. Tap the mic to stop.', style: G.text(16, color: G.accent, height: 1.3))),
                 ],
-                const SizedBox(height: 12),
-                Row(
-                  children: [
-                    // Image capture
-                    _MediaIconButton(
-                      icon: Icons.image_outlined,
-                      onTap: (_sending || _listening) ? null : _captureImage,
-                    ),
-                    const SizedBox(width: 8),
-                    // Voice → on-device dictation
-                    _MediaIconButton(
-                      icon: _listening ? Icons.stop_rounded : Icons.mic_none_rounded,
-                      active: _listening,
-                      onTap: _sending ? null : _toggleDictation,
-                    ),
-                    const SizedBox(width: 8),
-                    // Text capture
-                    Expanded(
-                      child: SizedBox(
-                        height: 50,
-                        child: FilledButton.icon(
-                          onPressed: (_sending || _listening) ? null : _send,
-                          icon: _sending
-                              ? SizedBox(
-                                  width: 18,
-                                  height: 18,
-                                  child: CircularProgressIndicator(
-                                      strokeWidth: 2.2,
-                                      color: AppColors.accentInk))
-                              : const Icon(Icons.send_rounded, size: 17),
-                          label: const Text('Capture'),
-                          style: FilledButton.styleFrom(
-                            backgroundColor: AppColors.accent,
-                            foregroundColor: AppColors.accentInk,
-                            shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(14)),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
+              ),
+            ],
+            const SizedBox(height: 14),
+            Row(
+              children: [
+                _MediaIconButton(
+                  icon: Icons.image_outlined,
+                  tooltip: 'Add an image',
+                  onTap: (_sending || _listening) ? null : _captureImage,
                 ),
-                const SizedBox(height: 18),
-                BlocBuilder<LifeCubit, LifeState>(
-                  builder: (context, s) {
-                    // Worth-now items float to the top of the inbox.
-                    final pending = [...s.pendingCaptures]..sort((a, b) {
-                        if (a.isWorthNow != b.isWorthNow) {
-                          return a.isWorthNow ? -1 : 1;
-                        }
-                        return 0;
-                      });
-                    if (pending.isEmpty) {
-                      return Padding(
-                        padding: EdgeInsets.symmetric(vertical: 8),
-                        child: Text('Inbox zero ✓',
-                            style:
-                                TextStyle(color: AppColors.tx4, fontSize: 13)),
-                      );
-                    }
-                    return ConstrainedBox(
-                      constraints: BoxConstraints(
-                          maxHeight:
-                              MediaQuery.of(context).size.height * 0.3),
-                      child: ListView(
-                        shrinkWrap: true,
-                        children: [
-                          Padding(
-                            padding: const EdgeInsets.only(bottom: 8),
-                            child: Eyebrow('Inbox · ${pending.length}'),
-                          ),
-                          for (final c in pending)
-                            Padding(
-                              padding: const EdgeInsets.only(bottom: 8),
-                              child: Container(
-                                padding: const EdgeInsets.all(12),
-                                decoration: BoxDecoration(
-                                  color: AppColors.surface2,
-                                  borderRadius: BorderRadius.circular(14),
-                                  border: Border.all(color: AppColors.line),
-                                ),
-                                child: Row(
-                                  children: [
-                                    if (c.isMedia) ...[
-                                      _CaptureThumb(c),
-                                      const SizedBox(width: 10),
-                                    ],
-                                    Expanded(
-                                      child: Column(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.start,
-                                        children: [
-                                          Text(
-                                              c.text.isNotEmpty
-                                                  ? c.text
-                                                  : (c.mediaType == 'AUDIO'
-                                                      ? 'Voice note'
-                                                      : 'Image'),
-                                              maxLines: 2,
-                                              overflow: TextOverflow.ellipsis,
-                                              style: TextStyle(
-                                                  fontSize: 13.5,
-                                                  fontStyle: c.text.isEmpty
-                                                      ? FontStyle.italic
-                                                      : FontStyle.normal,
-                                                  color: c.text.isEmpty
-                                                      ? AppColors.tx3
-                                                      : AppColors.tx)),
-                                          const SizedBox(height: 5),
-                                          if (!c.isClassified)
-                                            Row(
-                                              mainAxisSize: MainAxisSize.min,
-                                              children: [
-                                                SizedBox(
-                                                  width: 11,
-                                                  height: 11,
-                                                  child:
-                                                      CircularProgressIndicator(
-                                                          strokeWidth: 1.8,
-                                                          color:
-                                                              AppColors.tx4),
-                                                ),
-                                                const SizedBox(width: 7),
-                                                Text(
-                                                    c.isMedia
-                                                        ? 'Transcribing…'
-                                                        : 'Sorting…',
-                                                    style: TextStyle(
-                                                        fontSize: 11.5,
-                                                        color: AppColors.tx4)),
-                                              ],
-                                            )
-                                          else
-                                            Wrap(
-                                              spacing: 6,
-                                              runSpacing: 4,
-                                              crossAxisAlignment:
-                                                  WrapCrossAlignment.center,
-                                              children: [
-                                                GestureDetector(
-                                                  onTap: () => _reclassify(c),
-                                                  child: Chip3(
-                                                      '${c.type} · ${c.confidencePct}% ▾'),
-                                                ),
-                                                if (c.isWorthNow)
-                                                  Chip3('Worth now',
-                                                      icon: Icons.bolt,
-                                                      color: AppColors.accent,
-                                                      bg: AppColors.accentSoft),
-                                              ],
-                                            ),
-                                        ],
-                                      ),
-                                    ),
-                                    IconButton(
-                                      onPressed:
-                                          c.isClassified ? () => _convert(c) : null,
-                                      icon: Icon(Icons.check_circle,
-                                          color: c.isClassified
-                                              ? AppColors.accent
-                                              : AppColors.tx4,
-                                          size: 22),
-                                      tooltip: c.isClassified
-                                          ? 'Convert'
-                                          : 'Sorting…',
-                                    ),
-                                    IconButton(
-                                      onPressed: () => context
-                                          .read<LifeCubit>()
-                                          .dismissCapture(c.id),
-                                      icon: Icon(Icons.close,
-                                          color: AppColors.tx4, size: 20),
-                                      tooltip: 'Dismiss',
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                        ],
-                      ),
-                    );
-                  },
+                const SizedBox(width: 8),
+                _MediaIconButton(
+                  icon: _listening ? Icons.stop_rounded : Icons.mic_none_rounded,
+                  tooltip: _listening ? 'Stop listening' : 'Speak',
+                  active: _listening,
+                  onTap: _sending ? null : _toggleDictation,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: GPill(_sending ? 'Saving…' : 'Keep it', primary: true, onTap: (_sending || _listening) ? null : _send),
                 ),
               ],
             ),
-          ),
+            BlocBuilder<LifeCubit, LifeState>(
+              builder: (context, s) {
+                // Worth-now items float to the top.
+                final pending = [...s.pendingCaptures]..sort((a, b) {
+                    if (a.isWorthNow != b.isWorthNow) {
+                      return a.isWorthNow ? -1 : 1;
+                    }
+                    return 0;
+                  });
+                if (pending.isEmpty) return const SizedBox.shrink();
+                return ConstrainedBox(
+                  constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.3),
+                  child: ListView(
+                    shrinkWrap: true,
+                    children: [
+                      const GHeading('Waiting to be sorted'),
+                      for (final c in pending) _pendingCard(c),
+                    ],
+                  ),
+                );
+              },
+            ),
+          ],
         ),
       ),
     );
   }
+
+  Widget _pendingCard(Capture c) => GCard(
+        margin: const EdgeInsets.only(bottom: 8),
+        padding: const EdgeInsets.fromLTRB(16, 12, 4, 12),
+        child: Row(
+          children: [
+            if (c.isMedia) ...[
+              _CaptureThumb(c),
+              const SizedBox(width: 10),
+            ],
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    c.text.isNotEmpty ? c.text : (c.mediaType == 'AUDIO' ? 'Voice note' : 'Image'),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: G.text(18, color: c.text.isEmpty ? G.muted : G.ink, height: 1.3),
+                  ),
+                  if (!c.isClassified)
+                    Text(c.isMedia ? 'Listening to it…' : 'Sorting…', style: G.text(15, color: G.muted, height: 1.3))
+                  else
+                    InkWell(
+                      onTap: () => _reclassify(c),
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(minHeight: 34),
+                        child: Align(
+                          alignment: Alignment.centerLeft,
+                          child: Text(
+                            '${c.isWorthNow ? 'Worth doing now. ' : ''}Goes to ${_dest(c.type)}. Change',
+                            style: G.text(15, color: G.accent, height: 1.3),
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+            IconButton(
+              onPressed: c.isClassified ? () => _convert(c) : null,
+              icon: Icon(Icons.check_circle_rounded, color: c.isClassified ? G.accent : G.surfaceHigh, size: 28),
+              tooltip: c.isClassified ? 'Add it' : 'Sorting…',
+            ),
+            IconButton(
+              onPressed: () => context.read<LifeCubit>().dismissCapture(c.id),
+              icon: Icon(Icons.close_rounded, color: G.ink, size: 24),
+              tooltip: 'Remove',
+            ),
+          ],
+        ),
+      );
 }
 
-/// Square icon button used for the image / voice capture actions.
+/// Round icon button for the image and voice actions.
 class _MediaIconButton extends StatelessWidget {
   final IconData icon;
+  final String tooltip;
   final VoidCallback? onTap;
   final bool active;
-  const _MediaIconButton({required this.icon, this.onTap, this.active = false});
+  const _MediaIconButton({required this.icon, required this.tooltip, this.onTap, this.active = false});
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      width: 50,
-      height: 50,
-      child: Material(
-        color: active ? AppColors.accent : AppColors.surface2,
-        borderRadius: BorderRadius.circular(14),
-        child: InkWell(
-          borderRadius: BorderRadius.circular(14),
-          onTap: onTap,
-          child: Icon(
-            icon,
-            size: 20,
-            color: active
-                ? AppColors.accentInk
-                : (onTap == null ? AppColors.tx4 : AppColors.tx2),
-          ),
-        ),
+    return IconButton(
+      tooltip: tooltip,
+      onPressed: onTap,
+      iconSize: 26,
+      style: IconButton.styleFrom(
+        backgroundColor: active ? G.accent : G.card,
+        disabledBackgroundColor: G.card.withValues(alpha: 0.5),
+        foregroundColor: active ? G.onInk : G.ink,
+        minimumSize: const Size(58, 58),
       ),
+      icon: Icon(icon),
     );
   }
 }
 
-/// Small leading thumbnail for a media capture in the inbox: the stored image,
-/// or a mic glyph for a voice note.
+/// Small leading thumbnail for a media capture: the stored image, or a sound
+/// glyph for a voice note.
 class _CaptureThumb extends StatelessWidget {
   final Capture capture;
   const _CaptureThumb(this.capture);
@@ -650,11 +502,11 @@ class _CaptureThumb extends StatelessWidget {
   Widget build(BuildContext context) {
     if (capture.mediaType == 'IMAGE' && capture.mediaUrl != null) {
       return ClipRRect(
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: BorderRadius.circular(14),
         child: Image.network(
           capture.mediaUrl!,
-          width: 40,
-          height: 40,
+          width: 48,
+          height: 48,
           fit: BoxFit.cover,
           errorBuilder: (_, __, ___) => _glyph(Icons.image_outlined),
         ),
@@ -664,17 +516,14 @@ class _CaptureThumb extends StatelessWidget {
   }
 
   Widget _glyph(IconData icon) => Container(
-        width: 40,
-        height: 40,
-        decoration: BoxDecoration(
-          color: AppColors.surface3,
-          borderRadius: BorderRadius.circular(10),
-        ),
-        child: Icon(icon, size: 20, color: AppColors.tx3),
+        width: 48,
+        height: 48,
+        decoration: BoxDecoration(color: G.surfaceHigh, borderRadius: BorderRadius.circular(14)),
+        child: Icon(icon, size: 24, color: G.muted),
       );
 }
 
-/// Simple single-select list sheet — returns the picked id via Navigator.pop.
+/// Simple single-select list sheet: returns the picked id via Navigator.pop.
 class _PickerSheet extends StatelessWidget {
   final String title;
   final List<(String, String)> items; // (id, label)
@@ -693,12 +542,8 @@ class _PickerSheet extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Padding(
-            padding: const EdgeInsets.fromLTRB(20, 18, 20, 8),
-            child: Text(title,
-                style: GoogleFonts.instrumentSans(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.tx)),
+            padding: const EdgeInsets.fromLTRB(22, 22, 22, 8),
+            child: Text(title, style: G.text(26, w: FontWeight.w600, height: 1.15)),
           ),
           Flexible(
             child: ListView(
@@ -706,11 +551,10 @@ class _PickerSheet extends StatelessWidget {
               children: [
                 for (final (id, label) in items)
                   ListTile(
-                    title: Text(label,
-                        style: TextStyle(color: AppColors.tx, fontSize: 15)),
-                    trailing: id == selected
-                        ? Icon(Icons.check, color: AppColors.accent, size: 20)
-                        : null,
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 22),
+                    minTileHeight: 56,
+                    title: Text(label, style: G.text(19, height: 1.25)),
+                    trailing: id == selected ? Icon(Icons.check_rounded, color: G.accent, size: 24) : null,
                     onTap: () => Navigator.of(context).pop(id),
                   ),
               ],

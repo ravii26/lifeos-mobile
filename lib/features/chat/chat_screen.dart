@@ -16,19 +16,20 @@ import '../../data/models/chat.dart';
 import '../../data/repositories/life_repository.dart';
 import '../guide/guide_style.dart';
 import '../guide/save_sheet.dart';
-import '../places/know_card.dart';
-import '../places/now_card.dart';
 import '../places/now_cubit.dart';
+import '../places/support_screen.dart';
 import '../guide/tonight_cubit.dart';
+import '../shrink/shrink_screen.dart';
 import 'chat_cubit.dart';
 import 'goal_plan_card.dart';
 import 'starters.dart';
 import 'talk_controller.dart';
 
-/// Home tab: one chat. Talk normally; it answers in the right role and does
+/// Talk: one chat. Talk normally; it answers in the right role and does
 /// things (adds/completes tasks, logs habits, sets reminders) as it goes.
 class ChatScreen extends StatefulWidget {
-  const ChatScreen({super.key});
+  final VoidCallback? onBack;
+  const ChatScreen({super.key, this.onBack});
 
   @override
   State<ChatScreen> createState() => _ChatScreenState();
@@ -171,7 +172,6 @@ class _ChatScreenState extends State<ChatScreen> {
   String _lang = 'en_IN';
   String _dictBase = '';
   static const _langKey = 'chat_voice_lang';
-  static const _startedKey = 'ally_started';
 
   // A guided starter in progress (doc 17): one question at a time.
   Starter? _starter;
@@ -197,7 +197,7 @@ class _ChatScreenState extends State<ChatScreen> {
       if (!mounted) return;
       setState(() {
         if (l != null) _lang = l;
-        _started = p.getBool(_startedKey) ?? false;
+        _started = p.getBool(allyStartedKey) ?? false;
       });
     }).catchError((_) {});
   }
@@ -205,7 +205,7 @@ class _ChatScreenState extends State<ChatScreen> {
   void _markStarted() {
     if (_started) return;
     setState(() => _started = true);
-    SharedPreferences.getInstance().then((p) => p.setBool(_startedKey, true)).catchError((_) => false);
+    SharedPreferences.getInstance().then((p) => p.setBool(allyStartedKey, true)).catchError((_) => false);
   }
 
   StarterStep? get _step =>
@@ -386,6 +386,13 @@ class _ChatScreenState extends State<ChatScreen> {
     );
   }
 
+  // Changed their mind: the words said so far are dropped, what was typed stays.
+  Future<void> _cancelVoice() async {
+    await _speech.cancel();
+    _input.text = _dictBase.trimRight();
+    if (mounted) setState(() => _listening = false);
+  }
+
   Future<void> _switchLang() async {
     if (_listening) await _toggleVoice();
     final next = _lang == 'en_IN' ? 'hi_IN' : 'en_IN';
@@ -425,7 +432,6 @@ class _ChatScreenState extends State<ChatScreen> {
     return ColoredBox(
       color: G.bg,
       child: SafeArea(
-        bottom: false,
         child: BlocConsumer<ChatCubit, ChatState>(
           listener: (context, s) async {
             _scrollToEnd();
@@ -448,16 +454,31 @@ class _ChatScreenState extends State<ChatScreen> {
             }
           },
           builder: (context, s) {
+            if (_listening) {
+              return _ListeningView(controller: _input, hindi: _lang == 'hi_IN', onCancel: _cancelVoice, onFinish: _toggleVoice);
+            }
             final talking = s.messages.isNotEmpty;
             final step = _step;
             final guiding = _starter != null && step != null;
-            final nowPicking = context.select<NowCubit, bool>((c) => c.state.current != null && c.state.kind == 'PICK');
+            // When Ally is being a friend, tasks and starters step aside.
+            final last = s.messages.lastOrNull;
+            final friend = last != null && !last.fromUser && last.role == 'FRIEND';
             return Column(children: [
-              // Before you say anything, Now is the whole screen. Once you talk, it
-              // folds to one line and the conversation takes the space.
-              if (!guiding) NowCard(compact: talking, fresh: !_started, onStarter: _startGuide),
-              // One short question at a time, only once the person has started using Ally (never on top of the first-use starters).
-              if (!guiding && _started) const KnowCard(),
+              if (!guiding && widget.onBack != null)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(10, 6, 16, 2),
+                  child: Row(children: [
+                    IconButton(
+                      tooltip: 'Back',
+                      onPressed: () {
+                        FocusScope.of(context).unfocus();
+                        widget.onBack!();
+                      },
+                      icon: Icon(Icons.arrow_back_ios_new_rounded, size: 20, color: G.ink),
+                    ),
+                    Text(friend ? 'No tasks right now' : 'Ally', style: G.text(friend ? 18 : 20, w: FontWeight.w500, color: friend ? G.muted : G.ink, height: 1.2)),
+                  ]),
+                ),
               if (guiding)
                 Expanded(
                   child: _GuidePanel(
@@ -499,16 +520,18 @@ class _ChatScreenState extends State<ChatScreen> {
                             onMove: () => context.read<ChatCubit>().moveToLater(i),
                             onUndoMove: () => context.read<ChatCubit>().undoMove(i)),
                   ),
-                ),
+                )
+              else
+                Expanded(child: _EmptyTalk(onStarter: _startGuide)),
               // Reminders need permission: asked right after the first one is set, with the reason.
               if (!guiding && s.askNotifications)
                 _NotifyCard(
                   onAllow: _allowNotifications,
                   onLater: () => context.read<ChatCubit>().notificationsHandled(allowed: false),
                 ),
-              // Never a blank box: things to say, always one tap away. Hidden while
-              // the empty Now already shows the big starters.
-              if (!guiding && (talking || nowPicking))
+              // Things to say, one tap away. Hidden while the empty screen shows the big starters.
+              if (!guiding && talking && friend) const _FriendChoices(),
+              if (!guiding && talking && !friend)
                 _Suggestions(controller: _input, onStarter: _startGuide, onSay: _send),
               if (_talk.active) _TalkBar(talk: _talk, onStop: _toggleTalk),
               _Composer(
@@ -535,13 +558,170 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 }
 
-const _roleLabel = {
-  'FRIEND': 'As a friend',
-  'ASSISTANT': 'Assistant',
-  'MENTOR': 'Mentor',
-  'COACH': 'Coach',
-  'GUIDE': 'Guide',
-};
+/// Talk before anything has been said: an invitation, and four easy ways in.
+class _EmptyTalk extends StatelessWidget {
+  final ValueChanged<Starter> onStarter;
+  const _EmptyTalk({required this.onStarter});
+
+  @override
+  Widget build(BuildContext context) => ListView(
+        padding: const EdgeInsets.fromLTRB(22, 18, 22, 12),
+        children: [
+          Text("What's on your mind?", style: G.text(38, w: FontWeight.w600, height: 1.08, letterSpacing: -0.9)),
+          const SizedBox(height: 10),
+          Text('Say it messy. Work, health, family, money, anything.', style: G.text(19, color: G.muted, height: 1.38)),
+          const SizedBox(height: 20),
+          Padding(
+            padding: const EdgeInsets.only(bottom: 10),
+            child: Material(
+              color: G.accent,
+              borderRadius: BorderRadius.circular(20),
+              child: InkWell(
+                onTap: () => openShrink(context),
+                borderRadius: BorderRadius.circular(20),
+                child: Container(
+                  constraints: const BoxConstraints(minHeight: 62),
+                  padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+                  child: Row(children: [
+                    Icon(Icons.layers_clear_outlined, size: 24, color: G.onInk),
+                    const SizedBox(width: 14),
+                    Expanded(child: Text('I have too many things', style: G.text(18, w: FontWeight.w500, color: G.onInk, height: 1.25))),
+                  ]),
+                ),
+              ),
+            ),
+          ),
+          for (final st in nowStarters)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 10),
+              child: Material(
+                color: G.card,
+                borderRadius: BorderRadius.circular(20),
+                child: InkWell(
+                  onTap: () => onStarter(st),
+                  borderRadius: BorderRadius.circular(20),
+                  child: Container(
+                    constraints: const BoxConstraints(minHeight: 62),
+                    padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+                    child: Row(children: [
+                      Icon(st.icon, size: 24, color: G.accent),
+                      const SizedBox(width: 14),
+                      Expanded(child: Text(st.label, style: G.text(18, height: 1.25))),
+                    ]),
+                  ),
+                ),
+              ),
+            ),
+        ],
+      );
+}
+
+/// Voice takes over the screen while it listens. The words stay editable afterwards,
+/// because speech recognition often mishears Hinglish.
+class _ListeningView extends StatelessWidget {
+  final TextEditingController controller;
+  final bool hindi;
+  final VoidCallback onCancel;
+  final VoidCallback onFinish;
+  const _ListeningView({required this.controller, required this.hindi, required this.onCancel, required this.onFinish});
+
+  Widget _round(IconData icon, String label, double size, Color bg, Color fg, VoidCallback onTap) => Material(
+        color: bg,
+        shape: const CircleBorder(),
+        child: InkWell(
+          customBorder: const CircleBorder(),
+          onTap: onTap,
+          child: SizedBox(width: size, height: size, child: Icon(icon, semanticLabel: label, size: size * 0.42, color: fg)),
+        ),
+      );
+
+  @override
+  Widget build(BuildContext context) => Padding(
+        padding: const EdgeInsets.fromLTRB(26, 40, 26, 30),
+        child: Column(children: [
+          Text(hindi ? "I'm listening in Hindi" : "I'm listening", style: G.text(18, color: G.muted, height: 1.2)),
+          const Expanded(child: Center(child: FractionallySizedBox(widthFactor: 0.7, child: AspectRatio(aspectRatio: 1, child: _BigOrb())))),
+          SizedBox(
+            height: 130,
+            child: SingleChildScrollView(
+              reverse: true,
+              child: ValueListenableBuilder<TextEditingValue>(
+                valueListenable: controller,
+                builder: (_, v, _) => Text(
+                  v.text.isEmpty ? 'Say it all, in any order.' : v.text,
+                  textAlign: TextAlign.center,
+                  style: G.text(26, w: FontWeight.w500, color: v.text.isEmpty ? G.faint : G.ink, height: 1.25),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 26),
+          Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+            _round(Icons.close_rounded, 'Cancel', 60, G.card, G.ink, onCancel),
+            const SizedBox(width: 34),
+            _round(Icons.check_rounded, 'Finished speaking', 84, G.ink, G.onInk, onFinish),
+            const SizedBox(width: 94),
+          ]),
+        ]),
+      );
+}
+
+class _BigOrb extends StatelessWidget {
+  const _BigOrb();
+
+  @override
+  Widget build(BuildContext context) => LayoutBuilder(builder: (_, box) => AllyOrb(size: box.maxWidth));
+}
+
+/// Under a reply that gives the helpline: the call is one tap, not something to retype.
+class _HelpNow extends StatelessWidget {
+  const _HelpNow();
+
+  @override
+  Widget build(BuildContext context) => Padding(
+        padding: const EdgeInsets.only(top: 12),
+        child: Row(children: [
+          Expanded(
+            child: SizedBox(
+              height: 54,
+              child: TextButton(
+                onPressed: () => openLink(context, 'tel:14416'),
+                style: TextButton.styleFrom(backgroundColor: G.ink, foregroundColor: G.onInk, shape: const StadiumBorder()),
+                child: FittedBox(child: Text('Call 14416', style: G.text(18, w: FontWeight.w600, color: G.onInk, height: 1.2))),
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: GPill('More help', onTap: () => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => const SupportScreen()))),
+          ),
+        ]),
+      );
+}
+
+/// A bad day: lighten today, or reach a real person. Nothing to plan.
+class _FriendChoices extends StatelessWidget {
+  const _FriendChoices();
+
+  @override
+  Widget build(BuildContext context) => Padding(
+        padding: const EdgeInsets.fromLTRB(16, 4, 16, 2),
+        child: Row(children: [
+          Expanded(
+            child: GPill('Make today easy', onTap: () {
+              lowEnergyRequest.value = true;
+              ScaffoldMessenger.of(context)
+                ..hideCurrentSnackBar()
+                ..showSnackBar(const SnackBar(content: Text('Today is easy now. Only small things.')));
+            }),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: GPill('Talk to a person', onTap: () => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => const SupportScreen()))),
+          ),
+        ]),
+      );
+}
 
 class _Bubble extends StatelessWidget {
   final ChatMessage m;
@@ -580,37 +760,32 @@ class _Bubble extends StatelessWidget {
           children: [
             if (!m.fromUser) ...[
               Padding(
-                padding: const EdgeInsets.only(top: 14, bottom: 4),
-                child: Row(mainAxisSize: MainAxisSize.min, children: [
-                  Icon(Icons.auto_awesome_rounded, size: 14, color: G.accent),
-                  const SizedBox(width: 5),
-                  Text(_roleLabel[m.role] ?? 'Ally whisper', style: G.label(size: 11, color: G.faint)),
-                ]),
+                padding: const EdgeInsets.only(top: 18),
+                child: Text(m.text, style: G.text(23, w: FontWeight.w500, height: 1.25, letterSpacing: -0.3)),
               ),
-              Container(
-                margin: const EdgeInsets.only(top: 2),
-                padding: const EdgeInsets.only(left: 10, top: 4, bottom: 4),
-                decoration: BoxDecoration(
-                  border: Border(left: BorderSide(color: G.accent.withValues(alpha: 0.5), width: 1.5)),
+              if (isCrisisReply(m.text)) const _HelpNow(),
+              if (m.aiDown)
+                Container(
+                  margin: const EdgeInsets.only(top: 10),
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(color: G.card, borderRadius: BorderRadius.circular(20)),
+                  child: Text("My thinking is limited right now. Reminders, lists, timers and your Now card still work. Ask me again in a little while.",
+                      style: G.text(16, height: 1.35)),
                 ),
-                child: Text(
-                  '“${m.text}”',
-                  style: G.voice(15.5, color: G.ink),
-                ),
-              ),
             ] else ...[
               Container(
-                margin: const EdgeInsets.only(top: 10),
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                margin: const EdgeInsets.only(top: 14),
+                padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 13),
                 decoration: BoxDecoration(
-                  color: G.card,
-                  border: Border.all(color: G.lineSoft, width: 0.5),
-                  borderRadius: BorderRadius.circular(4),
+                  color: G.surfaceHigh,
+                  borderRadius: const BorderRadius.only(
+                    topLeft: Radius.circular(24),
+                    topRight: Radius.circular(24),
+                    bottomLeft: Radius.circular(24),
+                    bottomRight: Radius.circular(6),
+                  ),
                 ),
-                child: Text(
-                  m.text,
-                  style: G.text(14.5, height: 1.4, color: G.ink),
-                ),
+                child: Text(m.text, style: G.text(18, height: 1.32)),
               ),
             ],
             if (grouped)
@@ -636,7 +811,7 @@ class _Bubble extends StatelessWidget {
                       label: Text(o.title, style: G.text(14, w: FontWeight.w600)),
                       backgroundColor: Colors.transparent,
                       side: BorderSide(color: G.line),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+                      shape: const StadiumBorder(),
                       // "Remove habit: Gym session" is a command; "Pack gym bag" (which one did you finish?) is an answer.
                       onPressed: () => o.command ? onCommand(o.title) : onPick(o.title),
                     ),
@@ -653,7 +828,7 @@ class _Bubble extends StatelessWidget {
                       label: Text('${o.title}${o.minutes > 0 ? ' · ${o.minutes} min' : ''}', style: G.text(14, w: FontWeight.w600)),
                       backgroundColor: Colors.transparent,
                       side: BorderSide(color: G.line),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+                      shape: const StadiumBorder(),
                       onPressed: () => onPick(o.title),
                     ),
                 ]),
@@ -670,7 +845,7 @@ class _Bubble extends StatelessWidget {
                       label: Text('Habit: $t', style: G.text(14, w: FontWeight.w600)),
                       backgroundColor: Colors.transparent,
                       side: BorderSide(color: G.line),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+                      shape: const StadiumBorder(),
                       onPressed: () => onSuggest(t),
                     ),
                 ]),
@@ -832,7 +1007,7 @@ class _SavedCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: G.inset,
         border: Border.all(color: G.lineSoft, width: 0.5),
-        borderRadius: BorderRadius.circular(4),
+        borderRadius: BorderRadius.circular(20),
       ),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
@@ -904,32 +1079,32 @@ class _Receipt extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final (icon, text) = _describe(a);
-    return Padding(
-      padding: const EdgeInsets.only(top: 6, left: 4),
+    return Container(
+      margin: const EdgeInsets.only(top: 10),
+      padding: const EdgeInsets.only(left: 16, right: 6),
+      constraints: const BoxConstraints(minHeight: 56),
+      decoration: BoxDecoration(color: G.card, borderRadius: BorderRadius.circular(20)),
       child: Row(mainAxisSize: MainAxisSize.min, children: [
-        Icon(icon, size: 15, color: G.good),
-        const SizedBox(width: 6),
+        Icon(icon, size: 18, color: G.accent),
+        const SizedBox(width: 10),
         Flexible(
-          child: Text(a.undone ? 'Undone: $text' : text,
-              style: G.text(13,
-                  color: G.muted,
-                  w: FontWeight.w700).copyWith(decoration: a.undone ? TextDecoration.lineThrough : null)),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 10),
+            child: Text(a.undone ? 'Undone: $text' : text,
+                style: G.text(16, height: 1.3).copyWith(decoration: a.undone ? TextDecoration.lineThrough : null)),
+          ),
         ),
         if (a.type == 'CONTACT' && a.url != null)
-          GestureDetector(
-            onTap: () => openLink(context, a.url!),
-            child: Padding(
-              padding: const EdgeInsets.only(left: 10),
-              child: Text(a.kind == 'CALL' ? 'Call' : 'Open WhatsApp', style: G.text(13, w: FontWeight.w700, color: G.accent)),
-            ),
+          TextButton(
+            onPressed: () => openLink(context, a.url!),
+            style: TextButton.styleFrom(foregroundColor: G.accent, minimumSize: const Size(48, 44), padding: const EdgeInsets.symmetric(horizontal: 8)),
+            child: Text(a.kind == 'CALL' ? 'Call' : 'Open WhatsApp', style: G.text(16, w: FontWeight.w600, color: G.accent, height: 1.2)),
           ),
         if (a.activityId != null && !a.undone)
-          GestureDetector(
-            onTap: onUndo,
-            child: Padding(
-              padding: const EdgeInsets.only(left: 10),
-              child: Text('Undo', style: G.text(13, w: FontWeight.w700, color: G.ink)),
-            ),
+          TextButton(
+            onPressed: onUndo,
+            style: TextButton.styleFrom(foregroundColor: G.accent, minimumSize: const Size(48, 44), padding: const EdgeInsets.symmetric(horizontal: 8)),
+            child: Text('Undo', style: G.text(16, color: G.accent, height: 1.2)),
           ),
       ]),
     );
@@ -1014,15 +1189,30 @@ class _Composer extends StatelessWidget {
             ),
           ),
         Container(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+          constraints: const BoxConstraints(minHeight: 66),
+          padding: const EdgeInsets.fromLTRB(4, 8, 8, 8),
           decoration: BoxDecoration(
             color: G.card,
-            border: Border.all(color: listening ? G.accent : G.lineSoft, width: 0.5),
-            borderRadius: BorderRadius.circular(4),
+            border: Border.all(color: listening ? G.accent : G.card, width: 1),
+            borderRadius: BorderRadius.circular(33),
           ),
           child: Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
-            Icon(Icons.edit_note_rounded, size: 20, color: G.faint),
-            const SizedBox(width: 8),
+            // The less common ways in live together, so the box stays calm.
+            PopupMenuButton<String>(
+              tooltip: 'More ways to tell Ally',
+              icon: Icon(Icons.add_rounded, size: 24, color: G.muted),
+              color: G.surfaceHigh,
+              onSelected: (v) => switch (v) {
+                'talk' => onTalk(),
+                'save' => onSave(),
+                _ => onLang(),
+              },
+              itemBuilder: (_) => [
+                PopupMenuItem(value: 'talk', child: Text(talking ? 'Stop talking' : 'Talk out loud with Ally', style: G.text(16))),
+                PopupMenuItem(value: 'save', child: Text('Save a link', style: G.text(16))),
+                PopupMenuItem(value: 'lang', child: Text(lang == 'hi_IN' ? 'Voice typing: English' : 'Voice typing: Hindi', style: G.text(16))),
+              ],
+            ),
             Expanded(
               child: TextField(
                 controller: controller,
@@ -1030,11 +1220,11 @@ class _Composer extends StatelessWidget {
                 maxLines: 5,
                 textInputAction: TextInputAction.send,
                 onSubmitted: (_) => onSend(),
-                style: G.text(14),
+                style: G.text(18, height: 1.3),
                 cursorColor: G.accent,
                 decoration: InputDecoration(
-                  hintText: listening ? 'Listening…' : (hint ?? 'Tell Ally anything or ask…'),
-                  hintStyle: G.label(size: 13, color: G.faint),
+                  hintText: listening ? 'Listening…' : (hint ?? 'Say anything'),
+                  hintStyle: G.text(18, color: G.faint, height: 1.3),
                   isDense: true,
                   filled: false,
                   contentPadding: const EdgeInsets.symmetric(horizontal: 2, vertical: 10),
@@ -1044,66 +1234,26 @@ class _Composer extends StatelessWidget {
                 ),
               ),
             ),
-            // Dialect Toggle Pill
-            InkWell(
-              onTap: onLang,
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2.5),
-                decoration: BoxDecoration(
-                  border: Border.all(color: G.lineSoft, width: 0.5),
-                  borderRadius: BorderRadius.circular(3),
-                ),
-                child: Text(
-                  lang == 'hi_IN' ? 'हिं' : 'EN',
-                  style: G.label(size: 10, color: G.muted, w: FontWeight.w600),
-                ),
-              ),
-            ),
-            const SizedBox(width: 4),
-            // Talk mode: speak, hear Ally answer aloud, speak again.
-            InkWell(
-              onTap: onTalk,
-              child: SizedBox(
-                height: 38,
-                width: 34,
-                child: Tooltip(
-                  message: talking ? 'Stop talking' : 'Talk with Ally',
-                  child: Icon(Icons.record_voice_over_outlined, size: 18, color: talking ? G.accent : G.faint),
-                ),
-              ),
-            ),
-            // Link-Save Icon
-            InkWell(
-              onTap: onSave,
-              child: SizedBox(
-                height: 38,
-                width: 34,
-                child: Icon(Icons.bookmark_add_outlined, size: 18, color: G.faint),
-              ),
-            ),
-            // Send / Mic Action Capsule
+            const SizedBox(width: 6),
             ValueListenableBuilder<TextEditingValue>(
               valueListenable: controller,
               builder: (_, v, _) {
                 final send = v.text.trim().isNotEmpty && !listening;
-                return InkWell(
-                  onTap: send ? (sending ? null : () => onSend()) : onMic,
-                  child: Container(
-                    height: 32,
-                    width: 32,
-                    margin: const EdgeInsets.only(left: 4),
-                    decoration: BoxDecoration(
-                      color: send
-                          ? G.accent.withValues(alpha: 0.15)
-                          : (listening ? G.accent.withValues(alpha: 0.2) : G.inset),
-                      borderRadius: BorderRadius.circular(3),
-                    ),
-                    child: Icon(
-                      send
-                          ? Icons.arrow_upward_rounded
-                          : (listening ? Icons.stop_rounded : Icons.mic_none_rounded),
-                      size: 17,
-                      color: send || listening ? G.accent : G.faint,
+                return Material(
+                  color: G.accent,
+                  shape: const CircleBorder(),
+                  child: InkWell(
+                    customBorder: const CircleBorder(),
+                    onTap: send ? (sending ? null : () => onSend()) : onMic,
+                    child: SizedBox(
+                      width: 50,
+                      height: 50,
+                      child: Icon(
+                        send ? Icons.arrow_upward_rounded : (listening ? Icons.stop_rounded : Icons.mic_none_rounded),
+                        semanticLabel: send ? 'Send' : (listening ? 'Stop listening' : 'Speak to Ally'),
+                        size: 24,
+                        color: G.onInk,
+                      ),
                     ),
                   ),
                 );
@@ -1171,13 +1321,13 @@ class _GuidePanel extends StatelessWidget {
                 decoration: BoxDecoration(
                   color: G.card,
                   border: Border.all(color: G.lineSoft, width: 0.5),
-                  borderRadius: BorderRadius.circular(4),
+                  borderRadius: BorderRadius.circular(20),
                 ),
                 child: Text(answers[d.key]!.isEmpty ? 'Skipped' : answers[d.key]!, style: G.text(14.5)),
               ),
             ),
           ],
-          Text(step.question, style: G.voice(19, color: G.ink)),
+          Text(step.question, style: G.text(32, w: FontWeight.w600, height: 1.1, letterSpacing: -0.6)),
           const SizedBox(height: 16),
           Wrap(spacing: 10, runSpacing: 10, children: [
             for (final c in step.chips)
@@ -1187,7 +1337,7 @@ class _GuidePanel extends StatelessWidget {
                 materialTapTargetSize: MaterialTapTargetSize.padded,
                 backgroundColor: G.card,
                 side: BorderSide(color: G.line),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+                shape: const StadiumBorder(),
                 onPressed: () => onChip(c),
               ),
           ]),
@@ -1232,7 +1382,7 @@ class _Suggestions extends StatelessWidget {
                 label: Text(label, style: G.text(13.5, w: FontWeight.w500)),
                 backgroundColor: Colors.transparent,
                 side: BorderSide(color: G.line),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+                shape: const StadiumBorder(),
                 onPressed: onTap,
               ),
             );
@@ -1256,23 +1406,20 @@ class _NotifyCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Container(
-        margin: const EdgeInsets.fromLTRB(16, 4, 16, 4),
-        padding: const EdgeInsets.fromLTRB(14, 12, 8, 6),
-        decoration: BoxDecoration(
-          color: G.inset,
-          border: Border(left: BorderSide(color: G.accent, width: 2)),
-          borderRadius: const BorderRadius.horizontal(right: Radius.circular(3)),
-        ),
-        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text('To remind you on time, I need to send you notifications.', style: G.text(14.5, height: 1.4)),
-          Text('Only for things you ask for. Nothing else.', style: G.text(12.5, color: G.muted)),
-          Row(mainAxisAlignment: MainAxisAlignment.end, children: [
-            TextButton(onPressed: onLater, child: Text('Not now', style: G.text(14, color: G.muted))),
-            TextButton(
-              onPressed: onAllow,
-              child: Text('Allow notifications', style: G.text(14, w: FontWeight.w700, color: G.accent)),
-            ),
-          ]),
+        margin: const EdgeInsets.fromLTRB(16, 4, 16, 6),
+        padding: const EdgeInsets.all(18),
+        decoration: BoxDecoration(color: G.inset, borderRadius: BorderRadius.circular(26)),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          Text('Can I remind you on time?', style: G.text(26, w: FontWeight.w600, height: 1.12, letterSpacing: -0.4)),
+          const SizedBox(height: 6),
+          Text('I need permission to send what you asked me to remember.', style: G.text(17, color: G.muted, height: 1.35)),
+          const SizedBox(height: 14),
+          GPill('Allow reminders', primary: true, onTap: onAllow),
+          TextButton(
+            onPressed: onLater,
+            style: TextButton.styleFrom(foregroundColor: G.ink, minimumSize: const Size(64, 48)),
+            child: Text('Not now', style: G.text(17, height: 1.2)),
+          ),
         ]),
       );
 }
@@ -1370,7 +1517,7 @@ class _ListCard extends StatelessWidget {
   Widget build(BuildContext context) => Container(
         width: double.infinity,
         margin: const EdgeInsets.only(top: 8),
-        decoration: BoxDecoration(border: Border.all(color: G.lineSoft, width: 0.5), borderRadius: BorderRadius.circular(4)),
+        decoration: BoxDecoration(border: Border.all(color: G.lineSoft, width: 0.5), borderRadius: BorderRadius.circular(18)),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Padding(
             padding: const EdgeInsets.fromLTRB(12, 10, 12, 4),
@@ -1418,7 +1565,7 @@ class _TalkBar extends StatelessWidget {
       decoration: BoxDecoration(
         color: G.accent.withValues(alpha: 0.08),
         border: Border.all(color: G.accent.withValues(alpha: 0.4), width: 0.5),
-        borderRadius: BorderRadius.circular(4),
+        borderRadius: BorderRadius.circular(20),
       ),
       child: Row(children: [
         Expanded(

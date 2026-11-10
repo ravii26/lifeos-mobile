@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:google_fonts/google_fonts.dart';
 
-import '../../core/theme/app_colors.dart';
+import '../guide/guide_style.dart';
 import 'bloc/auth_bloc.dart';
 
+enum _Stage { welcome, register, signIn }
+
+/// The first thing anyone sees: the promise, then an account in as few fields as possible.
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
 
@@ -13,11 +15,13 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
-  bool _register = false;
+  _Stage _stage = _Stage.welcome;
   final _name = TextEditingController();
   final _email = TextEditingController();
   final _password = TextEditingController();
   final _formKey = GlobalKey<FormState>();
+
+  bool get _register => _stage == _Stage.register;
 
   @override
   void dispose() {
@@ -31,188 +35,128 @@ class _LoginScreenState extends State<LoginScreen> {
     if (!_formKey.currentState!.validate()) return;
     final bloc = context.read<AuthBloc>();
     if (_register) {
-      bloc.add(AuthRegisterRequested(
-          _name.text.trim(), _email.text.trim(), _password.text));
+      bloc.add(AuthRegisterRequested(_name.text.trim(), _email.text.trim(), _password.text));
     } else {
       bloc.add(AuthLoginRequested(_email.text.trim(), _password.text));
     }
   }
 
   @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.bg,
-      body: Container(
-        decoration: BoxDecoration(
-          gradient: RadialGradient(
-            center: Alignment(0.4, -1),
-            radius: 1.2,
-            colors: [Color(0xFF14171D), AppColors.bg],
-            stops: [0, 0.6],
-          ),
+  Widget build(BuildContext context) => PopScope(
+        canPop: _stage == _Stage.welcome,
+        onPopInvokedWithResult: (didPop, _) {
+          if (!didPop) setState(() => _stage = _Stage.welcome);
+        },
+        child: Scaffold(
+          backgroundColor: G.bg,
+          body: SafeArea(child: _stage == _Stage.welcome ? _welcome() : _form()),
         ),
-        child: SafeArea(
-          child: Center(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(horizontal: 26, vertical: 40),
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 420),
-                child: Form(
-                  key: _formKey,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      _logo(),
-                      const SizedBox(height: 24),
-                      Text(_register ? 'Create your account' : 'Welcome back',
-                          textAlign: TextAlign.center,
-                          style: GoogleFonts.instrumentSans(
-                              fontSize: 26,
-                              fontWeight: FontWeight.w700,
-                              letterSpacing: -0.5,
-                              color: AppColors.tx)),
-                      const SizedBox(height: 6),
-                      Text(
-                          _register
-                              ? 'Start running your life like a system.'
-                              : 'Pick up where you left off.',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(
-                              fontSize: 13.5, color: AppColors.tx3)),
-                      const SizedBox(height: 30),
-                      if (_register) ...[
-                        _field(_name, 'Name', TextInputType.name),
-                        const SizedBox(height: 12),
-                      ],
-                      _field(_email, 'Email', TextInputType.emailAddress,
-                          validator: (v) =>
-                              (v != null && v.contains('@')) ? null : 'Enter a valid email'),
-                      const SizedBox(height: 12),
-                      _field(_password, 'Password', TextInputType.text,
-                          obscure: true,
-                          validator: (v) => (v != null && v.length >= 6)
-                              ? null
-                              : 'Min 6 characters'),
-                      const SizedBox(height: 8),
-                      BlocBuilder<AuthBloc, AuthState>(
-                        builder: (context, state) {
-                          if (state.error == null) return const SizedBox(height: 8);
-                          return Padding(
-                            padding: const EdgeInsets.only(top: 6, bottom: 2),
-                            child: Text(state.error!,
-                                style: const TextStyle(
-                                    color: AppColors.danger, fontSize: 12.5)),
-                          );
-                        },
-                      ),
-                      const SizedBox(height: 12),
-                      BlocBuilder<AuthBloc, AuthState>(
-                        builder: (context, state) {
-                          final busy = state.status == AuthStatus.authenticating;
-                          return _primaryButton(busy);
-                        },
-                      ),
-                      const SizedBox(height: 18),
-                      TextButton(
-                        onPressed: () => setState(() => _register = !_register),
-                        child: RichText(
-                          text: TextSpan(
-                            style: TextStyle(
-                                fontSize: 13, color: AppColors.tx3),
-                            children: [
-                              TextSpan(
-                                  text: _register
-                                      ? 'Already have an account?  '
-                                      : "Don't have an account?  "),
-                              TextSpan(
-                                  text: _register ? 'Sign in' : 'Sign up',
-                                  style: TextStyle(
-                                      color: AppColors.accent,
-                                      fontWeight: FontWeight.w600)),
-                            ],
-                          ),
+      );
+
+  Widget _welcome() => Padding(
+        padding: const EdgeInsets.fromLTRB(24, 16, 24, 20),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          Expanded(
+            child: Center(
+              child: SingleChildScrollView(
+                child: Column(mainAxisSize: MainAxisSize.min, children: [
+                  const AllyOrb(size: 140),
+                  const SizedBox(height: 34),
+                  Text('Too much on your mind?',
+                      textAlign: TextAlign.center, style: G.text(46, w: FontWeight.w600, height: 1.06, letterSpacing: -1.4)),
+                  const SizedBox(height: 16),
+                  Text('Tell Ally everything. Get back one thing to do.',
+                      textAlign: TextAlign.center, style: G.text(20, color: G.muted, height: 1.4)),
+                ]),
+              ),
+            ),
+          ),
+          GPill('Get started', primary: true, onTap: () => setState(() => _stage = _Stage.register)),
+          const SizedBox(height: 10),
+          GPill('I already have an account', onTap: () => setState(() => _stage = _Stage.signIn)),
+          const SizedBox(height: 14),
+          Text('For adults, 18 and over. You can delete everything anytime.',
+              textAlign: TextAlign.center, style: G.text(15, color: G.muted, height: 1.3)),
+        ]),
+      );
+
+  Widget _form() => Padding(
+        padding: const EdgeInsets.fromLTRB(22, 10, 22, 16),
+        child: Form(
+          key: _formKey,
+          child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+            Align(
+              alignment: Alignment.centerLeft,
+              child: IconButton(
+                tooltip: 'Back',
+                onPressed: () => setState(() => _stage = _Stage.welcome),
+                icon: Icon(Icons.arrow_back_ios_new_rounded, size: 20, color: G.ink),
+                style: IconButton.styleFrom(backgroundColor: G.card, minimumSize: const Size(46, 46)),
+              ),
+            ),
+            Expanded(
+              child: ListView(children: [
+                const SizedBox(height: 20),
+                Text(_register ? "Let's get you set up" : 'Good to see you',
+                    style: G.text(44, w: FontWeight.w600, height: 1.05, letterSpacing: -1.3)),
+                const SizedBox(height: 24),
+                if (_register) ...[
+                  _field(_name, 'Name', 'What should I call you?', TextInputType.name),
+                  const SizedBox(height: 16),
+                ],
+                _field(_email, 'Email', 'you@gmail.com', TextInputType.emailAddress,
+                    validator: (v) => (v != null && v.contains('@')) ? null : 'Enter a valid email'),
+                const SizedBox(height: 16),
+                _field(_password, 'Password', 'At least 6 characters', TextInputType.text,
+                    obscure: true, validator: (v) => (v != null && v.length >= 6) ? null : 'At least 6 characters'),
+                BlocBuilder<AuthBloc, AuthState>(
+                  builder: (context, state) => state.error == null
+                      ? const SizedBox.shrink()
+                      : Padding(
+                          padding: const EdgeInsets.only(top: 14),
+                          child: Text(state.error!, style: G.text(16, color: G.accent, height: 1.3)),
                         ),
-                      ),
-                    ],
-                  ),
                 ),
-              ),
+              ]),
             ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _logo() => Center(
-        child: Column(
-          children: [
-            Container(
-              width: 52,
-              height: 52,
-              decoration: BoxDecoration(
-                color: AppColors.accent,
-                borderRadius: BorderRadius.circular(15),
-                boxShadow: [
-                  BoxShadow(color: AppColors.accentGlow, blurRadius: 22)
-                ],
-              ),
-              child: Center(
-                child: Text('A',
-                    style: GoogleFonts.instrumentSans(
-                        fontSize: 28,
-                        fontWeight: FontWeight.w800,
-                        color: AppColors.accentInk)),
-              ),
+            BlocBuilder<AuthBloc, AuthState>(
+              builder: (context, state) {
+                final busy = state.status == AuthStatus.authenticating;
+                return GPill(busy ? 'One moment…' : (_register ? 'Create my account' : 'Sign in'), primary: true, onTap: busy ? null : _submit);
+              },
             ),
-            const SizedBox(height: 12),
-            RichText(
-              text: TextSpan(
-                style: GoogleFonts.instrumentSans(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.tx),
-                children: [
-                  TextSpan(text: 'Ally'),
-                  TextSpan(text: '.', style: TextStyle(color: AppColors.accent)),
-                ],
-              ),
+            TextButton(
+              onPressed: () => setState(() => _stage = _register ? _Stage.signIn : _Stage.register),
+              style: TextButton.styleFrom(foregroundColor: G.ink, minimumSize: const Size(64, 52)),
+              child: Text(_register ? 'I already have an account' : 'New here? Create an account', style: G.text(17, height: 1.2)),
             ),
-          ],
+          ]),
         ),
       );
 
-  Widget _field(TextEditingController c, String hint, TextInputType type,
-      {bool obscure = false, String? Function(String?)? validator}) {
-    return TextFormField(
-      controller: c,
-      keyboardType: type,
-      obscureText: obscure,
-      style: TextStyle(color: AppColors.tx, fontSize: 15),
-      validator: validator,
-      decoration: InputDecoration(hintText: hint),
-    );
-  }
-
-  Widget _primaryButton(bool busy) => SizedBox(
-        height: 52,
-        child: FilledButton(
-          onPressed: busy ? null : _submit,
-          style: FilledButton.styleFrom(
-            backgroundColor: AppColors.accent,
-            foregroundColor: AppColors.accentInk,
-            shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(14)),
+  Widget _field(TextEditingController c, String label, String hint, TextInputType type,
+          {bool obscure = false, String? Function(String?)? validator}) =>
+      Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text(label, style: G.text(17, height: 1.2)),
+        const SizedBox(height: 8),
+        TextFormField(
+          controller: c,
+          keyboardType: type,
+          obscureText: obscure,
+          style: G.text(18, height: 1.3),
+          cursorColor: G.accent,
+          validator: validator,
+          decoration: InputDecoration(
+            hintText: hint,
+            hintStyle: G.text(18, color: G.faint, height: 1.3),
+            filled: true,
+            fillColor: G.card,
+            contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(20), borderSide: BorderSide.none),
+            enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(20), borderSide: BorderSide.none),
+            focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(20), borderSide: BorderSide(color: G.accent)),
+            errorStyle: G.text(15, color: G.accent, height: 1.2),
           ),
-          child: busy
-              ? SizedBox(
-                  width: 20,
-                  height: 20,
-                  child: CircularProgressIndicator(
-                      strokeWidth: 2.4, color: AppColors.accentInk))
-              : Text(_register ? 'Create account' : 'Sign in',
-                  style: const TextStyle(
-                      fontSize: 15, fontWeight: FontWeight.w700)),
         ),
-      );
+      ]);
 }

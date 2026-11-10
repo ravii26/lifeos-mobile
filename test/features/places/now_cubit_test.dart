@@ -5,6 +5,9 @@ import 'package:lifeos_mobile/data/repositories/life_repository.dart';
 import 'package:lifeos_mobile/features/places/now_cubit.dart';
 
 class _FakeRepo implements LifeRepository {
+  @override
+  bool get showingSaved => false;
+
   final List<String> calls = [];
   bool offlineAnswers = false;
   bool serverDown = false;

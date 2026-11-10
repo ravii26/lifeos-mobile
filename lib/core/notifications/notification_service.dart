@@ -49,9 +49,13 @@ class NotificationService {
   static bool isAgendaId(int id) => id >= agendaBase && id < agendaBase + _agendaSlots;
   static const _prefsLevel = 'ally_proactivity';
 
+  /// Ally's peach, used for the small icon and app name in the notification.
+  static const _tint = Color(0xFFF6C9B2);
+
   static const _agendaChannel = AndroidNotificationDetails(
     'ally_proactive',
     'From Ally',
+    color: _tint,
     channelDescription: 'Your briefing, nudges for what you planned, and the evening wrap-up',
     importance: Importance.high,
     priority: Priority.high,
@@ -82,6 +86,7 @@ class NotificationService {
   static const _channel = AndroidNotificationDetails(
     'habit_reminders',
     'Habit reminders',
+    color: _tint,
     channelDescription: 'Daily reminders to log your habits',
     importance: Importance.high,
     priority: Priority.high,
@@ -91,6 +96,7 @@ class NotificationService {
       AndroidNotificationDetails(
         'guide_nightly',
         'Tonight, one thing',
+        color: _tint,
         channelDescription: "The guide's nightly nudge",
         importance: Importance.high,
         priority: Priority.high,
@@ -283,6 +289,7 @@ class NotificationService {
 
   static const _reminderDetails = NotificationDetails(
     android: AndroidNotificationDetails('reminders', 'Reminders',
+        color: _tint,
         channelDescription: 'Reminders you asked for',
         importance: Importance.high,
         priority: Priority.high),
@@ -293,6 +300,7 @@ class NotificationService {
   // follow-up, In 1 hour / Tomorrow).
   static NotificationDetails _answerable({required bool followUp}) => NotificationDetails(
         android: AndroidNotificationDetails('reminders', 'Reminders',
+            color: _tint,
             channelDescription: 'Reminders you asked for',
             importance: Importance.high,
             priority: Priority.high,
@@ -468,6 +476,7 @@ class NotificationService {
         at,
         details: NotificationDetails(
           android: AndroidNotificationDetails(_agendaChannel.channelId, _agendaChannel.channelName,
+              color: _tint,
               channelDescription: _agendaChannel.channelDescription,
               importance: Importance.high,
               priority: Priority.high,
@@ -627,6 +636,7 @@ class NotificationService {
           ? const NotificationDetails(android: _channel, iOS: DarwinNotificationDetails())
           : const NotificationDetails(
               android: AndroidNotificationDetails('habit_reminders', 'Habit reminders',
+                  color: _tint,
                   channelDescription: 'Daily reminders to log your habits',
                   importance: Importance.high,
                   priority: Priority.high,

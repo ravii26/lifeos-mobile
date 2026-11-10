@@ -16,15 +16,15 @@ import '../chat/starters.dart';
 import '../guide/guide_style.dart';
 import '../guide/save_sheet.dart';
 import '../guide/tonight_cubit.dart';
-import '../places/notes_screen.dart';
 import '../places/now_cubit.dart';
-import '../places/plan_screen.dart';
+import '../places/now_screen.dart';
 import '../places/you_screen.dart';
 import 'life_cubit.dart';
 
-/// The four places Ally lives in (plan §5). Plain text labels on purpose:
-/// the look is decided in the design step, the structure is decided here.
-const _tabLabels = ['Now', 'Plan', 'Notes', 'You'];
+// Where Ally lives: Now and My life, with Talk one tap from either.
+const _nowPlace = 0;
+const _lifePlace = 1;
+const _talkPlace = 2;
 
 class HomeShell extends StatefulWidget {
   final AppUser user;
@@ -52,7 +52,8 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
     // Behaviour signal: the app was opened (once per session, on shell mount).
     getIt<LifeRepository>().recordBehavior('APP_OPEN').ignore();
 
-    starterRequest.addListener(_toNow);
+    starterRequest.addListener(_toTalk);
+    talkRequest.addListener(_openTalk);
     // What Ally says on its own follows every change (debounced), and a tapped
     // notification opens the right place (ADR 0027).
     placesRefresh.addListener(AgendaSync.soon);
@@ -71,23 +72,28 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
     }
   }
 
-  /// The Sunday review opens the week in chat; anything else opens Now.
+  /// The Sunday review opens the week in Talk; anything else opens Now.
   void _onNotificationOpened(String kind) {
     if (!mounted) return;
-    setState(() => _index = 0);
     final ctx = _cubitContext;
-    if (kind == 'WEEKLY_REVIEW' && ctx != null && ctx.mounted) {
-      ctx.read<ChatCubit>().send('How was my week?').ignore();
-    }
+    final review = kind == 'WEEKLY_REVIEW' && ctx != null && ctx.mounted;
+    setState(() => _index = review ? _talkPlace : _nowPlace);
+    if (review) ctx.read<ChatCubit>().send('How was my week?').ignore();
   }
 
-  void _toNow() {
-    if (starterRequest.value != null && _index != 0) setState(() => _index = 0);
+  void _openTalk() => setState(() => _index = _talkPlace);
+
+  // A starter tapped on any screen: leave pages opened from My life and go to Talk.
+  void _toTalk() {
+    if (starterRequest.value == null) return;
+    Navigator.of(context).popUntil((r) => r.isFirst);
+    if (_index != _talkPlace) setState(() => _index = _talkPlace);
   }
 
   @override
   void dispose() {
-    starterRequest.removeListener(_toNow);
+    starterRequest.removeListener(_toTalk);
+    talkRequest.removeListener(_openTalk);
     placesRefresh.removeListener(AgendaSync.soon);
     _openedSub?.cancel();
     WidgetsBinding.instance.removeObserver(this);
@@ -153,33 +159,42 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
       ],
       child: Builder(builder: (context) {
         _cubitContext = context;
-        return Scaffold(
-          backgroundColor: G.bg,
-          body: BlocListener<LifeCubit, LifeState>(
-            listenWhen: (prev, curr) => curr.error != null && curr.error != prev.error,
-            listener: (context, state) {
-              ScaffoldMessenger.of(context)
-                ..hideCurrentSnackBar()
-                ..showSnackBar(SnackBar(content: Text(state.error!)));
-              context.read<LifeCubit>().clearError();
-            },
-            child: IndexedStack(
-              index: _index,
-              children: [
-                const ChatScreen(),
-                const PlanScreen(),
-                const NotesScreen(),
-                YouScreen(user: widget.user),
-              ],
+        return PopScope(
+          // Back from My life or Talk returns to Now; back on Now leaves the app.
+          canPop: _index == _nowPlace,
+          onPopInvokedWithResult: (didPop, _) {
+            if (!didPop) setState(() => _index = _nowPlace);
+          },
+          child: Scaffold(
+            backgroundColor: G.bg,
+            body: BlocListener<LifeCubit, LifeState>(
+              listenWhen: (prev, curr) => curr.error != null && curr.error != prev.error,
+              listener: (context, state) {
+                ScaffoldMessenger.of(context)
+                  ..hideCurrentSnackBar()
+                  ..showSnackBar(SnackBar(content: Text(state.error!)));
+                context.read<LifeCubit>().clearError();
+              },
+              child: IndexedStack(
+                index: _index,
+                children: [
+                  const NowScreen(),
+                  YouScreen(user: widget.user),
+                  ChatScreen(onBack: () => setState(() => _index = _nowPlace)),
+                ],
+              ),
             ),
-          ),
-          bottomNavigationBar: _BottomNav(
-            index: _index,
-            onTap: (i) {
-              setState(() => _index = i);
-              // Looking at a place again always shows what is true now.
-              placesRefresh.value++;
-            },
+            bottomNavigationBar: _index == _talkPlace
+                ? null
+                : _BottomNav(
+                    index: _index,
+                    onTalk: () => setState(() => _index = _talkPlace),
+                    onTap: (i) {
+                      setState(() => _index = i);
+                      // Looking at a place again always shows what is true now.
+                      placesRefresh.value++;
+                    },
+                  ),
           ),
         );
       }),
@@ -205,80 +220,64 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
   }
 }
 
-/// Bottom navigation — Nocturne design: icon + label, active tab in primary
-/// accent with a small dot indicator below, inactive in muted tone.
-/// Icons: nightlight (Now), calendar_today (Plan), edit_note (Notes), person (You).
+/// Now on the left, My life on the right, and the way to talk to Ally between them.
 class _BottomNav extends StatelessWidget {
   final int index;
   final ValueChanged<int> onTap;
-  const _BottomNav({required this.index, required this.onTap});
+  final VoidCallback onTalk;
+  const _BottomNav({required this.index, required this.onTap, required this.onTalk});
 
-  static const _icons = [
-    Icons.bedtime_outlined,        // Now  — matches reference "nightlight"
-    Icons.calendar_today_outlined, // Plan — calendar_today
-    Icons.edit_note_outlined,      // Notes — stylus_note
-    Icons.person_outline_rounded,  // You  — person
-  ];
-
-  static const _iconsFilled = [
-    Icons.bedtime_rounded,
-    Icons.calendar_today_rounded,
-    Icons.edit_note_rounded,
-    Icons.person_rounded,
-  ];
+  Widget _place(String label, int place, Alignment alignment) => Expanded(
+        child: Semantics(
+          button: true,
+          selected: index == place,
+          child: GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: () => onTap(place),
+            child: Container(
+              alignment: alignment,
+              padding: const EdgeInsets.symmetric(horizontal: 24),
+              child: Text(
+                label,
+                style: G.text(16,
+                    w: index == place ? FontWeight.w600 : FontWeight.w400,
+                    color: index == place ? G.ink : G.muted,
+                    height: 1.2),
+              ),
+            ),
+          ),
+        ),
+      );
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: G.bg,
-        border: Border(top: BorderSide(color: G.lineSoft, width: 0.5)),
-      ),
+    return ColoredBox(
+      color: G.bg,
       child: SafeArea(
         top: false,
         child: SizedBox(
-          height: 60,
-          child: Row(
-            children: [
-              for (var i = 0; i < _tabLabels.length; i++)
-                Expanded(
-                  child: GestureDetector(
-                    behavior: HitTestBehavior.opaque,
-                    onTap: () => onTap(i),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          index == i ? _iconsFilled[i] : _icons[i],
-                          size: 22,
-                          color: index == i ? G.accent : G.faint,
-                        ),
-                        const SizedBox(height: 3),
-                        Text(
-                          _tabLabels[i],
-                          style: G.label(
-                            size: 11,
-                            color: index == i ? G.accent : G.faint,
-                            w: index == i ? FontWeight.w600 : FontWeight.w400,
-                          ),
-                        ),
-                        const SizedBox(height: 3),
-                        // Active dot indicator below the label
-                        AnimatedContainer(
-                          duration: const Duration(milliseconds: 180),
-                          width: index == i ? 4 : 0,
-                          height: index == i ? 4 : 0,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: G.accent,
-                          ),
-                        ),
-                      ],
-                    ),
+          height: 72,
+          child: Row(children: [
+            _place('Now', _nowPlace, Alignment.centerLeft),
+            Material(
+              color: G.surfaceHigh,
+              shape: const CircleBorder(),
+              child: InkWell(
+                customBorder: const CircleBorder(),
+                onTap: onTalk,
+                child: Semantics(
+                  label: 'Talk to Ally',
+                  button: true,
+                  child: SizedBox(
+                    width: 56,
+                    height: 56,
+                    child: Icon(Icons.mic_none_rounded, size: 25, color: G.ink),
                   ),
                 ),
-            ],
-          ),
+              ),
+            ),
+            _place('My life', _lifePlace, Alignment.centerRight),
+          ]),
         ),
       ),
     );

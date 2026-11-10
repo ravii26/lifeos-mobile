@@ -1029,6 +1029,22 @@ class LifeRepository {
   Future<Json> nowAdvice(String sourceType, String sourceId, String choice) async =>
       (await _api.post('/now/advice', body: {'sourceType': sourceType, 'sourceId': sourceId, 'choice': choice})) as Json;
 
+  /// True when the last read came from the phone's saved copy, because the server can't be reached.
+  bool get showingSaved => _api.servingFromCache;
+
+  /// What is parked right now, with the activity to undo to bring each back.
+  Future<List<Json>> parked() async => ((await _api.get('/now/pile/parked')) as List).whereType<Json>().toList();
+
+  /// The weekly check: what got done and what has gone quiet.
+  Future<Json> weekCheck() async => (await _api.get('/progress/week')) as Json;
+
+  /// Everything on the list against the time there is in a week.
+  Future<Json> pile() async => (await _api.get('/now/pile')) as Json;
+
+  /// PARK or LET_GO. Returns {message, activityId}.
+  Future<Json> decidePile(String sourceType, String sourceId, String decision) async =>
+      (await _api.post('/now/pile/decide', body: {'sourceType': sourceType, 'sourceId': sourceId, 'decision': decision})) as Json;
+
   // ---- What Ally says on its own (ADR 0027) ----
 
   /// Today's and tomorrow's briefing, slot nudges, wrap-up and Sunday review.

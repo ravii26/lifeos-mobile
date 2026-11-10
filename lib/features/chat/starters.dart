@@ -6,12 +6,18 @@ import 'package:intl/intl.dart';
 /// become one plain message to Ally, so the server's normal chat does the work.
 enum Starter { goal, reminder, habit, video, teach }
 
+/// Set once this person has told Ally anything, so Now can say hello the first time.
+const allyStartedKey = 'ally_started';
+
 /// The four big ways to start, shown on an empty Now (teach lives in Notes).
 const nowStarters = [Starter.goal, Starter.reminder, Starter.habit, Starter.video];
 
-/// Another place (an empty Plan or Notes) asks to start one: the shell
-/// switches to Now and the chat opens the guided questions.
+/// Another place (an empty Now, Plan or Notes) asks to start one: the shell
+/// opens Talk and the chat asks the guided questions.
 final ValueNotifier<Starter?> starterRequest = ValueNotifier<Starter?>(null);
+
+/// Bumped to open Talk from a place that has no way to reach the shell.
+final ValueNotifier<int> talkRequest = ValueNotifier<int>(0);
 
 extension StarterInfo on Starter {
   String get label => switch (this) {

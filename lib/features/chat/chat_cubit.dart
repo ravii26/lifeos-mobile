@@ -156,6 +156,7 @@ class ChatCubit extends Cubit<ChatState> {
           actions: reply.actions.where((a) => a.type != 'OPEN_SAVE').toList(),
           suggestions: reply.suggestions,
           capacity: reply.capacity,
+          aiDown: reply.aiDown,
         ),
       ];
       emit(state.copyWith(messages: list, sending: false, openSave: save?.text, askNotifications: ask ? true : null));

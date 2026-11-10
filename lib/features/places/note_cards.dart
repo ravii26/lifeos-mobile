@@ -41,13 +41,9 @@ class SpecialNoteCard extends StatelessWidget {
 
 Widget _frame({required Widget child}) => Container(
       margin: const EdgeInsets.only(bottom: 10),
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.fromLTRB(18, 16, 14, 12),
       width: double.infinity,
-      decoration: BoxDecoration(
-        color: G.card,
-        border: Border.all(color: G.lineSoft, width: 0.5),
-        borderRadius: BorderRadius.circular(4),
-      ),
+      decoration: BoxDecoration(color: G.card, borderRadius: BorderRadius.circular(22)),
       child: child,
     );
 
@@ -124,24 +120,32 @@ class _ChecklistCardState extends State<_ChecklistCard> {
     return _frame(
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Row(children: [
-          Expanded(child: Text('${widget.note['title']}', style: G.text(15, w: FontWeight.w600))),
-          Text(_items.isEmpty ? '' : (left == 0 ? 'All done' : '$left to go'), style: G.label(size: 11, color: G.faint)),
+          Expanded(child: Text('${widget.note['title']}', style: G.text(22, w: FontWeight.w600, height: 1.2))),
+          Text(_items.isEmpty ? '' : (left == 0 ? 'All done' : '$left to go'), style: G.text(15, color: G.muted, height: 1.2)),
         ]),
-        const SizedBox(height: 4),
-        if (_items.isEmpty) Text('Nothing on it yet. Tell Ally what to add.', style: G.text(13, color: G.muted)),
+        const SizedBox(height: 6),
+        if (_items.isEmpty) Text('Nothing on it yet. Tell Ally what to add.', style: G.text(17, color: G.muted, height: 1.35)),
         for (final item in _items)
           InkWell(
             onTap: _busy ? null : () => _tick(item),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 6),
+            child: Container(
+              constraints: const BoxConstraints(minHeight: 50),
               child: Row(children: [
-                Icon(_done.contains(item) ? Icons.check_box_rounded : Icons.check_box_outline_blank_rounded,
-                    size: 21, color: _done.contains(item) ? G.good : G.faint),
-                const SizedBox(width: 10),
+                Container(
+                  width: 26,
+                  height: 26,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: _done.contains(item) ? G.accent : Colors.transparent,
+                    border: _done.contains(item) ? null : Border.all(color: G.faint, width: 2),
+                  ),
+                  child: _done.contains(item) ? Icon(Icons.check_rounded, size: 17, color: G.onInk) : null,
+                ),
+                const SizedBox(width: 14),
                 Expanded(
                   child: Text(item,
-                      style: G.text(14, color: _done.contains(item) ? G.faint : G.ink)
-                          .copyWith(decoration: _done.contains(item) ? TextDecoration.lineThrough : null)),
+                      style: G.text(19, color: _done.contains(item) ? G.faint : G.ink, height: 1.25)
+                          .copyWith(decoration: _done.contains(item) ? TextDecoration.lineThrough : null, decorationColor: G.faint)),
                 ),
               ]),
             ),
@@ -151,7 +155,8 @@ class _ChecklistCardState extends State<_ChecklistCard> {
             alignment: Alignment.centerRight,
             child: TextButton(
               onPressed: _busy ? null : () => _reset(clear: !_routine),
-              child: Text(_routine ? 'Start again' : 'Clear what I got', style: G.label(size: 12, color: G.accent, w: FontWeight.w600)),
+              style: TextButton.styleFrom(minimumSize: const Size(64, 44)),
+              child: Text(_routine ? 'Start again' : 'Clear what I got', style: G.text(16, w: FontWeight.w600, color: G.accent, height: 1.2)),
             ),
           ),
       ]),
@@ -174,16 +179,16 @@ class _PersonCard extends StatelessWidget {
     return _frame(
       child: Row(children: [
         CircleAvatar(
-          radius: 18,
-          backgroundColor: G.inset,
-          child: Text('${note['title']}'.isEmpty ? '?' : '${note['title']}'.substring(0, 1).toUpperCase(), style: G.text(15, w: FontWeight.w600)),
+          radius: 23,
+          backgroundColor: G.surfaceHigh,
+          child: Text('${note['title']}'.isEmpty ? '?' : '${note['title']}'.substring(0, 1).toUpperCase(), style: G.text(18, height: 1.2)),
         ),
-        const SizedBox(width: 12),
+        const SizedBox(width: 14),
         Expanded(
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text('${note['title']}', style: G.text(15, w: FontWeight.w600)),
+            Text('${note['title']}', style: G.text(19, height: 1.25)),
             Text(birthday == null ? (phone == null ? 'Nothing saved yet' : 'Number saved') : 'Birthday $birthday',
-                style: G.label(size: 11, color: G.faint)),
+                style: G.text(15, color: G.muted, height: 1.25)),
           ]),
         ),
         if (phone != null) ...[
@@ -224,20 +229,15 @@ class _DietCard extends StatelessWidget {
     }
     return _frame(
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Row(children: [
-          Icon(Icons.restaurant_outlined, size: 18, color: G.faint),
-          const SizedBox(width: 8),
-          Text('My diet', style: G.text(15, w: FontWeight.w600)),
-        ]),
-        const SizedBox(height: 6),
-        if (lines.isEmpty) Text('Say "Monday diet: oats and eggs for breakfast".', style: G.text(13, color: G.muted)),
+        if (lines.isEmpty) Text('Say "Monday diet: oats and eggs for breakfast".', style: G.text(17, color: G.muted, height: 1.35)),
         for (final (day, meals) in lines)
           Padding(
-            padding: const EdgeInsets.symmetric(vertical: 3),
-            child: Text.rich(TextSpan(children: [
-              TextSpan(text: '$day  ', style: G.text(13, w: FontWeight.w600)),
-              TextSpan(text: meals, style: G.text(13, color: G.muted)),
-            ])),
+            padding: const EdgeInsets.symmetric(vertical: 7),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(day, style: G.text(19, w: FontWeight.w500, height: 1.25)),
+              const SizedBox(height: 2),
+              Text(meals, style: G.text(16, color: G.muted, height: 1.35)),
+            ]),
           ),
       ]),
     );

@@ -49,11 +49,11 @@ Future<bool> openPasteSave(BuildContext context) async {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('What did you save?', style: G.display(26)),
-          const SizedBox(height: 6),
-          Text('Paste a link to a video, reel or post. Tip: next time, use Share → Ally.',
-              style: G.voice(16)),
-          const SizedBox(height: 14),
+          Text('What did you save?', style: G.text(32, w: FontWeight.w600, height: 1.1, letterSpacing: -0.7)),
+          const SizedBox(height: 8),
+          Text('Paste a link to a video, reel or post. Next time, you can share it straight to Ally.',
+              style: G.text(17, color: G.muted, height: 1.35)),
+          const SizedBox(height: 16),
           TextField(
             controller: ctrl,
             autofocus: true,
@@ -66,11 +66,11 @@ Future<bool> openPasteSave(BuildContext context) async {
               filled: true,
               fillColor: G.card,
               border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(14), borderSide: BorderSide.none),
+                  borderRadius: BorderRadius.circular(20), borderSide: BorderSide.none),
             ),
           ),
-          const SizedBox(height: 14),
-          GButton('Turn it into an action', onTap: () => Navigator.pop(ctx, ctrl.text.trim())),
+          const SizedBox(height: 16),
+          SizedBox(width: double.infinity, child: GPill('Turn it into a step', primary: true, onTap: () => Navigator.pop(ctx, ctrl.text.trim()))),
         ],
       ),
     ),
@@ -337,10 +337,16 @@ class _SaveSheetState extends State<_SaveSheet> {
         hintText: hint,
         hintStyle: G.text(16, color: G.muted),
         filled: true,
-        fillColor: G.card,
+        fillColor: G.surfaceHigh,
         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(14), borderSide: BorderSide.none),
+      );
+
+  Widget _quiet(String label, VoidCallback onTap) => TextButton(
+        onPressed: _busy ? null : onTap,
+        style: TextButton.styleFrom(foregroundColor: G.ink, minimumSize: const Size(64, 48)),
+        child: Text(label, style: G.text(17, height: 1.2)),
       );
 
   Widget _summary(SaveProposal p) {
@@ -350,7 +356,7 @@ class _SaveSheetState extends State<_SaveSheet> {
         child: Row(children: [
           SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: G.ink)),
           const SizedBox(width: 10),
-          Expanded(child: Text('Watching the video for you…', style: G.text(14, color: G.muted))),
+          Expanded(child: Text('Watching the video for you…', style: G.text(16, color: G.muted, height: 1.3))),
         ]),
       );
     }
@@ -366,10 +372,10 @@ class _SaveSheetState extends State<_SaveSheet> {
         padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
         decoration: BoxDecoration(color: G.card, borderRadius: BorderRadius.circular(18)),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text('What it says', style: G.text(15, w: FontWeight.w700)),
-          const SizedBox(height: 6),
+          Text('What it says', style: G.text(16, color: G.muted, height: 1.2)),
+          const SizedBox(height: 8),
           for (final l in p.summaryLines)
-            Padding(padding: const EdgeInsets.only(bottom: 4), child: Text('· $l', style: G.text(15))),
+            Padding(padding: const EdgeInsets.only(bottom: 6), child: Text(l, style: G.text(18, height: 1.35))),
         ]),
       );
     }
@@ -385,9 +391,9 @@ class _SaveSheetState extends State<_SaveSheet> {
           mainAxisAlignment: MainAxisAlignment.center,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Done.', style: G.display(36)),
+            Text('Done.', style: G.text(44, w: FontWeight.w600, height: 1.05, letterSpacing: -1.3)),
             const SizedBox(height: 10),
-            Text(_done!, style: G.voice(19)),
+            Text(_done!, style: G.text(19, color: G.muted, height: 1.35)),
           ],
         ),
       );
@@ -401,32 +407,32 @@ class _SaveSheetState extends State<_SaveSheet> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: _error == null
               ? [
-                  CircularProgressIndicator(color: G.ink, strokeWidth: 2),
+                  CircularProgressIndicator(color: G.accent, strokeWidth: 2),
                   const SizedBox(height: 20),
-                  Text('Reading what you saved…', style: G.display(26)),
+                  Text('Reading what you saved…', style: G.text(32, w: FontWeight.w600, height: 1.1, letterSpacing: -0.7)),
                   const SizedBox(height: 8),
-                  Text('Working out what it is for.', style: G.voice(17)),
+                  Text('Working out what it is for.', style: G.text(18, color: G.muted, height: 1.35)),
                 ]
               : [
-                  Text("Couldn't read it.", style: G.display(28)),
+                  Text("Couldn't read it.", style: G.text(32, w: FontWeight.w600, height: 1.1, letterSpacing: -0.7)),
                   const SizedBox(height: 8),
-                  Text(_error!, style: G.text(15, color: G.muted)),
+                  Text(_error!, style: G.text(17, color: G.muted, height: 1.35)),
                   const SizedBox(height: 20),
-                  GButton('Try again', onTap: _read),
+                  SizedBox(width: double.infinity, child: GPill('Try again', primary: true, onTap: _read)),
                 ],
         ),
       );
     }
 
     final header = [
-      Text(p.platform ?? 'You saved', style: G.text(13, color: G.muted, w: FontWeight.w700)),
-      const SizedBox(height: 4),
-      Text(p.contentTitle, style: G.display(24, w: FontWeight.w800)),
+      Text(p.platform ?? 'You saved', style: G.text(16, color: G.accent, height: 1.2)),
+      const SizedBox(height: 8),
+      Text(p.contentTitle, style: G.text(32, w: FontWeight.w600, height: 1.1, letterSpacing: -0.7)),
       if (p.author != null) ...[
-        const SizedBox(height: 4),
-        Text(p.author!, style: G.text(14, color: G.muted)),
+        const SizedBox(height: 6),
+        Text(p.author!, style: G.text(16, color: G.muted, height: 1.3)),
       ],
-      const SizedBox(height: 14),
+      const SizedBox(height: 18),
     ];
 
     // A feeling save is already on the shelf. One tap if Ally guessed wrong.
@@ -439,16 +445,16 @@ class _SaveSheetState extends State<_SaveSheet> {
               p.feelings.isEmpty
                   ? "Kept for hard days. I'll bring it back when you need a lift."
                   : "Kept for days you feel ${p.feelings.join(', ')}. I'll bring it back then.",
-              style: G.voice(19)),
+              style: G.text(19, height: 1.35)),
           const SizedBox(height: 16),
           MoodPicker(selected: p.feelings, busy: _busy, onChanged: _setMoods),
           const SizedBox(height: 16),
           _summary(p),
-          if (_error != null) Text(_error!, style: G.text(14, color: const Color(0xFFB3261E))),
+          if (_error != null) Text(_error!, style: G.text(16, color: G.accent, height: 1.3)),
           const SizedBox(height: 10),
-          GButton('Done', onTap: () => Navigator.pop(context, true)),
-          const SizedBox(height: 8),
-          GButton('Not for hard days: I want to learn from it', primary: false, onTap: _busy ? null : () => _correct('LEARN')),
+          GPill('Done', primary: true, onTap: () => Navigator.pop(context, true)),
+          const SizedBox(height: 4),
+          _quiet('Actually, I want to learn from it', () => _correct('LEARN')),
         ],
       );
     }
@@ -460,15 +466,16 @@ class _SaveSheetState extends State<_SaveSheet> {
         children: [
           ...header,
           _summary(p),
-          Text('Saving it changes nothing. Doing one thing with it does.', style: G.voice(18)),
-          const SizedBox(height: 14),
           Container(
-            padding: const EdgeInsets.fromLTRB(14, 14, 14, 14),
-            decoration: BoxDecoration(color: G.tint, borderRadius: BorderRadius.circular(22)),
+            padding: const EdgeInsets.fromLTRB(14, 16, 14, 8),
+            decoration: BoxDecoration(color: G.card, borderRadius: BorderRadius.circular(24)),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(_steps.length > 1 ? 'Pick what you will do' : 'Your step', style: G.text(15, color: G.tintInk, w: FontWeight.w700)),
+                Padding(
+                  padding: const EdgeInsets.only(left: 6, bottom: 2),
+                  child: Text(_steps.length > 1 ? 'Instead of just saving it, pick what you will do' : 'Instead of just saving it', style: G.text(16, color: G.accent, height: 1.25)),
+                ),
                 const SizedBox(height: 8),
                 for (final s in _steps)
                   Padding(
@@ -477,6 +484,7 @@ class _SaveSheetState extends State<_SaveSheet> {
                       Checkbox(
                         value: s.selected,
                         activeColor: G.ink,
+                        checkColor: G.onInk,
                         onChanged: (v) => setState(() => s.selected = v ?? false),
                       ),
                       Expanded(
@@ -486,14 +494,14 @@ class _SaveSheetState extends State<_SaveSheet> {
                             minLines: 1,
                             maxLines: 3,
                             onChanged: (_) => _edited = true,
-                            style: G.text(16, w: FontWeight.w700),
+                            style: G.text(18, w: FontWeight.w500, height: 1.3),
                             decoration: _field('What will you do with it?'),
                           ),
                           const SizedBox(height: 6),
                           TextField(
                             controller: s.minimum,
                             onChanged: (_) => _edited = true,
-                            style: G.text(14),
+                            style: G.text(16, height: 1.3),
                             decoration: _field('2-minute version'),
                           ),
                           Row(children: [
@@ -505,18 +513,18 @@ class _SaveSheetState extends State<_SaveSheet> {
                                 _edited = true;
                               }),
                             ),
-                            Text('Repeat it as a habit', style: G.text(14, color: G.tintInk)),
+                            Expanded(child: Text('Repeat it as a habit', style: G.text(16, height: 1.25))),
                           ]),
                         ]),
                       ),
                     ]),
                   ),
-                if (p.reason.isNotEmpty) Text(p.reason, style: G.text(14, color: G.tintInk)),
+                if (p.reason.isNotEmpty) Padding(padding: const EdgeInsets.fromLTRB(6, 0, 6, 8), child: Text(p.reason, style: G.text(16, color: G.muted, height: 1.35))),
               ],
             ),
           ),
           const SizedBox(height: 14),
-          Text('When', style: G.text(14, color: G.muted, w: FontWeight.w700)),
+          Text('When', style: G.text(16, color: G.muted, height: 1.2)),
           const SizedBox(height: 8),
           Wrap(spacing: 6, children: [
             for (final (value, label) in _whens)
@@ -524,9 +532,9 @@ class _SaveSheetState extends State<_SaveSheet> {
                 label: Text(label),
                 selected: _when == value,
                 onSelected: (_) => setState(() => _when = value),
-                labelStyle: G.text(14, w: FontWeight.w700, color: _when == value ? Colors.white : G.ink),
-                selectedColor: G.ink,
-                backgroundColor: G.soft,
+                labelStyle: G.text(16, w: FontWeight.w600, color: _when == value ? G.onInk : G.ink),
+                selectedColor: G.accent,
+                backgroundColor: G.card,
                 showCheckmark: false,
                 side: BorderSide.none,
                 shape: const StadiumBorder(),
@@ -545,29 +553,20 @@ class _SaveSheetState extends State<_SaveSheet> {
           ],
           if (_error != null) ...[
             const SizedBox(height: 12),
-            Text(_error!, style: G.text(14, color: const Color(0xFFB3261E))),
+            Text(_error!, style: G.text(16, color: G.accent, height: 1.3)),
           ],
-          const SizedBox(height: 22),
+          const SizedBox(height: 20),
           if (p.suggestedChoice != null && p.suggestionReason.isNotEmpty) ...[
-            Text('Ally suggests: ${_choiceName(p.suggestedChoice!)}. ${p.suggestionReason}', style: G.text(14, color: G.tintInk)),
-            const SizedBox(height: 10),
+            Text('Ally suggests: ${_choiceName(p.suggestedChoice!)}. ${p.suggestionReason}', style: G.text(16, color: G.muted, height: 1.35)),
+            const SizedBox(height: 12),
           ],
-          GButton(
-            _steps.where((s) => s.selected).length > 1 ? 'Make these my actions' : 'Make it my action',
-            primary: p.suggestedChoice == null || p.suggestedChoice == 'DO',
-            onTap: _busy ? null : () => _decide('ACTION'),
-          ),
-          const SizedBox(height: 8),
-          GButton('Watch it later', primary: p.suggestedChoice == 'LATER', onTap: _busy ? null : () => _decide('LATER')),
-          const SizedBox(height: 8),
-          GButton(p.listName != null ? 'Add to my ${p.listName!.toLowerCase()} list' : 'Add to a list',
-              primary: p.suggestedChoice == 'LIST', onTap: _busy ? null : _pickList),
-          const SizedBox(height: 8),
-          GButton('Keep it for when I feel a certain way', primary: p.suggestedChoice == 'LIFT', onTap: _busy ? null : () => _correct('FEELING')),
-          TextButton(
-            onPressed: _busy ? null : () => _decide('DROP'),
-            child: Text("Let it go, I won't use it", style: G.text(15, color: G.muted, w: FontWeight.w700)),
-          ),
+          GPill(_steps.where((s) => s.selected).length > 1 ? 'Add these' : 'Add to my plan', primary: true, onTap: _busy ? null : () => _decide('ACTION')),
+          const SizedBox(height: 10),
+          GPill('Watch later', onTap: _busy ? null : () => _decide('LATER')),
+          const SizedBox(height: 4),
+          _quiet(p.listName != null ? 'Add to my ${p.listName!.toLowerCase()} list' : 'Add to a list', _pickList),
+          _quiet('Keep it for how I feel', () => _correct('FEELING')),
+          _quiet("Don't need it", () => _decide('DROP')),
         ],
       ),
     );

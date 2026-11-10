@@ -205,13 +205,15 @@ class ChatMessage {
   final String? role; // FRIEND | ASSISTANT | MENTOR | COACH | GUIDE (assistant replies)
   final List<String> suggestions; // habits Ally offers, added only on a tap
   final ChatCapacity? capacity;
+  final bool aiDown; // every AI provider failed, so this is the plain fallback answer
   const ChatMessage(
       {required this.fromUser,
       required this.text,
       this.actions = const [],
       this.role,
       this.suggestions = const [],
-      this.capacity});
+      this.capacity,
+      this.aiDown = false});
 
   ChatMessage copyWith({List<ChatAction>? actions, List<String>? suggestions, ChatCapacity? capacity}) => ChatMessage(
       fromUser: fromUser,
@@ -219,7 +221,8 @@ class ChatMessage {
       actions: actions ?? this.actions,
       role: role,
       suggestions: suggestions ?? this.suggestions,
-      capacity: capacity ?? this.capacity);
+      capacity: capacity ?? this.capacity,
+      aiDown: aiDown);
 
   /// What this reply made or touched, newest last (for "move it", "undo that").
   List<Json> get refs => fromUser ? const [] : [for (final a in actions) ?a.ref];
@@ -231,9 +234,11 @@ class ChatMessage {
         if (role != null) 'r': role,
         if (suggestions.isNotEmpty) 's': suggestions,
         if (capacity != null) 'c': capacity!.toJson(),
+        if (aiDown) 'd': true,
       };
 
   factory ChatMessage.fromJson(Json j) => ChatMessage(
+        aiDown: asBool(j['d']),
         fromUser: asBool(j['u']),
         text: asString(j['t']),
         actions: ((j['a'] as List?) ?? const [])
@@ -252,7 +257,8 @@ class ChatReply {
   final String role;
   final List<String> suggestions;
   final ChatCapacity? capacity;
-  const ChatReply(this.reply, this.actions, this.role, [this.suggestions = const [], this.capacity]);
+  final bool aiDown;
+  const ChatReply(this.reply, this.actions, this.role, [this.suggestions = const [], this.capacity, this.aiDown = false]);
 
   factory ChatReply.fromJson(Json j) => ChatReply(
         asString(j['reply']),
@@ -264,6 +270,7 @@ class ChatReply {
             .where((t) => t.isNotEmpty)
             .toList(),
         j['capacity'] is Json ? ChatCapacity.fromJson(j['capacity'] as Json) : null,
+        asBool(j['aiDown']),
       );
 }
 

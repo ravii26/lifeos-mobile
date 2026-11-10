@@ -16,8 +16,7 @@ import '../vault/vault_screen.dart';
 import 'note_cards.dart';
 import 'now_cubit.dart';
 
-/// Notes screen: what you taught Ally, what you saved, and what Ally knows about you.
-/// Styled according to Nocturne Sanctuary (ally_notes_saves design specification).
+/// Notes: what you taught Ally, what you saved, and what Ally knows about you.
 class NotesScreen extends StatefulWidget {
   const NotesScreen({super.key});
 
@@ -30,7 +29,7 @@ class _NotesScreenState extends State<NotesScreen> {
   List<Json> _saves = const [];
   List<Map<String, dynamic>> _notes = const [];
   String? _error;
-  int _tab = 0; // 0: Taught to Ally, 1: Saves & Reels, 2: About You
+  int _tab = 0; // Taught, Saved, About you
   final _searchController = TextEditingController();
   String _search = '';
 
@@ -75,19 +74,69 @@ class _NotesScreenState extends State<NotesScreen> {
     _load();
   }
 
+  Widget _noteCard(Map<String, dynamic> n, bool first) {
+    final ink = first ? G.onInk : G.ink;
+    final items = (n['items'] as List?) ?? const [];
+    final text = '${n['text'] ?? ''}';
+    final line = items.isNotEmpty ? items.take(4).join(', ') : text;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Material(
+        color: first ? G.accent : G.card,
+        borderRadius: BorderRadius.circular(24),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(24),
+          onTap: () => _push(const TaughtNotesScreen()),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 16, 20, 18),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text('${n['title']}', style: G.text(22, w: FontWeight.w600, color: ink, height: 1.2)),
+              if (line.isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.only(top: 4),
+                  child: Text(line, maxLines: 2, overflow: TextOverflow.ellipsis, style: G.text(17, color: ink, height: 1.3)),
+                ),
+            ]),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _rowCard({required String title, String? sub, required VoidCallback onTap}) => Padding(
+        padding: const EdgeInsets.only(bottom: 8),
+        child: Material(
+          color: G.card,
+          borderRadius: BorderRadius.circular(20),
+          child: InkWell(
+            borderRadius: BorderRadius.circular(20),
+            onTap: onTap,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(20, 15, 12, 15),
+              child: Row(children: [
+                Expanded(
+                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Text(title, style: G.text(19, height: 1.25)),
+                    if (sub != null) Padding(padding: const EdgeInsets.only(top: 2), child: Text(sub, style: G.text(15, color: G.muted, height: 1.3))),
+                  ]),
+                ),
+                Icon(Icons.chevron_right_rounded, color: G.faint),
+              ]),
+            ),
+          ),
+        ),
+      );
+
   @override
   Widget build(BuildContext context) {
     final waiting = _saves.where((s) => s['shelved'] != true && s['later'] != true).toList();
     final queue = _saves.where((s) => s['later'] == true).toList();
     final shelf = _saves.where((s) => s['shelved'] == true).length;
-    final filteredNotes = _search.isEmpty
-        ? _notes
-        : _notes.where((n) => '${n['title']} ${n['text'] ?? ''}'.toLowerCase().contains(_search.toLowerCase())).toList();
-    // Nothing taught or saved yet: one sentence and the ways to start.
+    final q = _search.toLowerCase();
+    final notes = q.isEmpty ? _notes : _notes.where((n) => '${n['title']} ${n['text'] ?? ''}'.toLowerCase().contains(q)).toList();
+    final saves = q.isEmpty ? waiting : waiting.where((s) => '${s['title']}'.toLowerCase().contains(q)).toList();
     final nothing = _notes.isEmpty && _saves.isEmpty;
-    final filteredSaves = _search.isEmpty
-        ? waiting
-        : waiting.where((s) => '${s['title']}'.toLowerCase().contains(_search.toLowerCase())).toList();
+    final plain = notes.where((n) => !isSpecialNote(n)).toList();
 
     return ColoredBox(
       color: G.bg,
@@ -96,289 +145,89 @@ class _NotesScreenState extends State<NotesScreen> {
         child: RefreshIndicator(
           onRefresh: _load,
           child: ListView(
-            padding: const EdgeInsets.fromLTRB(20, 14, 20, 36),
+            padding: const EdgeInsets.fromLTRB(22, 6, 22, 28),
             children: [
-              // Top Bar
-              Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-                Row(children: [
-                  Icon(Icons.bedtime_outlined, size: 20, color: G.accent),
-                  const SizedBox(width: 8),
-                  Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    Text('Notes', style: G.voice(16, color: G.ink)),
-                    Text('What you taught Ally and what you saved', style: G.label(size: 11, color: G.faint)),
-                  ]),
-                ]),
-              ]),
-              const SizedBox(height: 12),
-
-              if (nothing && _error == null) _EmptyNotes(onTeach: () => starterRequest.value = Starter.teach),
-              // Search, once there is something to search
-              if (!nothing) Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
-                decoration: BoxDecoration(
-                  color: G.inset,
-                  border: Border.all(color: G.lineSoft, width: 0.5),
-                  borderRadius: BorderRadius.circular(4),
-                ),
-                child: Row(children: [
-                  Icon(Icons.search_rounded, size: 18, color: G.faint),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: TextField(
-                      controller: _searchController,
-                      onChanged: (v) => setState(() => _search = v.trim()),
-                      style: G.text(13.5),
-                      cursorColor: G.accent,
-                      decoration: InputDecoration(
-                        hintText: 'Search notes, summaries, memories…',
-                        hintStyle: G.label(size: 12, color: G.faint),
-                        border: InputBorder.none,
-                        enabledBorder: InputBorder.none,
-                        focusedBorder: InputBorder.none,
-                        isDense: true,
-                        contentPadding: const EdgeInsets.symmetric(vertical: 8),
+              Text('Notes', style: G.text(44, w: FontWeight.w600, height: 1.05, letterSpacing: -1.3)),
+              const SizedBox(height: 8),
+              Text('Things you taught me, so you never have to remember.', style: G.text(19, color: G.muted, height: 1.3)),
+              const SizedBox(height: 16),
+              if (_error != null) Padding(padding: const EdgeInsets.only(bottom: 12), child: Text(_error!, style: G.text(16, color: G.muted, height: 1.3))),
+              if (nothing && _error == null) ...[
+                GPill('Teach Ally something', primary: true, onTap: () => starterRequest.value = Starter.teach),
+                const SizedBox(height: 10),
+                GPill('Turn a video into action', onTap: () => starterRequest.value = Starter.video),
+              ],
+              if (!nothing) ...[
+                Container(
+                  height: 52,
+                  padding: const EdgeInsets.only(left: 18, right: 8),
+                  decoration: BoxDecoration(color: G.card, borderRadius: BorderRadius.circular(26)),
+                  child: Row(children: [
+                    Icon(Icons.search_rounded, size: 22, color: G.muted),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: TextField(
+                        controller: _searchController,
+                        onChanged: (v) => setState(() => _search = v.trim()),
+                        style: G.text(17, height: 1.3),
+                        cursorColor: G.accent,
+                        decoration: InputDecoration(
+                          hintText: 'Search',
+                          hintStyle: G.text(17, color: G.faint, height: 1.3),
+                          filled: false,
+                          border: InputBorder.none,
+                          enabledBorder: InputBorder.none,
+                          focusedBorder: InputBorder.none,
+                          isDense: true,
+                        ),
                       ),
                     ),
-                  ),
-                  if (_search.isNotEmpty)
-                    GestureDetector(
-                      onTap: () {
-                        _searchController.clear();
-                        setState(() => _search = '');
-                      },
-                      child: Icon(Icons.close_rounded, size: 16, color: G.faint),
-                    ),
-                ]),
-              ),
-              if (!nothing) const SizedBox(height: 12),
-
-              // Segment Filter Tabs
-              if (!nothing) SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                child: Row(children: [
-                  _TabPill(
-                    label: 'Taught (${_notes.length})',
-                    active: _tab == 0,
-                    onTap: () => setState(() => _tab = 0),
-                  ),
-                  const SizedBox(width: 8),
-                  _TabPill(
-                    label: 'Saved (${waiting.length + queue.length})',
-                    active: _tab == 1,
-                    onTap: () => setState(() => _tab = 1),
-                  ),
-                  const SizedBox(width: 8),
-                  _TabPill(
-                    label: 'About you',
-                    active: _tab == 2,
-                    onTap: () => setState(() => _tab = 2),
-                  ),
-                ]),
-              ),
-              const SizedBox(height: 14),
-
-              if (_error != null)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 12),
-                  child: Text(_error!, style: G.label(size: 12, color: Colors.redAccent)),
-                ),
-
-              // TAB 0: Taught to Ally
-              if (_tab == 0 && !nothing) ...[
-                Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-                  Text('Things you taught Ally', style: G.text(16, w: FontWeight.w600)),
-                ]),
-                const SizedBox(height: 2),
-                Text(
-                  "Ally answers from these, so you don't have to repeat yourself.",
-                  style: G.label(size: 12, color: G.faint),
+                    if (_search.isNotEmpty)
+                      IconButton(
+                        tooltip: 'Clear search',
+                        onPressed: () {
+                          _searchController.clear();
+                          setState(() => _search = '');
+                        },
+                        icon: Icon(Icons.close_rounded, size: 20, color: G.muted),
+                      ),
+                  ]),
                 ),
                 const SizedBox(height: 12),
-                if (filteredNotes.isEmpty)
-                  Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: G.card,
-                      border: Border.all(color: G.lineSoft, width: 0.5),
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                    child: Text(
-                      'Nothing taught yet. Tell Ally things like your breakfast options or your gym routine.',
-                      style: G.voice(14, color: G.muted),
-                    ),
-                  ),
-                for (final n in filteredNotes)
-                  if (isSpecialNote(n))
-                    SpecialNoteCard(n, onChanged: _load)
-                  else
-                  InkWell(
-                    onTap: () => _push(const TaughtNotesScreen()),
-                    child: Container(
-                      margin: const EdgeInsets.only(bottom: 10),
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: G.card,
-                        border: Border.all(color: G.lineSoft, width: 0.5),
-                        borderRadius: BorderRadius.circular(4),
+                Row(children: [
+                  for (var i = 0; i < 3; i++) ...[
+                    Expanded(
+                      child: _TabPill(
+                        label: ['Taught', 'Saved', 'About you'][i],
+                        active: _tab == i,
+                        onTap: () => setState(() => _tab = i),
                       ),
-                      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                        Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                            decoration: BoxDecoration(
-                              color: G.inset,
-                              borderRadius: BorderRadius.circular(3),
-                            ),
-                            child: Text(
-                              _kindName['${n['template']}'] ?? 'Note',
-                              style: G.label(size: 10, color: G.faint, w: FontWeight.w600),
-                            ),
-                          ),
-                        ]),
-                        const SizedBox(height: 8),
-                        Text('${n['title']}', style: G.text(15, w: FontWeight.w600)),
-                        if (n['items'] != null && (n['items'] as List).isNotEmpty) ...[
-                          const SizedBox(height: 6),
-                          for (final it in (n['items'] as List).take(3))
-                            Padding(
-                              padding: const EdgeInsets.symmetric(vertical: 2),
-                              child: Row(children: [
-                                Container(width: 3, height: 3, decoration: BoxDecoration(shape: BoxShape.circle, color: G.faint)),
-                                const SizedBox(width: 6),
-                                Expanded(child: Text('$it', style: G.text(13, color: G.muted))),
-                              ]),
-                            ),
-                        ] else if (n['text'] != null && '${n['text']}'.isNotEmpty) ...[
-                          const SizedBox(height: 4),
-                          Text('${n['text']}', maxLines: 2, overflow: TextOverflow.ellipsis, style: G.text(13, color: G.muted)),
-                        ],
-                      ]),
                     ),
-                  ),
-                const SizedBox(height: 6),
-                OutlinedButton.icon(
-                  onPressed: () => starterRequest.value = Starter.teach,
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: G.accent,
-                    side: BorderSide(color: G.accent.withValues(alpha: 0.4), width: 0.5),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                  ),
-                  icon: Icon(Icons.add_rounded, size: 18, color: G.accent),
-                  label: Text('Teach Ally something new', style: G.label(size: 11, color: G.accent, w: FontWeight.w600)),
-                ),
+                    if (i < 2) const SizedBox(width: 6),
+                  ],
+                ]),
+                const SizedBox(height: 16),
               ],
-
-              // TAB 1: Saves & Reels
+              if (_tab == 0 && !nothing) ...[
+                for (final n in notes)
+                  if (isSpecialNote(n)) SpecialNoteCard(n, onChanged: _load) else _noteCard(n, identical(n, plain.firstOrNull)),
+                if (notes.isEmpty) Text('Nothing matches.', style: G.text(18, color: G.muted, height: 1.3)),
+                const SizedBox(height: 10),
+                GPill('Teach Ally something', primary: true, onTap: () => starterRequest.value = Starter.teach),
+              ],
               if (_tab == 1 && !nothing) ...[
                 WatchLaterSection(items: queue, onChanged: () {
                   placesRefresh.value++;
                   _load();
                 }),
-                Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-                  Text('Saved videos and links', style: G.text(16, w: FontWeight.w600)),
-                ]),
-                const SizedBox(height: 2),
-                Text(
-                  'Pick what each one is for: something to do, or something for a low day.',
-                  style: G.label(size: 12, color: G.faint),
-                ),
-                const SizedBox(height: 12),
-                if (filteredSaves.isEmpty)
-                  Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: G.card,
-                      border: Border.all(color: G.lineSoft, width: 0.5),
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                    child: Text(
-                      'Nothing saved. In YouTube or Instagram, tap Share and pick Ally.',
-                      style: G.voice(14, color: G.muted),
-                    ),
-                  ),
-                for (final s in filteredSaves)
-                  Container(
-                    margin: const EdgeInsets.only(bottom: 12),
-                    padding: const EdgeInsets.all(14),
-                    decoration: BoxDecoration(
-                      color: G.card,
-                      border: Border.all(color: G.lineSoft, width: 0.5),
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                      Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-                        Row(children: [
-                          Icon(Icons.play_circle_outline_rounded, size: 16, color: G.carried),
-                          const SizedBox(width: 6),
-                          Text('Saved link', style: G.label(size: 11, color: G.faint)),
-                        ]),
-                      ]),
-                      const SizedBox(height: 8),
-                      Text('${s['title']}', style: G.text(15, w: FontWeight.w600, height: 1.3)),
-                      const SizedBox(height: 10),
-                      const SizedBox(height: 8),
-                      Row(children: [
-                        TextButton(
-                          onPressed: () => _openSave(s),
-                          style: TextButton.styleFrom(
-                            backgroundColor: G.surfaceHigh,
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(3)),
-                          ),
-                          child: Text('Decide what it is for', style: G.label(size: 11, color: G.accent, w: FontWeight.w600)),
-                        ),
-                      ]),
-                    ]),
-                  ),
-
-                // For hard days: only when something is on it.
-                if (shelf > 0) ...[
-                  const SizedBox(height: 8),
-                  InkWell(
-                    onTap: () => _push(const VaultScreen()),
-                    child: Container(
-                      padding: const EdgeInsets.all(14),
-                      decoration: BoxDecoration(
-                        color: G.card,
-                        border: Border.all(color: G.lineSoft, width: 0.5),
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                      child: Row(children: [
-                        Icon(Icons.spa_outlined, size: 18, color: G.carried),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                            Text('For hard days ($shelf)', style: G.text(14, w: FontWeight.w500)),
-                            Text('Ally brings these back when you say you feel low.', style: G.text(12.5, color: G.muted)),
-                          ]),
-                        ),
-                        Icon(Icons.chevron_right_rounded, color: G.faint),
-                      ]),
-                    ),
-                  ),
-                ],
+                if (saves.isEmpty)
+                  Text('Nothing waiting. In YouTube or Instagram, tap Share and pick Ally.', style: G.text(18, color: G.muted, height: 1.4)),
+                for (final s in saves) _rowCard(title: '${s['title']}', sub: 'Decide what it is for', onTap: () => _openSave(s)),
+                if (shelf > 0) _rowCard(title: 'For hard days ($shelf)', sub: 'Ally brings these back when you feel low.', onTap: () => _push(const VaultScreen())),
               ],
-
-              // TAB 2: About You
               if (_tab == 2 && !nothing) ...[
-                Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-                  Text('About you', style: G.text(16, w: FontWeight.w600)),
-                ]),
-                const SizedBox(height: 8),
-                _AboutCard(
-                  icon: Icons.calendar_today_outlined,
-                  title: 'Your day',
-                  sub: 'When you wake, work and sleep, so Ally suggests things at the right time',
-                  onTap: () => _push(const YourDayScreen()),
-                ),
-                const SizedBox(height: 10),
-                _AboutCard(
-                  icon: Icons.psychology_outlined,
-                  title: 'What Ally remembers',
-                  sub: 'Things you told Ally about yourself. See them, change them, or delete them',
-                  onTap: () => _push(const MemoriesScreen()),
-                ),
+                _rowCard(title: 'My day', sub: 'When you wake, work and sleep', onTap: () => _push(const YourDayScreen())),
+                _rowCard(title: 'What Ally remembers', sub: 'See, change or delete it', onTap: () => _push(const MemoriesScreen())),
               ],
             ],
           ),
@@ -395,98 +244,17 @@ class _TabPill extends StatelessWidget {
   const _TabPill({required this.label, required this.active, required this.onTap});
 
   @override
-  Widget build(BuildContext context) => GestureDetector(
-        onTap: onTap,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 150),
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-          decoration: BoxDecoration(
-            color: active ? G.surfaceHigh : G.card,
-            border: Border.all(color: active ? G.accent.withValues(alpha: 0.5) : G.lineSoft, width: 0.5),
-            borderRadius: BorderRadius.circular(4),
-          ),
-          child: Text(
-            label,
-            style: G.label(
-              size: 11,
-              color: active ? G.accent : G.faint,
-              w: active ? FontWeight.w600 : FontWeight.w400,
-            ),
+  Widget build(BuildContext context) => Material(
+        color: active ? G.accent : G.card,
+        shape: const StadiumBorder(),
+        child: InkWell(
+          customBorder: const StadiumBorder(),
+          onTap: onTap,
+          child: Container(
+            height: 46,
+            alignment: Alignment.center,
+            child: Text(label, style: G.text(16, w: active ? FontWeight.w600 : FontWeight.w400, color: active ? G.onInk : G.ink, height: 1.2)),
           ),
         ),
-      );
-}
-
-class _AboutCard extends StatelessWidget {
-  final IconData icon;
-  final String title;
-  final String sub;
-  final VoidCallback onTap;
-  const _AboutCard({required this.icon, required this.title, required this.sub, required this.onTap});
-
-  @override
-  Widget build(BuildContext context) => InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(4),
-        child: Container(
-          padding: const EdgeInsets.all(14),
-          decoration: BoxDecoration(
-            color: G.card,
-            border: Border.all(color: G.lineSoft, width: 0.5),
-            borderRadius: BorderRadius.circular(4),
-          ),
-          child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Icon(icon, size: 20, color: G.accent),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text(title, style: G.text(15, w: FontWeight.w600)),
-                const SizedBox(height: 4),
-                Text(sub, style: G.text(13, color: G.muted, height: 1.4)),
-              ]),
-            ),
-            Icon(Icons.chevron_right_rounded, size: 18, color: G.faint),
-          ]),
-        ),
-      );
-}
-
-const _kindName = {'LIST': 'List', 'ROUTINE': 'Routine', 'PLAYBOOK': 'How-to', 'INFO': 'Info'};
-
-/// Notes with nothing in it yet: what it is for, and the two ways to fill it.
-class _EmptyNotes extends StatelessWidget {
-  final VoidCallback onTeach;
-  const _EmptyNotes({required this.onTeach});
-
-  @override
-  Widget build(BuildContext context) => Padding(
-        padding: const EdgeInsets.only(top: 28, bottom: 20),
-        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text('Nothing here yet.', style: G.voice(20, color: G.ink)),
-          const SizedBox(height: 6),
-          Text(
-              'Teach Ally things it should know, like your breakfast options or a gym routine. '
-              'Or turn a video you saved into something to do.',
-              style: G.text(14, color: G.muted, height: 1.45)),
-          const SizedBox(height: 18),
-          FilledButton.icon(
-            onPressed: onTeach,
-            style: FilledButton.styleFrom(
-              backgroundColor: G.accent,
-              foregroundColor: G.bg,
-              minimumSize: const Size(0, 48),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
-            ),
-            icon: const Icon(Icons.edit_note_rounded, size: 18),
-            label: Text('Teach Ally something', style: G.text(15, w: FontWeight.w600, color: G.bg)),
-          ),
-          const SizedBox(height: 8),
-          TextButton.icon(
-            onPressed: () => starterRequest.value = Starter.video,
-            style: TextButton.styleFrom(minimumSize: const Size(0, 48)),
-            icon: Icon(Icons.play_circle_outline_rounded, size: 18, color: G.accent),
-            label: Text('Turn a video into action', style: G.text(15, w: FontWeight.w600, color: G.accent)),
-          ),
-        ]),
       );
 }

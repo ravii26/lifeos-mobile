@@ -8,7 +8,7 @@ import '../shell/life_cubit.dart';
 
 /// Palette offered for an area's accent colour.
 const _palette = <String>[
-  '#c5f23f', // chartreuse (accent)
+  '#f6c9b2', // peach (accent)
   '#4f8cff', // blue
   '#2dd4a7', // teal
   '#ff6b81', // pink
@@ -86,15 +86,14 @@ class _AreaFormState extends State<AreaForm> {
   @override
   Widget build(BuildContext context) {
     return FormSheet(
-      title: _isEdit ? 'Edit area' : 'New area',
+      title: _isEdit ? 'Edit this part' : 'A new part of life',
       children: [
-        formField(_name, 'Area name', autofocus: !_isEdit),
+        formField(_name, 'Like Health or Family', autofocus: !_isEdit),
         const SizedBox(height: 16),
-        formLabel('Type'),
+        formLabel('How much does it need right now?'),
         chipWrap([
-          for (final t in const ['PRIMARY', 'MAINTENANCE'])
-            selChip(titleCaseWord(t), _type == t,
-                () => setState(() => _type = t)),
+          selChip('My focus', _type == 'PRIMARY', () => setState(() => _type = 'PRIMARY')),
+          selChip('Just keep it going', _type == 'MAINTENANCE', () => setState(() => _type = 'MAINTENANCE')),
         ]),
         const SizedBox(height: 16),
         formLabel('Colour'),
@@ -106,8 +105,8 @@ class _AreaFormState extends State<AreaForm> {
               GestureDetector(
                 onTap: () => setState(() => _color = c),
                 child: Container(
-                  width: 34,
-                  height: 34,
+                  width: 44,
+                  height: 44,
                   decoration: BoxDecoration(
                     color: _hex(c),
                     shape: BoxShape.circle,
@@ -129,17 +128,17 @@ class _AreaFormState extends State<AreaForm> {
               GestureDetector(
                 onTap: () => setState(() => _icon = entry.key),
                 child: Container(
-                  width: 42,
-                  height: 42,
+                  width: 46,
+                  height: 46,
                   decoration: BoxDecoration(
                     color: _icon == entry.key
                         ? _hex(_color).withValues(alpha: 0.18)
                         : AppColors.surface2,
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(18),
                     border: Border.all(
                         color: _icon == entry.key
                             ? _hex(_color)
-                            : AppColors.line),
+                            : Colors.transparent),
                   ),
                   child: Icon(entry.value,
                       size: 20,
@@ -149,12 +148,12 @@ class _AreaFormState extends State<AreaForm> {
           ],
         ),
         const SizedBox(height: 22),
-        saveButton(_saving, _save, _isEdit ? 'Save changes' : 'Create area'),
+        saveButton(_saving, _save, _isEdit ? 'Save changes' : 'Add it'),
         if (_isEdit) ...[
           const SizedBox(height: 6),
-          deleteRow(context, 'Delete area', () async {
+          deleteRow(context, 'Delete this part', () async {
             if (await confirmDelete(context,
-                '“${widget.area!.name}” and its score history will be removed.')) {
+                '“${widget.area!.name}” will be removed.')) {
               if (!context.mounted) return;
               context.read<LifeCubit>().deleteArea(widget.area!.id);
               Navigator.of(context).pop();

@@ -14,7 +14,7 @@ class AppTheme {
 
   /// Resolves the /settings.font value to a Google Fonts text theme.
   static TextTheme _textTheme(String font, TextTheme base) =>
-      GoogleFonts.instrumentSansTextTheme(base);
+      GoogleFonts.outfitTextTheme(base);
 
   /// Builds the theme from the CURRENT [G] palette.
   static ThemeData build(
@@ -63,7 +63,7 @@ class AppTheme {
         elevation: 0,
         centerTitle: false,
         iconTheme: IconThemeData(color: G.faint, size: 22),
-        titleTextStyle: GoogleFonts.instrumentSans(
+        titleTextStyle: GoogleFonts.outfit(
           fontSize: 16,
           color: G.ink,
         ),
@@ -72,7 +72,7 @@ class AppTheme {
         color: G.card,
         elevation: 0,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(4),
+          borderRadius: BorderRadius.circular(22),
           side: BorderSide(color: G.lineSoft, width: 0.5),
         ),
       ),
@@ -99,7 +99,7 @@ class AppTheme {
           DividerThemeData(color: G.lineSoft, thickness: 0.5),
       snackBarTheme: SnackBarThemeData(
         backgroundColor: G.surfaceHigh,
-        contentTextStyle: GoogleFonts.instrumentSans(
+        contentTextStyle: GoogleFonts.outfit(
             fontSize: 13, color: G.ink),
         shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(4)),

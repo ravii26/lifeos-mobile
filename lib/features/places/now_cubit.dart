@@ -84,6 +84,10 @@ class NowState extends Equatable {
   final bool focus; // a deadline has taken the rest of today (message says what waits)
   final bool lowEnergy; // "low energy today": smallest versions until tomorrow
   final NowExtras extras; // counts, timer, routine, meal, watch later (Phase D)
+  final bool restedToday; // "I'm finished for today": nothing more is suggested
+  final bool welcomeBack; // back after a gap: no catching up asked for
+  final bool sick; // sick mode: nothing is asked of them today
+  final bool fromSaved; // no connection: this is the last card the phone kept
 
   const NowState({
     this.status = NowStatus.loading,
@@ -100,6 +104,10 @@ class NowState extends Equatable {
     this.focus = false,
     this.lowEnergy = false,
     this.extras = NowExtras.empty,
+    this.restedToday = false,
+    this.welcomeBack = false,
+    this.sick = false,
+    this.fromSaved = false,
   });
 
   NowOption? get current => index < options.length ? options[index] : null;
@@ -136,10 +144,14 @@ class NowState extends Equatable {
         focus: focus,
         lowEnergy: lowEnergy ?? this.lowEnergy,
         extras: extras ?? this.extras,
+        restedToday: restedToday,
+        welcomeBack: welcomeBack,
+        sick: sick,
+        fromSaved: fromSaved,
       );
 
   @override
-  List<Object?> get props => [status, kind, message, options, index, busy, error, note, undoId, prep, advice, focus, lowEnergy, extras];
+  List<Object?> get props => [status, kind, message, options, index, busy, error, note, undoId, prep, advice, focus, lowEnergy, extras, restedToday, welcomeBack, sick, fromSaved];
 }
 
 /// The card on Now: the right thing for right now, with Done / Smaller / Not now.
@@ -173,7 +185,29 @@ class NowCubit extends Cubit<NowState> {
     return d != null && d.year == n.year && d.month == n.month && d.day == n.day;
   }
 
+  // "I'm finished for today" holds for the rest of that day, unless they ask for more.
+  DateTime? _restDay;
+  bool get _restToday {
+    final d = _restDay;
+    final n = DateTime.now();
+    return d != null && d.year == n.year && d.month == n.month && d.day == n.day;
+  }
+
+  Future<void> finishForToday() async {
+    _restDay = DateTime.now();
+    await load();
+  }
+
+  Future<void> resumeToday() async {
+    _restDay = null;
+    await load();
+  }
+
   Future<void> load({bool smallest = false, int? minutes}) async {
+    if (_restToday) {
+      emit(NowState(status: NowStatus.ready, kind: 'REST', undoId: state.undoId, restedToday: true, extras: state.extras));
+      return;
+    }
     if (state.options.isEmpty) emit(state.copyWith(status: NowStatus.loading));
     try {
       final data = await _repo.now(smallest: smallest || _lowToday, minutes: minutes);
@@ -190,6 +224,9 @@ class NowCubit extends Cubit<NowState> {
         undoId: state.undoId,
         lowEnergy: _lowToday,
         extras: _extrasOf(data),
+        welcomeBack: asBool(data['welcomeBack']),
+        sick: asString(data['mode']) == 'SICK',
+        fromSaved: _repo.showingSaved,
       ));
     } on ApiException catch (e) {
       emit(state.copyWith(status: state.options.isEmpty ? NowStatus.error : NowStatus.ready, error: e.message));
@@ -244,9 +281,10 @@ class NowCubit extends Cubit<NowState> {
     load();
   }
 
-  Future<void> _answer(String action, {bool reload = true}) async {
+  /// True when the answer was saved, or queued to be saved once back online.
+  Future<bool> _answer(String action, {bool reload = true}) async {
     final o = state.current;
-    if (o == null || state.busy) return;
+    if (o == null || state.busy) return false;
     emit(state.copyWith(busy: true, clearUndo: true));
     try {
       final id = await _repo.respondNow(o.sourceType, o.sourceId, action, minutes: o.minutes, count: o.count);
@@ -263,15 +301,32 @@ class NowCubit extends Cubit<NowState> {
         index: state.index >= rest.length ? 0 : state.index,
         note: "Saved offline. It'll sync when you're back online.",
       ));
-      return;
+      return true;
     } on ApiException catch (e) {
       emit(state.copyWith(busy: false, error: e.message));
-      return;
+      return false;
     }
     if (reload) await load();
+    return true;
   }
 
-  Future<void> done() => _answer('DONE');
+  Future<bool> done() => _answer('DONE');
+
+  /// From the Not now choices: TOMORROW, WEEKEND or LET_GO, each undoable.
+  Future<void> moveCurrent(String choice) async {
+    final o = state.current;
+    if (o == null || state.busy) return;
+    emit(state.copyWith(busy: true, clearUndo: true));
+    try {
+      final r = await _repo.nowAdvice(o.sourceType, o.sourceId, choice);
+      placesRefresh.value++;
+      emit(state.copyWith(busy: false, undoId: asStringOrNull(r['activityId'])));
+      await load();
+      emit(state.copyWith(note: asString(r['message'])));
+    } on ApiException catch (e) {
+      emit(state.copyWith(busy: false, error: e.message));
+    }
+  }
 
   /// "Not now": log it (with no guilt) and show the next option, if there is one.
   Future<void> notNow() async {
@@ -287,6 +342,23 @@ class NowCubit extends Cubit<NowState> {
   Future<void> lowEnergy() async {
     _lowEnergyDay = DateTime.now();
     await load();
+  }
+
+  /// Feeling better after a low-energy day: back to normal suggestions.
+  Future<void> endLowEnergy() async {
+    _lowEnergyDay = null;
+    await load();
+  }
+
+  /// Leaving sick mode. Waits for the server, because the next card depends on it.
+  Future<void> feelingBetter() async {
+    try {
+      await _repo.setMode('NORMAL');
+      placesRefresh.value++;
+      await load();
+    } on ApiException catch (e) {
+      emit(state.copyWith(error: e.message));
+    }
   }
 
   /// One of the advice buttons. MINIMUM_NOW counts the 2-minute version now;

@@ -149,7 +149,8 @@ class AppearanceCubit extends Cubit<AppearanceState> {
 
   /// Applies the palette for the current state, then emits so the tree rebuilds.
   void _emit(AppearanceState s) {
-    AppColors.apply(light: s.light, accent: s.accent);
+    // One look for now (Plum, dark): earlier saved light mode or accents no longer apply.
+    AppColors.apply(light: false, accent: AppAccent.nocturne);
     emit(s);
     // Best-effort: keep the home-screen widget's theme in sync with the app's.
     getIt<WidgetSyncService>().pushTheme(

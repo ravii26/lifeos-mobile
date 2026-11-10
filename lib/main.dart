@@ -88,23 +88,20 @@ class LifeOSApp extends StatelessWidget {
               theme: AppTheme.build(
                   accent: appearance.accent,
                   font: appearance.font,
-                  light: appearance.light),
+                  light: false),
               builder: (context, child) {
-                // Ally's palette follows the phone's light/dark setting (ADR 0021);
-                // status bar icons follow it, and the tree rebuilds when it flips.
-                final dark = MediaQuery.platformBrightnessOf(context) == Brightness.dark;
-                G.dark = dark;
+                // Plum is dark only for now, whatever the phone's own setting is.
                 SystemChrome.setSystemUIOverlayStyle(SystemUiOverlayStyle(
                   statusBarColor: Colors.transparent,
-                  statusBarIconBrightness: dark ? Brightness.light : Brightness.dark,
+                  statusBarIconBrightness: Brightness.light,
                   systemNavigationBarColor: G.bg,
-                  systemNavigationBarIconBrightness: dark ? Brightness.light : Brightness.dark,
+                  systemNavigationBarIconBrightness: Brightness.light,
                 ));
                 final mq = MediaQuery.of(context);
                 return MediaQuery(
                   data: mq.copyWith(
                       textScaler: TextScaler.linear(appearance.textScale)),
-                  child: KeyedSubtree(key: ValueKey(dark), child: child!),
+                  child: child!,
                 );
               },
               home: const _Root(),

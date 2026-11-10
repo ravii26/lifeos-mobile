@@ -6,6 +6,7 @@ import '../../core/notifications/notification_service.dart';
 import '../../core/system/system_settings.dart';
 import '../../data/models/chat.dart';
 import '../../data/repositories/life_repository.dart';
+import '../chat/starters.dart';
 import '../guide/guide_style.dart';
 
 /// "Are my reminders going to come?" Shows the three things Android needs
@@ -96,11 +97,37 @@ class _RemindersCheckScreenState extends State<RemindersCheckScreen> with Widget
 
     return Scaffold(
       backgroundColor: G.bg,
-      appBar: const GTopBar('Reminders', subtitle: 'Make sure they arrive on time', showBack: true),
+      appBar: AppBar(backgroundColor: G.bg, surfaceTintColor: G.bg, foregroundColor: G.ink, elevation: 0),
       body: ListView(
-        padding: const EdgeInsets.fromLTRB(20, 8, 20, 40),
+        padding: const EdgeInsets.fromLTRB(22, 0, 22, 32),
         children: [
-          const GHeading('What your phone needs'),
+          Text('Reminders', style: G.text(44, w: FontWeight.w600, height: 1.05, letterSpacing: -1.3)),
+          const SizedBox(height: 16),
+          if (_loadingReminders)
+            Padding(padding: const EdgeInsets.symmetric(vertical: 12), child: Text('Loading…', style: G.text(18, color: G.muted)))
+          else if (upcoming.isEmpty)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              child: Text('No reminders yet. Try saying "remind me at 6 to call Mummy".', style: G.text(19, color: G.muted, height: 1.4)),
+            )
+          else
+            for (final (r, t) in upcoming.take(8))
+              Container(
+                constraints: const BoxConstraints(minHeight: 70),
+                alignment: Alignment.centerLeft,
+                decoration: BoxDecoration(border: Border(bottom: BorderSide(color: G.lineSoft))),
+                padding: const EdgeInsets.symmetric(vertical: 10),
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Text(r.text, style: G.text(20, height: 1.25)),
+                  const SizedBox(height: 2),
+                  Text(r.repeats ? '${_when(t)}, repeats' : _when(t), style: G.text(15, color: G.muted, height: 1.25)),
+                ]),
+              ),
+          const SizedBox(height: 18),
+          GPill('Add a reminder', primary: true, onTap: () => starterRequest.value = Starter.reminder),
+          const SizedBox(height: 26),
+          Text('Make sure they arrive', style: G.text(16, color: G.muted, height: 1.2)),
+          const SizedBox(height: 4),
           _Check(
             ok: _notifications,
             title: 'Notifications are on',
@@ -130,34 +157,15 @@ class _RemindersCheckScreenState extends State<RemindersCheckScreen> with Widget
             last: true,
           ),
           const SizedBox(height: 20),
-          GButton('Send a test reminder in 1 minute', onTap: _test, icon: Icons.notifications_active_outlined),
+          GPill('Send a test reminder', onTap: _test),
           if (_testNote != null)
             Padding(
-              padding: const EdgeInsets.only(top: 10),
-              child: Text(_testNote!, style: G.text(13, color: G.muted, height: 1.45)),
+              padding: const EdgeInsets.only(top: 12),
+              child: Text(_testNote!, style: G.text(16, color: G.muted, height: 1.4)),
             ),
-          const GHeading('Coming up'),
-          if (_loadingReminders)
-            Padding(padding: const EdgeInsets.symmetric(vertical: 12), child: Text('Loading…', style: G.text(14, color: G.faint)))
-          else if (upcoming.isEmpty)
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 12),
-              child: Text('No reminders set. Tell Ally "remind me at 6 to call mom".', style: G.text(14, color: G.muted, height: 1.45)),
-            )
-          else
-            for (final (r, t) in upcoming.take(8))
-              Container(
-                padding: const EdgeInsets.symmetric(vertical: 12),
-                decoration: BoxDecoration(border: Border(top: BorderSide(color: G.lineSoft, width: 0.5))),
-                child: Row(children: [
-                  SizedBox(width: 92, child: Text(_when(t), style: G.label(size: 12, color: G.muted))),
-                  Expanded(child: Text(r.text, style: G.text(15))),
-                  if (r.repeats) Text('repeats', style: G.label(size: 11, color: G.faint)),
-                ]),
-              ),
           Padding(
             padding: const EdgeInsets.only(top: 14),
-            child: Text('$_pending reminder notifications are set on this phone.', style: G.label(size: 11, color: G.faint)),
+            child: Text('$_pending set on this phone.', style: G.text(15, color: G.muted, height: 1.3)),
           ),
         ],
       ),
@@ -202,12 +210,17 @@ class _Check extends StatelessWidget {
           const SizedBox(width: 12),
           Expanded(
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text(title, style: G.text(15, w: FontWeight.w500)),
+              Text(title, style: G.text(17, height: 1.3)),
               if (ok == false)
-                Padding(padding: const EdgeInsets.only(top: 2), child: Text(why, style: G.text(13, color: G.muted, height: 1.4))),
+                Padding(padding: const EdgeInsets.only(top: 2), child: Text(why, style: G.text(15, color: G.muted, height: 1.35))),
             ]),
           ),
-          if (ok == false) TextButton(onPressed: onFix, child: Text(fix, style: G.label(size: 12, color: G.accent))),
+          if (ok == false)
+            TextButton(
+              onPressed: onFix,
+              style: TextButton.styleFrom(minimumSize: const Size(56, 44)),
+              child: Text(fix, style: G.text(16, w: FontWeight.w600, color: G.accent, height: 1.2)),
+            ),
         ]),
       );
 }

@@ -23,9 +23,9 @@ class TaskDetailScreen extends StatelessWidget {
         if (t == null) {
           return Scaffold(
             backgroundColor: G.bg,
-            appBar: const GTopBar('Task', showBack: true),
+            appBar: gBar(),
             body: Center(
-              child: Text('Task not found', style: G.voice(15, color: G.muted)),
+              child: Text("Couldn't find this.", style: G.text(18, color: G.muted, height: 1.35)),
             ),
           );
         }
@@ -34,15 +34,20 @@ class TaskDetailScreen extends StatelessWidget {
         final goal = s.goalById(task.goalId);
         final project = s.projectById(task.projectId);
         final color = area?.color ?? G.accent;
+        final facts = <(String, String)>[
+          if (task.dueDate != null) ('By', _fmtDate(task.dueDate!)),
+          if (area != null) ('Part of life', area.name),
+          if (goal != null) ('Goal', goal.title),
+          if (project != null) ('Project', project.title),
+          if (task.priorityLabel == 'P1') ('Importance', 'High'),
+        ];
 
         return Scaffold(
           backgroundColor: G.bg,
-          appBar: GTopBar(
-            'Task Detail',
-            subtitle: task.isDone ? 'Completed' : 'Open action',
-            showBack: true,
-            trailing: IconButton(
-              icon: Icon(Icons.edit_outlined, size: 18, color: G.muted),
+          appBar: gBar(actions: [
+            IconButton(
+              tooltip: 'Edit',
+              icon: Icon(Icons.edit_outlined, size: 23, color: G.ink),
               onPressed: () => showModalBottomSheet(
                 context: context,
                 isScrollControlled: true,
@@ -53,224 +58,52 @@ class TaskDetailScreen extends StatelessWidget {
                 ),
               ),
             ),
-          ),
+          ]),
           body: ListView(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 40),
+            padding: const EdgeInsets.fromLTRB(22, 0, 22, 28),
             children: [
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: G.card,
-                  borderRadius: BorderRadius.circular(4),
-                  border: Border.all(color: G.lineSoft, width: 0.5),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        if (task.priorityLabel.isNotEmpty &&
-                            task.priorityLabel != 'NONE')
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 6, vertical: 2),
-                            decoration: BoxDecoration(
-                              color: G.inset,
-                              borderRadius: BorderRadius.circular(2),
-                              border: Border.all(color: G.lineSoft, width: 0.5),
-                            ),
-                            child: Text(
-                              task.priorityLabel,
-                              style: G.label(size: 10, color: G.faint),
-                            ),
-                          ),
-                        if (area != null) ...[
-                          const SizedBox(width: 8),
-                          Row(
-                            children: [
-                              Container(
-                                width: 5,
-                                height: 5,
-                                decoration: BoxDecoration(
-                                  shape: BoxShape.circle,
-                                  color: color,
-                                ),
-                              ),
-                              const SizedBox(width: 5),
-                              Text(area.name,
-                                  style: G.label(size: 11, color: color)),
-                            ],
-                          ),
-                        ],
-                        const Spacer(),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 7, vertical: 2),
-                          decoration: BoxDecoration(
-                            color: task.isDone
-                                ? G.good.withValues(alpha: 0.15)
-                                : G.inset,
-                            borderRadius: BorderRadius.circular(2),
-                            border: Border.all(
-                              color: task.isDone
-                                  ? G.good.withValues(alpha: 0.4)
-                                  : G.lineSoft,
-                              width: 0.5,
-                            ),
-                          ),
-                          child: Text(
-                            task.isDone ? 'Completed' : 'Open',
-                            style: G.label(
-                              size: 10.5,
-                              color: task.isDone ? G.good : G.muted,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    if (goal != null || project != null) ...[
-                      const SizedBox(height: 10),
-                      Wrap(
-                        spacing: 6,
-                        runSpacing: 4,
-                        children: [
-                          if (goal != null)
-                            Text(
-                              'Goal: ${goal.title}',
-                              style: G.label(size: 11, color: G.faint),
-                            ),
-                          if (project != null)
-                            Text(
-                              'Project: ${project.title}',
-                              style: G.label(size: 11, color: G.faint),
-                            ),
-                        ],
+              GTitle(task.title, size: 36, sub: task.isDone ? 'Done.' : null),
+              if (facts.isNotEmpty)
+                GCard(
+                  child: Column(children: [
+                    for (var i = 0; i < facts.length; i++)
+                      Padding(
+                        padding: EdgeInsets.only(top: i == 0 ? 0 : 12),
+                        child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                          SizedBox(width: 108, child: Text(facts[i].$1, style: G.text(16, color: G.muted, height: 1.35))),
+                          Expanded(child: Text(facts[i].$2, style: G.text(18, height: 1.3))),
+                        ]),
                       ),
-                    ],
-                    const SizedBox(height: 14),
-                    Text(
-                      task.title,
-                      style: G.text(17, w: FontWeight.w500, color: G.ink),
-                    ),
-                    if (task.dueDate != null) ...[
-                      const SizedBox(height: 10),
-                      Row(
-                        children: [
-                          Icon(Icons.calendar_today_outlined,
-                              size: 13, color: G.faint),
-                          const SizedBox(width: 6),
-                          Text(_fmtDate(task.dueDate!),
-                              style: G.label(size: 11.5, color: G.muted)),
-                        ],
-                      ),
-                    ],
-                    if (_noteText(task).isNotEmpty) ...[
-                      const SizedBox(height: 10),
-                      Text(_noteText(task),
-                          style: G.text(13.5, color: G.muted, height: 1.45)),
-                    ],
-                    // Made from a save: the video or post is one tap away.
-                    if (task.sourceUrl != null) ...[
-                      const SizedBox(height: 6),
-                      OpenSourceButton(task.sourceUrl!),
-                    ],
-                  ],
+                  ]),
                 ),
-              ),
-              const SizedBox(height: 16),
+              if (_noteText(task).isNotEmpty)
+                GCard(child: Text(_noteText(task), style: G.text(18, color: G.muted, height: 1.4))),
+              // Made from a save: the video or post is one tap away.
+              if (task.sourceUrl != null) OpenSourceButton(task.sourceUrl!),
+              const SizedBox(height: 14),
               if (!task.isDone) ...[
-                SizedBox(
-                  width: double.infinity,
-                  height: 44,
-                  child: OutlinedButton.icon(
-                    onPressed: () => Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (_) =>
-                            FocusScreen(task: task, accentColor: color),
-                      ),
-                    ),
-                    icon: Icon(Icons.bolt, size: 16, color: G.accent),
-                    label: Text('Start focus block',
-                        style: G.text(13.5,
-                            w: FontWeight.w500, color: G.accent)),
-                    style: OutlinedButton.styleFrom(
-                      backgroundColor: G.accent.withValues(alpha: 0.1),
-                      side: BorderSide(
-                          color: G.accent.withValues(alpha: 0.35), width: 0.5),
-                      shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(4)),
-                    ),
-                  ),
-                ),
+                GPill('Start', primary: true, onTap: () => Navigator.of(context).push(
+                      MaterialPageRoute(builder: (_) => FocusScreen(task: task, accentColor: color)),
+                    )),
                 const SizedBox(height: 10),
-                Row(
-                  children: [
-                    Expanded(
-                      child: OutlinedButton.icon(
-                        onPressed: () {
-                          context
-                              .read<LifeCubit>()
-                              .completeTask(task.id);
-                          Navigator.of(context).pop();
-                        },
-                        icon: Icon(Icons.check, size: 15, color: G.good),
-                        label: Text('Mark done',
-                            style: G.text(13,
-                                w: FontWeight.w500, color: G.good)),
-                        style: OutlinedButton.styleFrom(
-                          minimumSize: const Size.fromHeight(42),
-                          side: BorderSide(
-                              color: G.good.withValues(alpha: 0.35), width: 0.5),
-                          shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(4)),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: OutlinedButton.icon(
-                        onPressed: () {
-                          context.read<LifeCubit>().deleteTask(task.id);
-                          Navigator.of(context).pop();
-                        },
-                        icon: Icon(Icons.delete_outline,
-                            size: 15, color: G.carried),
-                        label: Text('Delete',
-                            style: G.text(13,
-                                w: FontWeight.w500, color: G.carried)),
-                        style: OutlinedButton.styleFrom(
-                          minimumSize: const Size.fromHeight(42),
-                          side: BorderSide(
-                              color: G.carried.withValues(alpha: 0.35),
-                              width: 0.5),
-                          shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(4)),
-                        ),
-                      ),
-                    ),
-                  ],
+                GPill('Mark done', onTap: () {
+                  context.read<LifeCubit>().completeTask(task.id);
+                  Navigator.of(context).pop();
+                }),
+                const SizedBox(height: 4),
+                TextButton(
+                  onPressed: () {
+                    context.read<LifeCubit>().deleteTask(task.id);
+                    Navigator.of(context).pop();
+                  },
+                  style: TextButton.styleFrom(foregroundColor: G.ink, minimumSize: const Size(64, 48)),
+                  child: Text('Delete', style: G.text(17, height: 1.2)),
                 ),
-              ] else ...[
-                SizedBox(
-                  width: double.infinity,
-                  height: 42,
-                  child: OutlinedButton.icon(
-                    onPressed: () {
-                      context.read<LifeCubit>().completeTask(task.id);
-                      Navigator.of(context).pop();
-                    },
-                    icon: Icon(Icons.undo_rounded, size: 16, color: G.muted),
-                    label: Text('Reopen task',
-                        style: G.text(13,
-                            w: FontWeight.w500, color: G.muted)),
-                    style: OutlinedButton.styleFrom(
-                      side: BorderSide(color: G.lineSoft, width: 0.5),
-                      shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(4)),
-                    ),
-                  ),
-                ),
-              ],
+              ] else
+                GPill('Not done yet', onTap: () {
+                  context.read<LifeCubit>().completeTask(task.id);
+                  Navigator.of(context).pop();
+                }),
             ],
           ),
         );
@@ -290,6 +123,6 @@ class TaskDetailScreen extends StatelessWidget {
       'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
       'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
     ];
-    return 'Due ${months[d.month - 1]} ${d.day}, ${d.year}';
+    return '${d.day} ${months[d.month - 1]} ${d.year}';
   }
 }

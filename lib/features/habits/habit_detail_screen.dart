@@ -5,7 +5,7 @@ import '../../core/links/open_link.dart';
 import '../../data/models/habit.dart';
 import '../guide/guide_style.dart';
 import '../shell/life_cubit.dart';
-import 'habits_screen.dart' show openHabitForm;
+import 'habits_screen.dart' show habitWeekLine, openHabitForm;
 
 class HabitDetailScreen extends StatelessWidget {
   final String habitId;
@@ -22,102 +22,62 @@ class HabitDetailScreen extends StatelessWidget {
         if (h == null) {
           return Scaffold(
             backgroundColor: G.bg,
-            appBar: const GTopBar('Habit', showBack: true),
+            appBar: gBar(),
             body: Center(
-              child:
-                  Text('Habit not found', style: G.voice(15, color: G.muted)),
+              child: Text("Couldn't find this.", style: G.text(18, color: G.muted, height: 1.35)),
             ),
           );
         }
         final habit = h;
-        final color = s.areaById(habit.areaId)?.color ?? G.accent;
-        final completed = habit.history.where((d) => d).length;
-        final rate = habit.history.isEmpty
-            ? 0
-            : (completed / habit.history.length * 100).round();
 
         return Scaffold(
           backgroundColor: G.bg,
-          appBar: GTopBar(
-            habit.title,
-            subtitle: 'Habit continuity',
-            showBack: true,
-            trailing: IconButton(
-              icon: Icon(Icons.edit_outlined, size: 18, color: G.muted),
+          appBar: gBar(actions: [
+            IconButton(
+              tooltip: 'Edit',
+              icon: Icon(Icons.edit_outlined, size: 23, color: G.ink),
               onPressed: () => openHabitForm(context, habit: habit),
             ),
-          ),
+          ]),
           body: ListView(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 40),
+            padding: const EdgeInsets.fromLTRB(22, 0, 22, 28),
             children: [
+              GTitle(habit.title, size: 36, sub: habitWeekLine(habit.history)),
               // Made from a save: the video or post is one tap away.
-              if (habit.sourceUrl != null) ...[
-                OpenSourceButton(habit.sourceUrl!),
-                const SizedBox(height: 8),
-              ],
-              Row(
-                children: [
-                  _stat('${habit.currentStreak}', 'Days logged', G.good),
-                  const SizedBox(width: 8),
-                  _stat('${habit.longestStreak}', 'Best continuity', G.ink),
-                  const SizedBox(width: 8),
-                  _stat('$rate%', 'Consistency', G.accent),
-                ],
-              ),
-              const SizedBox(height: 12),
-              _logCard(context, habit, color),
-              const SizedBox(height: 8),
+              if (habit.sourceUrl != null) OpenSourceButton(habit.sourceUrl!),
+              _logCard(context, habit),
               Center(
-                child: TextButton.icon(
+                child: TextButton(
                   onPressed: () => _backfillDay(context, habit),
-                  icon: Icon(Icons.history_rounded, size: 16, color: G.muted),
-                  label: Text('Log a past day',
-                      style: G.label(size: 11.5, color: G.muted)),
+                  style: TextButton.styleFrom(foregroundColor: G.ink, minimumSize: const Size(64, 48)),
+                  child: Text('Add a day I missed logging', style: G.text(17, height: 1.2)),
                 ),
               ),
               const SizedBox(height: 8),
-              Container(
-                padding: const EdgeInsets.all(14),
-                decoration: BoxDecoration(
-                  color: G.card,
-                  borderRadius: BorderRadius.circular(4),
-                  border: Border.all(color: G.lineSoft, width: 0.5),
-                ),
+              GCard(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('RECENT CONTINUITY',
-                        style: G.label(size: 10.5, color: G.faint)),
+                    Text('Recent days', style: G.text(16, color: G.muted, height: 1.2)),
                     const SizedBox(height: 12),
-                    _Heatmap(history: habit.history, color: G.good),
+                    _RecentDays(history: habit.history),
                   ],
                 ),
               ),
-              const SizedBox(height: 12),
-              Container(
-                padding: const EdgeInsets.all(14),
-                decoration: BoxDecoration(
-                  color: G.card,
-                  borderRadius: BorderRadius.circular(4),
-                  border: Border.all(color: G.lineSoft, width: 0.5),
-                ),
+              GCard(
                 child: Column(
                   children: [
-                    _info('Frequency', habit.frequency),
-                    const SizedBox(height: 8),
-                    Container(height: 0.5, color: G.lineSoft),
-                    const SizedBox(height: 8),
+                    _info('How often', _title(habit.frequency)),
+                    const SizedBox(height: 12),
                     _info('Reminder', habit.reminderTime ?? 'Off'),
-                    const SizedBox(height: 8),
-                    Container(height: 0.5, color: G.lineSoft),
-                    const SizedBox(height: 8),
+                    const SizedBox(height: 12),
                     _info(
-                      'Target',
+                      'Aim',
                       habit.kind == 'timer'
-                          ? '${habit.targetMinutes}m focus'
+                          ? '${habit.targetMinutes} min'
                           : habit.kind == 'count'
-                              ? '${habit.targetCount} count'
-                              : 'Smallest version (2 min counts)',
+                              ? '${habit.targetCount} a day'
+                              : 'Even 2 minutes counts',
                     ),
                   ],
                 ),
@@ -129,180 +89,57 @@ class HabitDetailScreen extends StatelessWidget {
     );
   }
 
-  Widget _stat(String num, String label, Color c) => Expanded(
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
-          decoration: BoxDecoration(
-            color: G.card,
-            borderRadius: BorderRadius.circular(4),
-            border: Border.all(color: G.lineSoft, width: 0.5),
-          ),
-          child: Column(
-            children: [
-              Text(num, style: G.numeral(24, color: c)),
-              const SizedBox(height: 4),
-              Text(label,
-                  textAlign: TextAlign.center,
-                  style: G.label(size: 10, color: G.faint)),
-            ],
-          ),
-        ),
+  static String _title(String s) => s.isEmpty ? s : s[0] + s.substring(1).toLowerCase();
+
+  Widget _bar(double pct) => ClipRRect(
+        borderRadius: BorderRadius.circular(4),
+        child: LinearProgressIndicator(value: pct, minHeight: 8, color: G.accent, backgroundColor: G.surfaceHigh),
       );
 
-  Widget _logCard(BuildContext context, Habit h, Color color) {
-    if (h.kind == 'boolean') {
-      return Container(
-        padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(
-          color: G.card,
-          borderRadius: BorderRadius.circular(4),
-          border: Border.all(color: G.lineSoft, width: 0.5),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text('TODAY', style: G.label(size: 10.5, color: G.faint)),
-                Text(
-                  h.todayDone ? 'Logged' : 'Pending',
-                  style: G.label(
-                    size: 11,
-                    color: h.todayDone ? G.good : G.faint,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            SizedBox(
-              width: double.infinity,
-              height: 44,
-              child: OutlinedButton.icon(
-                onPressed: () => context.read<LifeCubit>().logHabit(h),
-                icon: Icon(
-                  h.todayDone ? Icons.check : Icons.add,
-                  size: 16,
-                  color: h.todayDone ? G.good : G.ink,
-                ),
-                label: Text(
-                  h.todayDone ? 'Logged today (Tap to toggle)' : 'Mark as done',
-                  style: G.text(13.5,
-                      w: FontWeight.w500,
-                      color: h.todayDone ? G.good : G.ink),
-                ),
-                style: OutlinedButton.styleFrom(
-                  backgroundColor: h.todayDone
-                      ? G.good.withValues(alpha: 0.12)
-                      : G.inset,
-                  side: BorderSide(
-                    color: h.todayDone
-                        ? G.good.withValues(alpha: 0.4)
-                        : G.lineSoft,
-                    width: 0.5,
-                  ),
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(4)),
-                ),
-              ),
-            ),
-          ],
-        ),
+  Widget _todayLine(String left, String right) => Row(
+        children: [
+          Expanded(child: Text(left, style: G.text(16, color: G.muted, height: 1.2))),
+          Text(right, style: G.text(18, w: FontWeight.w500, height: 1.2)),
+        ],
       );
+
+  Widget _round(IconData icon, String tip, VoidCallback? onTap) => IconButton(
+        tooltip: tip,
+        onPressed: onTap,
+        iconSize: 26,
+        style: IconButton.styleFrom(
+          backgroundColor: G.surfaceHigh,
+          disabledBackgroundColor: G.surfaceHigh.withValues(alpha: 0.4),
+          foregroundColor: G.ink,
+          minimumSize: const Size(56, 56),
+        ),
+        icon: Icon(icon),
+      );
+
+  Widget _logCard(BuildContext context, Habit h) {
+    if (h.kind == 'boolean') {
+      return GPill(h.todayDone ? 'Done today. Tap to undo' : 'Mark done', primary: !h.todayDone, onTap: () => context.read<LifeCubit>().logHabit(h));
     }
 
     if (h.kind == 'count') {
       final pct = h.target == 0 ? 0.0 : (h.todayCount / h.targetCount).clamp(0.0, 1.0);
-      return Container(
-        padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(
-          color: G.card,
-          borderRadius: BorderRadius.circular(4),
-          border: Border.all(color: G.lineSoft, width: 0.5),
-        ),
+      void setCount(int n) => context.read<LifeCubit>().updateHabitLog(h, count: n, minutes: h.todayMinutes, completed: n >= h.targetCount);
+      return GCard(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text('TODAY\'S COUNT',
-                    style: G.label(size: 10.5, color: G.faint)),
-                Text(
-                  '${h.todayCount} / ${h.targetCount}',
-                  style: G.label(
-                      size: 11,
-                      color: h.todayDone ? G.good : G.ink),
-                ),
-              ],
-            ),
-            const SizedBox(height: 10),
-            Container(
-              height: 3,
-              decoration: BoxDecoration(
-                color: G.inset,
-                borderRadius: BorderRadius.circular(1.5),
-              ),
-              child: FractionallySizedBox(
-                alignment: Alignment.centerLeft,
-                widthFactor: pct,
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: h.todayDone ? G.good : G.accent,
-                    borderRadius: BorderRadius.circular(1.5),
-                  ),
-                ),
-              ),
-            ),
+            _todayLine('Today', '${h.todayCount} of ${h.targetCount}'),
+            const SizedBox(height: 12),
+            _bar(pct),
             const SizedBox(height: 16),
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                IconButton(
-                  onPressed: h.todayCount > 0
-                      ? () {
-                          final nextCount = h.todayCount - 1;
-                          context.read<LifeCubit>().updateHabitLog(
-                                h,
-                                count: nextCount,
-                                minutes: h.todayMinutes,
-                                completed: nextCount >= h.targetCount,
-                              );
-                        }
-                      : null,
-                  icon: Icon(Icons.remove, size: 18, color: G.ink),
-                  style: IconButton.styleFrom(
-                    backgroundColor: G.inset,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(4),
-                      side: BorderSide(color: G.lineSoft, width: 0.5),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 20),
-                Text('${h.todayCount}',
-                    style: G.numeral(28, color: G.ink)),
-                const SizedBox(width: 20),
-                IconButton(
-                  onPressed: () {
-                    final nextCount = h.todayCount + 1;
-                    context.read<LifeCubit>().updateHabitLog(
-                          h,
-                          count: nextCount,
-                          minutes: h.todayMinutes,
-                          completed: nextCount >= h.targetCount,
-                        );
-                  },
-                  icon: Icon(Icons.add, size: 18, color: G.accent),
-                  style: IconButton.styleFrom(
-                    backgroundColor: G.accent.withValues(alpha: 0.12),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(4),
-                      side: BorderSide(
-                          color: G.accent.withValues(alpha: 0.4), width: 0.5),
-                    ),
-                  ),
-                ),
+                _round(Icons.remove_rounded, 'One less', h.todayCount > 0 ? () => setCount(h.todayCount - 1) : null),
+                const SizedBox(width: 24),
+                Text('${h.todayCount}', style: G.numeral(42)),
+                const SizedBox(width: 24),
+                _round(Icons.add_rounded, 'One more', () => setCount(h.todayCount + 1)),
               ],
             ),
           ],
@@ -310,95 +147,29 @@ class HabitDetailScreen extends StatelessWidget {
       );
     }
 
-    // Timer
+    // Minutes
     final pct = h.target == 0 ? 0.0 : (h.todayMinutes / h.targetMinutes).clamp(0.0, 1.0);
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: G.card,
-        borderRadius: BorderRadius.circular(4),
-        border: Border.all(color: G.lineSoft, width: 0.5),
-      ),
+    void setMinutes(int n) => context.read<LifeCubit>().updateHabitLog(h, count: h.todayCount, minutes: n, completed: n >= h.targetMinutes);
+    return GCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text('TODAY\'S TIME',
-                  style: G.label(size: 10.5, color: G.faint)),
-              Text(
-                '${h.todayMinutes} / ${h.targetMinutes}m',
-                style: G.label(
-                    size: 11,
-                    color: h.todayDone ? G.good : G.ink),
-              ),
-            ],
-          ),
-          const SizedBox(height: 10),
-          Container(
-            height: 3,
-            decoration: BoxDecoration(
-              color: G.inset,
-              borderRadius: BorderRadius.circular(1.5),
-            ),
-            child: FractionallySizedBox(
-              alignment: Alignment.centerLeft,
-              widthFactor: pct,
-              child: Container(
-                decoration: BoxDecoration(
-                  color: h.todayDone ? G.good : G.accent,
-                  borderRadius: BorderRadius.circular(1.5),
-                ),
-              ),
-            ),
-          ),
+          _todayLine('Today', '${h.todayMinutes} of ${h.targetMinutes} min'),
+          const SizedBox(height: 12),
+          _bar(pct),
           const SizedBox(height: 16),
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+            mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              OutlinedButton(
-                onPressed: h.todayMinutes >= 5
-                    ? () {
-                        final nextMin = h.todayMinutes - 5;
-                        context.read<LifeCubit>().updateHabitLog(
-                              h,
-                              count: h.todayCount,
-                              minutes: nextMin,
-                              completed: nextMin >= h.targetMinutes,
-                            );
-                      }
-                    : null,
-                style: OutlinedButton.styleFrom(
-                  side: BorderSide(color: G.lineSoft, width: 0.5),
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(4)),
-                ),
-                child: Text('-5m', style: G.label(size: 11, color: G.muted)),
-              ),
-              Text('${h.todayMinutes}m',
-                  style: G.numeral(26, color: G.ink)),
-              OutlinedButton(
-                onPressed: () {
-                  final nextMin = h.todayMinutes + 5;
-                  context.read<LifeCubit>().updateHabitLog(
-                        h,
-                        count: h.todayCount,
-                        minutes: nextMin,
-                        completed: nextMin >= h.targetMinutes,
-                      );
-                },
-                style: OutlinedButton.styleFrom(
-                  backgroundColor: G.accent.withValues(alpha: 0.1),
-                  side: BorderSide(
-                      color: G.accent.withValues(alpha: 0.3), width: 0.5),
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(4)),
-                ),
-                child: Text('+5m', style: G.label(size: 11, color: G.accent)),
-              ),
+              _round(Icons.remove_rounded, '5 minutes less', h.todayMinutes >= 5 ? () => setMinutes(h.todayMinutes - 5) : null),
+              const SizedBox(width: 24),
+              Text('${h.todayMinutes}', style: G.numeral(42)),
+              const SizedBox(width: 24),
+              _round(Icons.add_rounded, '5 minutes more', () => setMinutes(h.todayMinutes + 5)),
             ],
           ),
+          const SizedBox(height: 8),
+          Center(child: Text('Each tap is 5 minutes', style: G.text(15, color: G.muted, height: 1.3))),
         ],
       ),
     );
@@ -411,7 +182,7 @@ class HabitDetailScreen extends StatelessWidget {
       initialDate: now.subtract(const Duration(days: 1)),
       firstDate: now.subtract(const Duration(days: 60)),
       lastDate: now.subtract(const Duration(days: 1)),
-      helpText: 'Log a missed day',
+      helpText: 'Which day?',
     );
     if (picked == null || !context.mounted) return;
 
@@ -421,36 +192,34 @@ class HabitDetailScreen extends StatelessWidget {
     }
 
     final controller = TextEditingController();
-    final unit = h.kind == 'timer' ? 'min' : 'count';
+    final unit = h.kind == 'timer' ? 'minutes' : 'times';
     final value = await showDialog<int>(
       context: context,
       builder: (dctx) => AlertDialog(
         backgroundColor: G.card,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(4),
-          side: BorderSide(color: G.lineSoft, width: 0.5),
-        ),
-        title: Text('${picked.month}/${picked.day} — how much?',
-            style: G.voice(15, color: G.ink)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
+        title: Text('How much that day?', style: G.text(26, w: FontWeight.w600, height: 1.15)),
         content: TextField(
           controller: controller,
           keyboardType: TextInputType.number,
           autofocus: true,
-          style: G.text(14, color: G.ink),
+          cursorColor: G.accent,
+          style: G.text(18, height: 1.3),
           decoration: InputDecoration(
-            hintText: 'e.g. ${h.target} ($unit)',
-            hintStyle: G.text(14, color: G.faint),
+            hintText: 'Like ${h.target} $unit',
+            hintStyle: G.text(18, color: G.faint, height: 1.3),
           ),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(dctx).pop(),
-            child: Text('Cancel', style: G.label(size: 11.5, color: G.muted)),
+            style: TextButton.styleFrom(foregroundColor: G.ink, minimumSize: const Size(64, 48)),
+            child: Text('Cancel', style: G.text(17, height: 1.2)),
           ),
           TextButton(
-            onPressed: () =>
-                Navigator.of(dctx).pop(int.tryParse(controller.text)),
-            child: Text('Save', style: G.label(size: 11.5, color: G.accent)),
+            onPressed: () => Navigator.of(dctx).pop(int.tryParse(controller.text)),
+            style: TextButton.styleFrom(foregroundColor: G.accent, minimumSize: const Size(64, 48)),
+            child: Text('Save', style: G.text(17, w: FontWeight.w600, color: G.accent, height: 1.2)),
           ),
         ],
       ),
@@ -466,41 +235,33 @@ class HabitDetailScreen extends StatelessWidget {
   }
 
   Widget _info(String k, String v) => Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(k, style: G.label(size: 11.5, color: G.faint)),
-          Text(v, style: G.text(13, w: FontWeight.w500, color: G.ink)),
+          SizedBox(width: 108, child: Text(k, style: G.text(16, color: G.muted, height: 1.35))),
+          Expanded(child: Text(v, style: G.text(18, height: 1.3))),
         ],
       );
 }
 
-class _Heatmap extends StatelessWidget {
+/// One small square per recent day. Peach when it happened, and never a count.
+class _RecentDays extends StatelessWidget {
   final List<bool> history;
-  final Color color;
-  const _Heatmap({required this.history, required this.color});
+  const _RecentDays({required this.history});
 
   @override
   Widget build(BuildContext context) {
     if (history.isEmpty) {
-      return Text('No history recorded yet.',
-          style: G.voice(13, color: G.faint));
+      return Text('Nothing logged yet.', style: G.text(17, color: G.muted, height: 1.35));
     }
     return Wrap(
-      spacing: 5,
-      runSpacing: 5,
+      spacing: 6,
+      runSpacing: 6,
       children: [
         for (final done in history)
           Container(
-            width: 14,
-            height: 14,
-            decoration: BoxDecoration(
-              color: done ? color : G.inset,
-              borderRadius: BorderRadius.circular(2),
-              border: Border.all(
-                color: done ? Colors.transparent : G.lineSoft,
-                width: 0.5,
-              ),
-            ),
+            width: 20,
+            height: 20,
+            decoration: BoxDecoration(color: done ? G.accent : G.surfaceHigh, borderRadius: BorderRadius.circular(6)),
           ),
       ],
     );

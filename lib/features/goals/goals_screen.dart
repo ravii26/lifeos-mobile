@@ -182,7 +182,7 @@ class _GoalsView extends StatelessWidget {
                   decoration: BoxDecoration(
                     color: G.inset,
                     border: Border.all(color: G.lineSoft, width: 0.5),
-                    borderRadius: BorderRadius.circular(4),
+                    borderRadius: BorderRadius.circular(18),
                   ),
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -215,7 +215,7 @@ class _GoalsView extends StatelessWidget {
                     decoration: BoxDecoration(
                       color: G.card,
                       border: Border.all(color: G.lineSoft, width: 0.5),
-                      borderRadius: BorderRadius.circular(4),
+                      borderRadius: BorderRadius.circular(18),
                     ),
                     child: Center(
                       child: Text(
@@ -307,7 +307,7 @@ class _GoalCard extends StatelessWidget {
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: G.card,
-        borderRadius: BorderRadius.circular(4),
+        borderRadius: BorderRadius.circular(18),
         border: Border.all(color: G.lineSoft, width: 0.5),
       ),
       child: Column(
@@ -528,7 +528,7 @@ class _GoalFormState extends State<_GoalForm> {
               style: OutlinedButton.styleFrom(
                 side: BorderSide(color: G.lineSoft, width: 0.5),
                 shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(4)),
+                    borderRadius: BorderRadius.circular(18)),
               ),
             ),
             if (_deadline != null) ...[
@@ -567,7 +567,7 @@ class _GoalFormState extends State<_GoalForm> {
             side: BorderSide(
                 color: G.accent.withValues(alpha: 0.4), width: 0.5),
             shape:
-                RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
           ),
         ),
       );
@@ -590,7 +590,7 @@ class _GoalFormState extends State<_GoalForm> {
       builder: (_) => AlertDialog(
         backgroundColor: G.card,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(4),
+          borderRadius: BorderRadius.circular(18),
           side: BorderSide(color: G.lineSoft, width: 0.5),
         ),
         title: Text('Focus is full', style: G.voice(16, color: G.ink)),

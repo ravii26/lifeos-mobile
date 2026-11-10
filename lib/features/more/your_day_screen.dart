@@ -24,7 +24,6 @@ const _modeText = {
 };
 
 /// What Ally believes your day looks like, so a wrong schedule is easy to spot.
-/// Styled according to Nocturne Sanctuary.
 class YourDayScreen extends StatefulWidget {
   const YourDayScreen({super.key});
 
@@ -58,10 +57,10 @@ class _YourDayScreenState extends State<YourDayScreen> {
     }
   }
 
-  String _hours(int minutes) {
-    if (minutes <= 0) return 'none';
+  String _free(int minutes) {
+    if (minutes <= 0) return 'No free time';
     final h = minutes ~/ 60, m = minutes % 60;
-    return h == 0 ? '$m min' : (m == 0 ? '$h h' : '$h h $m min');
+    return '${h == 0 ? '$m min' : (m == 0 ? '$h h' : '$h h $m min')} free';
   }
 
   @override
@@ -71,108 +70,66 @@ class _YourDayScreenState extends State<YourDayScreen> {
     final order = days == null ? const <Map<String, dynamic>>[] : [...days.skip(1), days.first];
     return Scaffold(
       backgroundColor: G.bg,
-      appBar: GTopBar(
-        'Your day & schedule',
-        subtitle: 'Schedule blocks and active mode',
-      ),
+      appBar: gBar(),
       body: RefreshIndicator(
+        color: G.accent,
+        backgroundColor: G.card,
         onRefresh: _load,
         child: ListView(
-          padding: const EdgeInsets.fromLTRB(20, 16, 20, 36),
+          padding: const EdgeInsets.fromLTRB(22, 0, 22, 28),
           children: [
-            Text(
-              'This is how Ally thinks your days run. To change it, tell Ally in chat, like "I work 10 to 8:30 on weekdays", or answer the three questions again.',
-              style: G.voice(14, color: G.muted),
+            const GTitle('My day', sub: 'This is how Ally thinks your days run. If it looks wrong, just say so in Talk, like "I work 10 to 8:30 on weekdays".'),
+            GCard(
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text('Right now', style: G.text(16, color: G.accent, height: 1.2)),
+                const SizedBox(height: 4),
+                Text(_modeText[_mode] ?? _mode, style: G.text(23, w: FontWeight.w500, height: 1.2)),
+              ]),
             ),
-            const SizedBox(height: 10),
-            GButton('Set my day again', primary: false, onTap: () async {
+            GPill('Set my day again', onTap: () async {
               await Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => const FirstRunScreen()));
               await _load();
             }),
-            const SizedBox(height: 14),
-            // Current Mode Banner
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: G.card,
-                border: Border.all(color: G.lineSoft, width: 0.5),
-                borderRadius: BorderRadius.circular(4),
-              ),
-              child: Row(children: [
-                Container(
-                  width: 6,
-                  height: 6,
-                  decoration: BoxDecoration(shape: BoxShape.circle, color: G.accent),
-                ),
-                const SizedBox(width: 8),
-                Text('ACTIVE MODE: ', style: G.label(size: 10, color: G.faint, w: FontWeight.w600)),
-                Text(_modeText[_mode] ?? _mode, style: G.text(14, w: FontWeight.w600, color: G.ink)),
-              ]),
-            ),
-            const SizedBox(height: 14),
-            Container(height: 0.5, color: G.lineSoft),
-            const SizedBox(height: 14),
-
+            const SizedBox(height: 22),
             if (_error != null)
               Padding(
                 padding: const EdgeInsets.only(bottom: 12),
-                child: Text(_error!, style: G.label(size: 12, color: Colors.redAccent)),
+                child: Text(_error!, style: G.text(16, color: G.accent, height: 1.3)),
               ),
             if (days == null && _error == null)
-              const Center(
+              Center(
                 child: Padding(
-                  padding: EdgeInsets.all(32),
-                  child: CircularProgressIndicator(strokeWidth: 1.5),
+                  padding: const EdgeInsets.all(32),
+                  child: CircularProgressIndicator(strokeWidth: 2, color: G.accent),
                 ),
               ),
-
             for (final d in order)
-              Container(
-                margin: const EdgeInsets.only(bottom: 10),
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: G.card,
-                  border: Border.all(color: G.lineSoft, width: 0.5),
-                  borderRadius: BorderRadius.circular(4),
-                ),
+              GCard(
                 child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-                    Text(_weekdays[(d['weekday'] as num).toInt()], style: G.text(15, w: FontWeight.w600)),
-                    Text(
-                      d['custom'] == true ? 'You taught Ally' : 'Default guess',
-                      style: G.label(size: 10, color: G.faint),
-                    ),
-                  ]),
-                  const SizedBox(height: 8),
+                  Text(_weekdays[(d['weekday'] as num).toInt()], style: G.text(23, w: FontWeight.w500, height: 1.2)),
+                  Text(
+                    d['custom'] == true ? 'You told Ally this' : "Ally's guess",
+                    style: G.text(15, color: G.muted, height: 1.3),
+                  ),
+                  const SizedBox(height: 10),
                   for (final b in (d['blocks'] as List).whereType<Map<String, dynamic>>())
                     Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 3),
-                      child: Row(children: [
-                        Container(
-                          width: 4,
-                          height: 4,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: G.part('${b['block']}'),
+                      padding: const EdgeInsets.symmetric(vertical: 5),
+                      child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                        Padding(
+                          padding: const EdgeInsets.only(top: 8),
+                          child: Container(
+                            width: 8,
+                            height: 8,
+                            decoration: BoxDecoration(shape: BoxShape.circle, color: G.accent),
                           ),
                         ),
-                        const SizedBox(width: 6),
-                        SizedBox(
-                          width: 80,
-                          child: Text(
-                            _blockLabel[b['block']] ?? '${b['block']}',
-                            style: G.text(13, w: FontWeight.w500),
-                          ),
-                        ),
+                        const SizedBox(width: 10),
                         Expanded(
-                          child: Text(
-                            '${b['start']} – ${b['end']}',
-                            style: G.label(size: 11, color: G.faint),
-                          ),
-                        ),
-                        Text(
-                          'free ${_hours((b['freeMinutes'] as num).toInt())}',
-                          style: G.label(size: 11, color: G.muted),
+                          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                            Text('${_blockLabel[b['block']] ?? b['block']}, ${b['start']} to ${b['end']}', style: G.text(18, height: 1.3)),
+                            Text(_free((b['freeMinutes'] as num).toInt()), style: G.text(15, color: G.muted, height: 1.3)),
+                          ]),
                         ),
                       ]),
                     ),

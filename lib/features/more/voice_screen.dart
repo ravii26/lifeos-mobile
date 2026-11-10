@@ -112,36 +112,37 @@ class _VoiceScreenState extends State<VoiceScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: G.bg,
-      appBar: const GTopBar("Ally's voice", subtitle: 'How Ally sounds when it talks', showBack: true),
+      appBar: gBar(),
       body: ValueListenableBuilder<InstallState>(
         valueListenable: _voice.installState,
         builder: (context, install, _) => ListView(
-          padding: const EdgeInsets.fromLTRB(20, 8, 20, 40),
+          padding: const EdgeInsets.fromLTRB(22, 0, 22, 28),
           children: [
-            Text(
-              'Natural voices are downloaded once (use Wi-Fi) and then work with no internet. The download carries on if you leave this screen, and resumes if the connection drops. If a voice fails, Ally uses the phone voice.',
-              style: G.text(13, color: G.muted, height: 1.45),
-            ),
-            const SizedBox(height: 14),
-            const GHeading('Choose a voice'),
+            const GTitle("Ally's voice", sub: 'Natural voices download once, best on Wi-Fi, and then work with no internet.'),
             _row(
               title: 'Phone voice',
-              sub: "Your phone's built-in voice. Always works. You can pick a better one in Android's text-to-speech settings.",
+              sub: "Your phone's built-in voice. Always works.",
               selected: _chosen == null,
-              trailing: _chosen == null ? null : TextButton(onPressed: () => _use(null), child: Text('Use', style: G.text(14, w: FontWeight.w700))),
+              trailing: _chosen == null ? null : _action('Use', () => _use(null)),
             ),
             for (final v in voiceOptions) _voiceRow(v, install),
-            const SizedBox(height: 16),
-            GButton(_speaking ? 'Stop' : 'Hear it', onTap: _hear),
-            if (_speedNote != null) Padding(padding: const EdgeInsets.only(top: 12), child: Text(_speedNote!, style: G.text(13, color: G.muted, height: 1.4))),
-            if (_error != null) Padding(padding: const EdgeInsets.only(top: 12), child: Text(_error!, style: G.text(13, color: G.muted, height: 1.4))),
+            const SizedBox(height: 12),
+            GPill(_speaking ? 'Stop' : 'Hear it', primary: true, onTap: _hear),
+            if (_speedNote != null) Padding(padding: const EdgeInsets.only(top: 12), child: Text(_speedNote!, style: G.text(16, color: G.muted, height: 1.35))),
+            if (_error != null) Padding(padding: const EdgeInsets.only(top: 12), child: Text(_error!, style: G.text(16, color: G.accent, height: 1.35))),
             if (_voice.lastEngine.isNotEmpty)
-              Padding(padding: const EdgeInsets.only(top: 12), child: Text('Last spoken with: ${_voice.lastEngine}', style: G.label(size: 11, color: G.faint))),
+              Padding(padding: const EdgeInsets.only(top: 12), child: Text('Last spoken with: ${_voice.lastEngine}', style: G.text(15, color: G.muted, height: 1.3))),
           ],
         ),
       ),
     );
   }
+
+  Widget _action(String label, VoidCallback? onTap) => TextButton(
+        onPressed: onTap,
+        style: TextButton.styleFrom(foregroundColor: G.accent, minimumSize: const Size(48, 44)),
+        child: Text(label, style: G.text(16, w: FontWeight.w600, color: G.accent, height: 1.2)),
+      );
 
   Widget _voiceRow(VoiceOption v, InstallState install) {
     final installed = _installed[v.id] == true;
@@ -156,28 +157,25 @@ class _VoiceScreenState extends State<VoiceScreen> {
       below = Padding(
         padding: const EdgeInsets.only(top: 8),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          LinearProgressIndicator(value: install.stage == InstallStage.unpacking || install.progress == 0 ? null : install.progress, color: G.accent, backgroundColor: G.lineSoft),
-          const SizedBox(height: 4),
-          Text(install.label, style: G.label(size: 11, color: G.faint)),
+          LinearProgressIndicator(value: install.stage == InstallStage.unpacking || install.progress == 0 ? null : install.progress, color: G.accent, backgroundColor: G.surfaceHigh, minHeight: 6, borderRadius: BorderRadius.circular(3)),
+          const SizedBox(height: 6),
+          Text(install.label, style: G.text(15, color: G.muted, height: 1.3)),
         ]),
       );
     } else if (failed) {
-      below = Padding(padding: const EdgeInsets.only(top: 6), child: Text(install.error ?? 'It did not finish.', style: G.text(13, color: G.muted, height: 1.4)));
+      below = Padding(padding: const EdgeInsets.only(top: 6), child: Text(install.error ?? 'It did not finish.', style: G.text(16, color: G.accent, height: 1.3)));
     } else if (!installed && partialMb > 0) {
-      below = Padding(padding: const EdgeInsets.only(top: 6), child: Text('$partialMb MB already downloaded.', style: G.label(size: 11, color: G.faint)));
+      below = Padding(padding: const EdgeInsets.only(top: 6), child: Text('$partialMb MB already downloaded.', style: G.text(15, color: G.muted, height: 1.3)));
     }
 
     Widget trailing;
     if (running) {
       trailing = install.stage == InstallStage.downloading
-          ? TextButton(onPressed: _voice.cancelInstall, child: Text('Stop', style: G.text(14, color: G.muted)))
-          : const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2));
+          ? _action('Stop', _voice.cancelInstall)
+          : SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2, color: G.accent));
     } else if (!installed) {
       final label = failed || partialMb > 0 ? 'Resume' : 'Download';
-      trailing = TextButton(
-        onPressed: _voice.installing ? null : () => _voice.startInstall(v),
-        child: Text(label, style: G.text(14, w: FontWeight.w700)),
-      );
+      trailing = _action(label, _voice.installing ? null : () => _voice.startInstall(v));
     } else {
       trailing = PopupMenuButton<String>(
         onSelected: (a) {
@@ -190,26 +188,26 @@ class _VoiceScreenState extends State<VoiceScreen> {
           PopupMenuItem(value: 'speed', enabled: !_checking, child: Text(_checking ? 'Checking…' : 'Check speed')),
           const PopupMenuItem(value: 'remove', child: Text('Remove download')),
         ],
-        icon: Icon(Icons.more_horiz, color: G.faint),
+        color: G.surfaceHigh,
+        icon: Icon(Icons.more_horiz, color: G.ink),
       );
     }
 
     return _row(title: v.label, sub: '${v.blurb} About ${v.mb} MB.', selected: selected, below: below, trailing: trailing);
   }
 
-  Widget _row({required String title, required String sub, required bool selected, Widget? trailing, Widget? below}) => Container(
-        padding: const EdgeInsets.symmetric(vertical: 12),
-        decoration: BoxDecoration(border: Border(top: BorderSide(color: G.lineSoft, width: 0.5))),
+  Widget _row({required String title, required String sub, required bool selected, Widget? trailing, Widget? below}) => GCard(
+        padding: const EdgeInsets.fromLTRB(16, 14, 10, 14),
         child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Padding(
             padding: const EdgeInsets.only(top: 2, right: 12),
-            child: Icon(selected ? Icons.radio_button_checked : Icons.radio_button_unchecked, size: 20, color: selected ? G.accent : G.faint),
+            child: Icon(selected ? Icons.radio_button_checked : Icons.radio_button_unchecked, size: 24, color: selected ? G.accent : G.faint),
           ),
           Expanded(
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text(title, style: G.text(15, w: FontWeight.w600)),
+              Text(title, style: G.text(20, w: FontWeight.w500, height: 1.25)),
               const SizedBox(height: 2),
-              Text(sub, style: G.text(13, color: G.muted, height: 1.4)),
+              Text(sub, style: G.text(16, color: G.muted, height: 1.3)),
               if (below != null) below,
             ]),
           ),

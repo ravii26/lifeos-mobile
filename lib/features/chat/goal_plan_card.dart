@@ -105,59 +105,68 @@ class _GoalPlanCardState extends State<GoalPlanCard> {
     final milestones = ((plan['milestones'] as List?) ?? const []).map((e) => e.toString()).toList();
     final deadline = asStringOrNull(plan['deadline']);
     return Container(
-      margin: const EdgeInsets.only(top: 10),
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(color: G.card, border: Border.all(color: G.lineSoft, width: 0.5), borderRadius: BorderRadius.circular(4)),
+      margin: const EdgeInsets.only(top: 12),
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(color: G.card, borderRadius: BorderRadius.circular(24)),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Text(asString(plan['title']), style: G.text(16, w: FontWeight.w600)),
-        if (deadline != null) Text('By ${_date(deadline)}', style: G.label(size: 11, color: G.faint)),
+        Text('A week you can keep', style: G.text(16, color: G.accent, height: 1.2)),
+        const SizedBox(height: 6),
+        Text(asString(plan['title']), style: G.text(25, w: FontWeight.w600, height: 1.12, letterSpacing: -0.4)),
+        if (deadline != null) Padding(padding: const EdgeInsets.only(top: 3), child: Text('By ${_date(deadline)}', style: G.text(16, color: G.muted, height: 1.3))),
         const SizedBox(height: 10),
         for (final t in targets)
-          Padding(
-            padding: const EdgeInsets.symmetric(vertical: 5),
+          Container(
+            constraints: const BoxConstraints(minHeight: 54),
+            padding: const EdgeInsets.symmetric(vertical: 8),
+            decoration: BoxDecoration(border: Border(bottom: BorderSide(color: G.surfaceHigh))),
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Row(children: [
-                Expanded(child: Text(asString(t['title']), style: G.text(14.5, w: FontWeight.w500))),
-                Text(_amount(t), style: G.label(size: 12, color: G.muted)),
+                Expanded(child: Text(asString(t['title']), style: G.text(19, height: 1.25))),
+                const SizedBox(width: 10),
+                Text(_amount(t), style: G.text(15, color: G.accent, height: 1.25)),
               ]),
-              if (asStringOrNull(t['note']) != null) Text(asString(t['note']), style: G.text(12.5, color: G.faint)),
+              if (asStringOrNull(t['note']) != null) Text(asString(t['note']), style: G.text(15, color: G.muted, height: 1.3)),
             ]),
           ),
         if (milestones.isNotEmpty) ...[
-          const SizedBox(height: 6),
-          Text('Stages: ${milestones.join(' → ')}', style: G.text(12.5, color: G.muted, height: 1.4)),
+          const SizedBox(height: 10),
+          Text('Stages: ${milestones.join(', then ')}', style: G.text(16, color: G.muted, height: 1.35)),
         ],
         if (asStringOrNull(_fit?['message']) != null) ...[
           const SizedBox(height: 10),
-          Text(asString(_fit!['message']), style: G.text(13, color: G.muted, height: 1.4)),
+          Text(asString(_fit!['message']), style: G.text(17, height: 1.35)),
         ],
         if (_caution != null) ...[
-          const SizedBox(height: 10),
+          const SizedBox(height: 12),
           Container(
-            padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
-            decoration: BoxDecoration(color: G.inset, border: Border(left: BorderSide(color: G.carried, width: 2))),
-            child: Text(asString(_caution!['message']), style: G.text(13, color: G.ink, height: 1.4)),
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(color: G.surfaceHigh, borderRadius: BorderRadius.circular(18)),
+            child: Text(asString(_caution!['message']), style: G.text(17, height: 1.35)),
           ),
         ],
-        const SizedBox(height: 12),
+        const SizedBox(height: 14),
         if (_done != null)
           Row(children: [
-            Expanded(child: Text(_done!, style: G.text(13, color: G.muted))),
-            if (_undoId != null) TextButton(onPressed: _undo, child: Text('Undo', style: G.label(size: 12, color: G.accent, w: FontWeight.w600))),
+            Expanded(child: Text(_done!, style: G.text(16, color: G.muted, height: 1.35))),
+            if (_undoId != null)
+              TextButton(
+                onPressed: _undo,
+                style: TextButton.styleFrom(minimumSize: const Size(48, 44)),
+                child: Text('Undo', style: G.text(16, w: FontWeight.w600, color: G.accent, height: 1.2)),
+              ),
           ])
         else
           Row(children: [
-            Expanded(child: GButton(_busy ? 'Saving…' : (_caution != null ? 'Start anyway' : 'Keep it'), onTap: _busy ? null : () => _keep(park: false))),
+            Expanded(child: GPill(_busy ? 'Saving…' : (_caution != null ? 'Start anyway' : 'Keep this plan'), primary: true, onTap: _busy ? null : () => _keep(park: false))),
             if (_caution != null) ...[
               const SizedBox(width: 8),
-              Expanded(child: GButton('Park it', primary: false, onTap: _busy ? null : () => _keep(park: true))),
+              Expanded(child: GPill('Park it', onTap: _busy ? null : () => _keep(park: true))),
             ],
           ]),
         if (_done == null)
           Padding(
-            padding: const EdgeInsets.only(top: 8),
-            child: Text('Want it different? Just say so, like "make it 3 evenings a week".',
-                style: G.label(size: 11, color: G.faint)),
+            padding: const EdgeInsets.only(top: 10),
+            child: Text('Want it different? Just say so, like "make it lighter".', style: G.text(15, color: G.muted, height: 1.3)),
           ),
       ]),
     );

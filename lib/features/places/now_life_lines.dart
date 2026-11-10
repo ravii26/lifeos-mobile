@@ -38,7 +38,7 @@ class NowLifeLines extends StatelessWidget {
         decoration: BoxDecoration(
           color: G.inset,
           border: Border(left: BorderSide(color: edge ?? G.lineSoft, width: edge == null ? 0.5 : 2)),
-          borderRadius: BorderRadius.circular(3),
+          borderRadius: BorderRadius.circular(10),
         ),
         child: child,
       );

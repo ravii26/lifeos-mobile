@@ -4,7 +4,7 @@ import '../../data/models/area.dart';
 import '../../data/models/task.dart';
 import '../guide/guide_style.dart';
 
-/// Planar Nocturne task row with hairline border, square checkbox, and gentle actions.
+/// One to-do in a list: a round tick, the title, and a quiet line about it.
 class TaskRow extends StatelessWidget {
   final Task task;
   final Area? area;
@@ -18,85 +18,41 @@ class TaskRow extends StatelessWidget {
     required this.onDelete,
   });
 
+  String get _meta => [
+        if (area != null) area!.name,
+        if (task.kind == 'count') '${task.completedCount} of ${task.targetCount}',
+        if (task.priorityLabel == 'P1') 'High',
+      ].join(', ');
+
   @override
   Widget build(BuildContext context) {
-    final areaColor = area?.color ?? G.faint;
+    final meta = _meta;
     final content = Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
-      decoration: BoxDecoration(
-        color: G.card,
-        borderRadius: BorderRadius.circular(4),
-        border: Border.all(color: G.lineSoft, width: 0.5),
-      ),
+      constraints: const BoxConstraints(minHeight: 68),
+      padding: const EdgeInsets.fromLTRB(8, 8, 16, 8),
+      decoration: BoxDecoration(color: G.card, borderRadius: BorderRadius.circular(24)),
       child: Row(
         children: [
           _Check(done: task.isDone, onTap: onComplete),
-          const SizedBox(width: 12),
+          const SizedBox(width: 6),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
                   task.title,
-                  style: G.text(
-                    14,
-                    w: FontWeight.w400,
-                    color: task.isDone ? G.faint : G.ink,
-                  ).copyWith(
-                    decoration: task.isDone ? TextDecoration.lineThrough : null,
-                  ),
+                  style: G.text(19, color: task.isDone ? G.muted : G.ink, height: 1.25).copyWith(
+                        decoration: task.isDone ? TextDecoration.lineThrough : null,
+                        decorationColor: G.muted,
+                      ),
                 ),
-                const SizedBox(height: 3),
-                Row(
-                  children: [
-                    Container(
-                      width: 5,
-                      height: 5,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: areaColor,
-                      ),
-                    ),
-                    const SizedBox(width: 5),
-                    Text(
-                      area?.name ?? '—',
-                      style: G.label(size: 10.5, color: areaColor),
-                    ),
-                    if (task.source != null &&
-                        task.source!.toUpperCase() != 'MANUAL') ...[
-                      const SizedBox(width: 6),
-                      Text(
-                        '↳ ${task.source}',
-                        style: G.label(size: 9.5, color: G.faint),
-                      ),
-                    ],
-                    if (task.kind == 'count') ...[
-                      const SizedBox(width: 6),
-                      Text(
-                        '${task.completedCount}/${task.targetCount}',
-                        style: G.label(size: 10, color: G.muted),
-                      ),
-                    ],
-                  ],
-                ),
+                if (meta.isNotEmpty) ...[
+                  const SizedBox(height: 2),
+                  Text(meta, style: G.text(15, color: G.muted, height: 1.3)),
+                ],
               ],
             ),
           ),
-          if (task.priorityLabel.isNotEmpty && task.priorityLabel != 'NONE') ...[
-            const SizedBox(width: 8),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
-              decoration: BoxDecoration(
-                color: G.inset,
-                borderRadius: BorderRadius.circular(2),
-                border: Border.all(color: G.lineSoft, width: 0.5),
-              ),
-              child: Text(
-                task.priorityLabel,
-                style: G.label(size: 9.5, color: G.faint),
-              ),
-            ),
-          ],
         ],
       ),
     );
@@ -121,32 +77,10 @@ class TaskRow extends StatelessWidget {
 
   Widget _swipeBg({required bool left}) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
+      padding: const EdgeInsets.symmetric(horizontal: 22),
       alignment: left ? Alignment.centerLeft : Alignment.centerRight,
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(4),
-        color: left
-            ? G.good.withValues(alpha: 0.15)
-            : G.carried.withValues(alpha: 0.15),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: left
-            ? [
-                Icon(Icons.check, size: 15, color: G.good),
-                const SizedBox(width: 6),
-                Text('Complete',
-                    style: G.text(12,
-                        w: FontWeight.w600, color: G.good)),
-              ]
-            : [
-                Text('Remove',
-                    style: G.text(12,
-                        w: FontWeight.w600, color: G.carried)),
-                const SizedBox(width: 6),
-                Icon(Icons.delete_outline, size: 15, color: G.carried),
-              ],
-      ),
+      decoration: BoxDecoration(borderRadius: BorderRadius.circular(24), color: G.surfaceHigh),
+      child: Text(left ? 'Done' : 'Remove', style: G.text(17, w: FontWeight.w500, color: left ? G.accent : G.ink, height: 1.2)),
     );
   }
 }
@@ -157,22 +91,24 @@ class _Check extends StatelessWidget {
   const _Check({required this.done, required this.onTap});
 
   @override
-  Widget build(BuildContext context) => GestureDetector(
+  Widget build(BuildContext context) => InkResponse(
         onTap: onTap,
-        child: Container(
-          width: 20,
-          height: 20,
-          decoration: BoxDecoration(
-            color: done ? G.good : G.inset,
-            borderRadius: BorderRadius.circular(3),
-            border: Border.all(
-              color: done ? G.good : G.lineSoft,
-              width: 0.8,
+        radius: 26,
+        child: SizedBox(
+          width: 48,
+          height: 48,
+          child: Center(
+            child: Container(
+              width: 28,
+              height: 28,
+              decoration: BoxDecoration(
+                color: done ? G.accent : Colors.transparent,
+                shape: BoxShape.circle,
+                border: Border.all(color: done ? G.accent : G.faint, width: 2),
+              ),
+              child: done ? Icon(Icons.check_rounded, size: 19, color: G.onInk) : null,
             ),
           ),
-          child: done
-              ? Icon(Icons.check, size: 13, color: G.onInk)
-              : null,
         ),
       );
 }

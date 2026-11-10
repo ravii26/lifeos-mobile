@@ -11,6 +11,7 @@ import '../auth/bloc/auth_bloc.dart';
 import '../chat/memories_screen.dart';
 import '../chat/starters.dart';
 import '../guide/guide_style.dart';
+import '../habits/habits_screen.dart';
 import '../more/how_ally_works_screen.dart';
 import '../more/voice_screen.dart';
 import '../more/reminders_check_screen.dart';
@@ -19,10 +20,27 @@ import '../more/log_screen.dart';
 import '../more/your_day_screen.dart';
 import '../more/where_you_stand_screen.dart';
 import '../shell/life_cubit.dart';
+import '../shrink/parked_screen.dart';
+import '../shrink/shrink_screen.dart';
+import 'life_notes_screen.dart';
+import 'notes_screen.dart';
 import 'now_cubit.dart';
+import 'plan_screen.dart';
+import 'week_screen.dart';
 
-/// You: how this week is going, your goals, what you keep doing, parts of your
-/// life and settings. Sections appear only when they have something real in them.
+/// The goals shown in focus: active ones only, three at most.
+List<Map<String, dynamic>> focusGoals(List<Map<String, dynamic>> projects) =>
+    projects.where((p) => p['status'] != 'PAUSED').take(3).toList();
+
+/// How far along a goal is, 0 to 1, when the server knows.
+double? goalProgress(Map<String, dynamic> project) {
+  final detail = project['detail'];
+  if (detail is! Map) return null;
+  final percent = detail['percent'];
+  return percent is num ? (percent / 100).clamp(0.0, 1.0).toDouble() : null;
+}
+
+/// My life: this week's mood of the calendar, what's in focus, and everything else one tap away.
 class YouScreen extends StatefulWidget {
   final AppUser user;
   const YouScreen({super.key, required this.user});
@@ -37,7 +55,6 @@ class _YouScreenState extends State<YouScreen> {
   String _mode = 'NORMAL';
   int? _kept;
   String _level = 'NORMAL';
-  bool _loading = false;
   String? _error;
 
   @override
@@ -88,22 +105,22 @@ class _YouScreenState extends State<YouScreen> {
     Navigator.of(context).push(MaterialPageRoute<void>(
       builder: (_) => BlocProvider.value(
         value: life,
-        child: title == null
-            ? page
-            : Scaffold(
-                backgroundColor: G.bg,
-                appBar: AppBar(
-                  backgroundColor: G.bg,
-                  surfaceTintColor: G.bg,
-                  foregroundColor: G.ink,
-                  elevation: 0,
-                  title: Text(title, style: G.voice(16, color: G.ink)),
-                ),
-                body: page,
-              ),
+        child: title == null ? page : _titled(title, page),
       ),
     )).then((_) => _load());
   }
+
+  Widget _titled(String title, Widget page) => Scaffold(
+        backgroundColor: G.bg,
+        appBar: AppBar(
+          backgroundColor: G.bg,
+          surfaceTintColor: G.bg,
+          foregroundColor: G.ink,
+          elevation: 0,
+          title: Text(title, style: G.text(20, w: FontWeight.w500, height: 1.2)),
+        ),
+        body: page,
+      );
 
   static String _levelLine(String level) => switch (level) {
         'QUIETER' => 'Quieter: morning briefing, evening wrap-up and Sunday review',
@@ -115,22 +132,22 @@ class _YouScreenState extends State<YouScreen> {
   Future<void> _chooseLevel() async {
     final picked = await showModalBottomSheet<String>(
       context: context,
-      backgroundColor: G.bg,
+      backgroundColor: G.inset,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(34))),
       builder: (ctx) => SafeArea(
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(20, 18, 20, 12),
+          padding: const EdgeInsets.fromLTRB(22, 24, 22, 12),
           child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text('How much should Ally speak on its own?', style: G.text(16, w: FontWeight.w600)),
-            const SizedBox(height: 4),
-            Text('Never during your night (from your sleep time to your wake time). Reminders you set always come.',
-                style: G.text(13, color: G.muted, height: 1.4)),
+            Text('How much should Ally speak up?', style: G.text(26, w: FontWeight.w600, height: 1.12)),
+            const SizedBox(height: 8),
+            Text('Never during your night. Reminders you set always come.', style: G.text(16, color: G.muted, height: 1.4)),
             const SizedBox(height: 10),
             for (final l in const ['NORMAL', 'QUIETER', 'SILENT'])
               ListTile(
                 contentPadding: EdgeInsets.zero,
                 leading: Icon(_level == l ? Icons.radio_button_checked : Icons.radio_button_off, color: G.accent),
-                title: Text(_levelLine(l).split(':').first, style: G.text(15, w: FontWeight.w600)),
-                subtitle: Text(_levelLine(l).split(': ').last, style: G.text(13, color: G.muted)),
+                title: Text(_levelLine(l).split(':').first, style: G.text(18, w: FontWeight.w500)),
+                subtitle: Text(_levelLine(l).split(': ').last, style: G.text(15, color: G.muted, height: 1.3)),
                 onTap: () => Navigator.pop(ctx, l),
               ),
           ]),
@@ -147,40 +164,53 @@ class _YouScreenState extends State<YouScreen> {
     }
   }
 
-  // The weekly card is only ever shown when asked for.
-  Future<void> _week() async {
-    setState(() => _loading = true);
-    String text;
-    try {
-      text = await _repo.weekCard();
-    } on ApiException catch (e) {
-      text = e.message;
-    } finally {
-      if (mounted) setState(() => _loading = false);
-    }
-    if (!mounted) return;
-    await showDialog<void>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: G.card,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(4),
-          side: BorderSide(color: G.lineSoft, width: 0.5),
+  void _openSettings() {
+    final life = context.read<LifeCubit>();
+    final auth = context.read<AuthBloc>();
+    final rows = <Widget>[
+      _SettingRow('Parts of my life', () => _push(AreasScreen(onOpenMore: () {}))),
+      _SettingRow('My day', () => _push(const YourDayScreen())),
+      _SettingRow('How Ally works for me', () => _push(const HowAllyWorksScreen())),
+      _SettingRow('How much Ally speaks up', _chooseLevel),
+      _SettingRow("Ally's voice", () => _push(const VoiceScreen())),
+      _SettingRow('What Ally remembers', () => _push(const MemoriesScreen())),
+      _SettingRow('Check my reminders', () => _push(const RemindersCheckScreen())),
+      _SettingRow('Account and my data', () => _push(SettingsScreen(user: widget.user))),
+    ];
+    Navigator.of(context).push(MaterialPageRoute<void>(
+      builder: (_) => BlocProvider.value(
+        value: life,
+        child: _titled(
+          'Settings',
+          ListView(padding: const EdgeInsets.fromLTRB(22, 6, 22, 24), children: [
+            ...rows,
+            const SizedBox(height: 12),
+            TextButton(
+              onPressed: () => auth.add(const AuthLogoutRequested()),
+              style: TextButton.styleFrom(foregroundColor: G.muted, minimumSize: const Size(64, 48), alignment: Alignment.centerLeft),
+              child: Text('Sign out', style: G.text(17, color: G.muted, height: 1.2)),
+            ),
+          ]),
         ),
-        title: Text('Your week', style: G.voice(20, color: G.ink)),
-        content: Text(text, style: G.text(14, height: 1.5)),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: Text('Close', style: G.label(size: 12, color: G.accent, w: FontWeight.w600)),
-          ),
-        ],
       ),
-    );
+    ));
   }
 
   @override
   Widget build(BuildContext context) {
+    final focus = focusGoals(_projects);
+    final places = <(String, VoidCallback)>[
+      ("Today's plan", () => _push(const PlanScreen(), title: '')),
+      ('Reminders', () => _push(const RemindersCheckScreen())),
+      ('Habits', () => _push(HabitsScreen(onOpenMore: () {}), title: 'Habits')),
+      ('Notes', () => _push(const NotesScreen(), title: '')),
+      ('Lists', () => _push(const LifeNotesScreen(page: LifeNotes.lists))),
+      ('Meals', () => _push(const LifeNotesScreen(page: LifeNotes.meals))),
+      ('People', () => _push(const LifeNotesScreen(page: LifeNotes.people))),
+      ('Log and limits', () => _push(const LogScreen())),
+      ('Parked', () => _push(const ParkedScreen())),
+      ('My week', () => _push(const WeekScreen())),
+    ];
     return ColoredBox(
       color: G.bg,
       child: SafeArea(
@@ -188,228 +218,82 @@ class _YouScreenState extends State<YouScreen> {
         child: RefreshIndicator(
           onRefresh: _load,
           child: ListView(
-            padding: const EdgeInsets.fromLTRB(20, 14, 20, 36),
+            padding: const EdgeInsets.fromLTRB(22, 18, 22, 20),
             children: [
-              // Nocturne Top Bar
-              Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-                Row(children: [
-                  Icon(Icons.bedtime_outlined, size: 20, color: G.accent),
-                  const SizedBox(width: 8),
-                  Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    Text('You', style: G.voice(16, color: G.ink)),
-                    Text('Your goals, your week, your settings', style: G.label(size: 11, color: G.faint)),
+              Row(children: [
+                Expanded(child: Text('My life', style: G.text(44, w: FontWeight.w600, height: 1.05, letterSpacing: -1.3))),
+                IconButton(
+                  tooltip: 'Settings',
+                  onPressed: _openSettings,
+                  icon: Icon(Icons.tune_rounded, color: G.ink),
+                  style: IconButton.styleFrom(backgroundColor: G.card, minimumSize: const Size(46, 46)),
+                ),
+              ]),
+              if ((_kept ?? 0) > 0)
+                Padding(
+                  padding: const EdgeInsets.only(top: 4),
+                  child: Text(_kept == 1 ? '1 thing done this week' : '$_kept things done this week',
+                      style: G.text(18, color: G.muted, height: 1.3)),
+                ),
+              if (_error != null)
+                Padding(
+                  padding: const EdgeInsets.only(top: 8),
+                  child: Text(_error!, style: G.text(16, color: G.muted, height: 1.3)),
+                ),
+              const SizedBox(height: 18),
+              Container(
+                padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+                decoration: BoxDecoration(color: G.card, borderRadius: BorderRadius.circular(22)),
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Text("How's this week?", style: G.text(17, w: FontWeight.w500, height: 1.2)),
+                  const SizedBox(height: 10),
+                  Row(children: [
+                    for (final (mode, label) in const [('NORMAL', 'Normal'), ('BUSY', 'Busy'), ('SICK', 'Sick'), ('TRAVEL', 'Away')]) ...[
+                      Expanded(child: _ModePill(label: label, active: _mode == mode, onTap: () => _changeMode(mode))),
+                      if (mode != 'TRAVEL') const SizedBox(width: 6),
+                    ],
                   ]),
                 ]),
-              ]),
-              const SizedBox(height: 14),
-
-              // How this week is going: changes how much Ally asks of you.
-              Text("How's this week?", style: G.text(15, w: FontWeight.w600)),
+              ),
+              const SizedBox(height: 20),
+              Text('In focus', style: G.text(16, color: G.muted, height: 1.2)),
               const SizedBox(height: 8),
-              SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                child: Row(children: [
-                  for (final (mode, label) in const [('NORMAL', 'Normal'), ('BUSY', 'Busy'), ('SICK', 'Sick'), ('TRAVEL', 'Travelling')]) ...[
-                    _ModePill(label: label, active: _mode == mode, onTap: () => _changeMode(mode)),
-                    const SizedBox(width: 6),
-                  ],
-                ]),
-              ),
-              const SizedBox(height: 6),
-              Text(
-                switch (_mode) {
-                  'SICK' => 'No reminders or suggestions. Just rest.',
-                  'BUSY' => 'Only the smallest version of each thing until you switch back.',
-                  'TRAVEL' || 'HOLIDAY' => 'Reminders and suggestions are paused while you are away.',
-                  _ => 'Ally suggests things as usual.',
-                },
-                style: G.text(12.5, color: G.muted),
-              ),
-              const SizedBox(height: 16),
-              Container(height: 0.5, color: G.lineSoft),
-              const SizedBox(height: 14),
-
-              if (_error != null) Text(_error!, style: G.label(size: 12, color: Colors.redAccent)),
-
-              // This week: only once something was done. Nothing to lose here, it only adds up.
-              if ((_kept ?? 0) > 0) ...[
-                Row(crossAxisAlignment: CrossAxisAlignment.baseline, textBaseline: TextBaseline.alphabetic, children: [
-                  Text('$_kept', style: G.numeral(36, color: G.ink)),
-                  const SizedBox(width: 8),
-                  Text(_kept == 1 ? 'thing done this week' : 'things done this week',
-                      style: G.text(18, w: FontWeight.w500, color: G.ink)),
-                ]),
-                Text('Every Done, small version and habit counts.', style: G.text(13, color: G.muted)),
-                const SizedBox(height: 18),
-                Container(height: 0.5, color: G.lineSoft),
-                const SizedBox(height: 14),
-              ],
-
-              // Your goals, or one way to start one.
-              Text('Your goals', style: G.text(16, w: FontWeight.w600)),
-              const SizedBox(height: 10),
-              if (_projects.isEmpty) ...[
-                Text('Your goals and how far along you are show up here.', style: G.text(13.5, color: G.muted)),
-                const SizedBox(height: 8),
-                Align(
-                  alignment: Alignment.centerLeft,
-                  child: TextButton.icon(
-                    onPressed: () => starterRequest.value = Starter.goal,
-                    style: TextButton.styleFrom(minimumSize: const Size(0, 44), padding: EdgeInsets.zero),
-                    icon: Icon(Icons.flag_outlined, size: 18, color: G.accent),
-                    label: Text('Plan a goal', style: G.text(15, w: FontWeight.w600, color: G.accent)),
+              if (focus.isEmpty)
+                GPill('Plan a goal', onTap: () => starterRequest.value = Starter.goal)
+              else
+                for (final p in focus)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: _GoalCard(project: p, onTap: () => _push(const WhereYouStandScreen())),
                   ),
-                ),
-              ],
-              for (final p in _projects) ...[
-                _ProjectProgressCard(project: p),
-                const SizedBox(height: 10),
-              ],
-              const SizedBox(height: 14),
-              Container(height: 0.5, color: G.lineSoft),
-              const SizedBox(height: 14),
-
-              // Habits you keep: only what the logs show, and only once there is something.
-              BlocBuilder<LifeCubit, LifeState>(
-                builder: (context, life) {
-                  final proof = [
-                    for (final h in life.habits)
-                      if (h.history.where((d) => d).isNotEmpty) (h.title, h.history.where((d) => d).length, h.history.length),
-                  ]..sort((a, b) => b.$2.compareTo(a.$2));
-                  if (proof.isEmpty) return const SizedBox.shrink();
-                  return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    Text('Habits you keep', style: G.text(16, w: FontWeight.w600)),
-                    const SizedBox(height: 10),
-                    for (final (title, done, days) in proof.take(3))
-                      Padding(
-                        padding: const EdgeInsets.only(bottom: 8),
-                        child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                          Icon(Icons.check_circle_outline_rounded, size: 18, color: G.good),
-                          const SizedBox(width: 10),
-                          Expanded(child: Text('$title: done on $done of the last $days days.', style: G.text(14))),
-                        ]),
-                      ),
-                    const SizedBox(height: 10),
-                    Container(height: 0.5, color: G.lineSoft),
-                    const SizedBox(height: 14),
-                  ]);
-                },
-              ),
-
-              // Parts of your life, most important first. Hidden until there are any.
-              BlocBuilder<LifeCubit, LifeState>(
-                builder: (context, life) {
-                  const order = {'MAIN': 0, 'SECONDARY': 1, 'MAINTAIN': 2, 'LATER': 3};
-                  final areas = life.areas.where((a) => a.isActive).toList()
-                    ..sort((a, b) => (order[a.tier] ?? 9).compareTo(order[b.tier] ?? 9));
-                  if (areas.isEmpty) return const SizedBox.shrink();
-                  return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-                      Text('Parts of your life', style: G.text(16, w: FontWeight.w600)),
-                      InkWell(
-                        onTap: () => _push(AreasScreen(onOpenMore: () {}), title: 'Parts of your life'),
-                        child: Padding(
-                          padding: const EdgeInsets.all(8),
-                          child: Text('Change', style: G.label(size: 12, color: G.accent, w: FontWeight.w600)),
+              const SizedBox(height: 6),
+              GPill('Too much on my plate', onTap: () => openShrink(context)),
+              const SizedBox(height: 18),
+              Text('Everything else', style: G.text(16, color: G.muted, height: 1.2)),
+              const SizedBox(height: 8),
+              GridView.count(
+                crossAxisCount: 2,
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                mainAxisSpacing: 8,
+                crossAxisSpacing: 8,
+                childAspectRatio: 3.1,
+                children: [
+                  for (final (label, onTap) in places)
+                    Material(
+                      color: G.card,
+                      borderRadius: BorderRadius.circular(18),
+                      child: InkWell(
+                        borderRadius: BorderRadius.circular(18),
+                        onTap: onTap,
+                        child: Container(
+                          alignment: Alignment.centerLeft,
+                          padding: const EdgeInsets.symmetric(horizontal: 18),
+                          child: Text(label, maxLines: 1, overflow: TextOverflow.ellipsis, style: G.text(17, height: 1.2)),
                         ),
                       ),
-                    ]),
-                    const SizedBox(height: 4),
-                    Container(
-                      decoration: BoxDecoration(
-                        color: G.card,
-                        border: Border.all(color: G.lineSoft, width: 0.5),
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                      child: Column(children: [
-                        for (var i = 0; i < areas.length; i++) ...[
-                          if (i > 0) Container(height: 0.5, color: G.lineSoft),
-                          _AreaRow(label: areas[i].name, tier: tierName(areas[i].tier), color: areas[i].color),
-                        ],
-                      ]),
                     ),
-                    const SizedBox(height: 18),
-                    Container(height: 0.5, color: G.lineSoft),
-                    const SizedBox(height: 14),
-                  ]);
-                },
-              ),
-
-              // Settings, in plain words.
-              Text('Settings', style: G.text(16, w: FontWeight.w600)),
-              const SizedBox(height: 4),
-              if (_projects.isNotEmpty)
-                _NavActionRow(
-                  icon: Icons.auto_graph_rounded,
-                  title: 'Goals in detail',
-                  sub: 'How far along each goal is, and the pace',
-                  onTap: () => _push(const WhereYouStandScreen()),
-                ),
-              _NavActionRow(
-                icon: Icons.calendar_view_week_rounded,
-                title: _loading ? 'Loading your week…' : 'Your week',
-                sub: 'A short look back at the week, when you want it',
-                onTap: _week,
-              ),
-              _NavActionRow(
-                icon: Icons.query_stats_rounded,
-                title: 'Log and limits',
-                sub: 'Water, spending, sleep, weight and the caps you set',
-                onTap: () => _push(const LogScreen()),
-              ),
-              _NavActionRow(
-                icon: Icons.schedule_rounded,
-                title: 'Your day',
-                sub: 'When you wake, work and sleep',
-                onTap: () => _push(const YourDayScreen()),
-              ),
-              _NavActionRow(
-                icon: Icons.tune_rounded,
-                title: 'How Ally works for you',
-                sub: 'What it helps with most, and how direct it is',
-                onTap: () => _push(const HowAllyWorksScreen()),
-              ),
-              _NavActionRow(
-                icon: Icons.graphic_eq_rounded,
-                title: "Ally's voice",
-                sub: 'The phone voice, or a more natural one that works offline',
-                onTap: () => _push(const VoiceScreen()),
-              ),
-              _NavActionRow(
-                icon: Icons.psychology_outlined,
-                title: 'What Ally remembers',
-                sub: 'See, change or delete what you told Ally',
-                onTap: () => _push(const MemoriesScreen()),
-              ),
-              _NavActionRow(
-                icon: Icons.alarm_on_outlined,
-                title: 'Reminders',
-                sub: 'Check they arrive on time, or send a test',
-                onTap: () => _push(const RemindersCheckScreen()),
-              ),
-              _NavActionRow(
-                icon: Icons.notifications_none_rounded,
-                title: 'How much Ally speaks',
-                sub: _levelLine(_level),
-                onTap: _chooseLevel,
-              ),
-              _NavActionRow(
-                icon: Icons.settings_outlined,
-                title: 'Account and data',
-                sub: 'Profile, export or delete your data',
-                onTap: () => _push(SettingsScreen(user: widget.user)),
-              ),
-              const SizedBox(height: 14),
-              InkWell(
-                onTap: () => context.read<AuthBloc>().add(const AuthLogoutRequested()),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 8),
-                  child: Row(children: [
-                    Icon(Icons.logout_rounded, size: 16, color: G.faint),
-                    const SizedBox(width: 8),
-                    Text('Sign out', style: G.label(size: 12, color: G.faint)),
-                  ]),
-                ),
+                ],
               ),
             ],
           ),
@@ -426,115 +310,83 @@ class _ModePill extends StatelessWidget {
   const _ModePill({required this.label, required this.active, required this.onTap});
 
   @override
-  Widget build(BuildContext context) => GestureDetector(
-        onTap: onTap,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 150),
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-          decoration: BoxDecoration(
-            color: active ? G.surfaceHigh : G.card,
-            border: Border.all(color: active ? G.accent.withValues(alpha: 0.6) : G.lineSoft, width: 0.5),
-            borderRadius: BorderRadius.circular(4),
-          ),
-          child: Row(children: [
-            if (active) ...[
-              Container(width: 5, height: 5, decoration: BoxDecoration(shape: BoxShape.circle, color: G.accent)),
-              const SizedBox(width: 6),
-            ],
-            Text(
-              label,
-              style: G.label(
-                size: 11,
-                color: active ? G.ink : G.muted,
-                w: active ? FontWeight.w600 : FontWeight.w400,
-              ),
+  Widget build(BuildContext context) => Material(
+        color: active ? G.accent : G.surfaceHigh,
+        shape: const StadiumBorder(),
+        child: InkWell(
+          customBorder: const StadiumBorder(),
+          onTap: onTap,
+          child: Container(
+            height: 44,
+            alignment: Alignment.center,
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Text(label,
+                  style: G.text(16, w: active ? FontWeight.w600 : FontWeight.w400, color: active ? G.onInk : G.ink, height: 1.2)),
             ),
-          ]),
+          ),
         ),
       );
 }
 
-class _ProjectProgressCard extends StatelessWidget {
+class _GoalCard extends StatelessWidget {
   final Map<String, dynamic> project;
-  const _ProjectProgressCard({required this.project});
+  final VoidCallback onTap;
+  const _GoalCard({required this.project, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
-    final title = '${project['title']}';
+    final ink = G.onInk;
     final message = '${project['message'] ?? ''}';
-    final status = project['status'] == 'PAUSED';
-
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: G.card,
-        border: Border.all(color: G.lineSoft, width: 0.5),
-        borderRadius: BorderRadius.circular(4),
-      ),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-          Expanded(child: Text(title, style: G.text(15, w: FontWeight.w600, height: 1.3))),
-          if (status)
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
-              decoration: BoxDecoration(
-                color: G.inset,
-                borderRadius: BorderRadius.circular(3),
+    final progress = goalProgress(project);
+    return Material(
+      color: G.accent,
+      borderRadius: BorderRadius.circular(20),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(20),
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(18, 13, 18, 14),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text('${project['title']}',
+                maxLines: 2, overflow: TextOverflow.ellipsis, style: G.text(20, w: FontWeight.w600, color: ink, height: 1.2)),
+            if (message.isNotEmpty) ...[
+              const SizedBox(height: 2),
+              Text(message, maxLines: 2, overflow: TextOverflow.ellipsis, style: G.text(15, color: ink, height: 1.3)),
+            ],
+            if (progress != null) ...[
+              const SizedBox(height: 10),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(10),
+                child: LinearProgressIndicator(
+                  value: progress,
+                  minHeight: 5,
+                  backgroundColor: ink.withValues(alpha: 0.18),
+                  valueColor: AlwaysStoppedAnimation<Color>(ink),
+                ),
               ),
-              child: Text('Paused', style: G.label(size: 10, color: G.faint)),
-            ),
-        ]),
-        if (message.isNotEmpty) ...[
-          const SizedBox(height: 6),
-          Text(message, style: G.text(13, color: G.muted, height: 1.4)),
-        ],
-      ]),
+            ],
+          ]),
+        ),
+      ),
     );
   }
 }
 
-class _AreaRow extends StatelessWidget {
-  final String label;
-  final String tier;
-  final Color color;
-  const _AreaRow({required this.label, required this.tier, required this.color});
-
-  @override
-  Widget build(BuildContext context) => Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
-        child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-          Row(children: [
-            Container(width: 6, height: 6, decoration: BoxDecoration(shape: BoxShape.circle, color: color)),
-            const SizedBox(width: 10),
-            Text(label, style: G.text(14, w: FontWeight.w500)),
-          ]),
-          Text(tier, style: G.label(size: 11, color: G.faint)),
-        ]),
-      );
-}
-
-class _NavActionRow extends StatelessWidget {
-  final IconData icon;
+class _SettingRow extends StatelessWidget {
   final String title;
-  final String sub;
   final VoidCallback onTap;
-  const _NavActionRow({required this.icon, required this.title, required this.sub, required this.onTap});
+  const _SettingRow(this.title, this.onTap);
 
   @override
   Widget build(BuildContext context) => InkWell(
         onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 9),
+        child: Container(
+          constraints: const BoxConstraints(minHeight: 60),
+          decoration: BoxDecoration(border: Border(bottom: BorderSide(color: G.lineSoft))),
           child: Row(children: [
-            Icon(icon, size: 18, color: G.faint),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text(title, style: G.text(14, w: FontWeight.w500)),
-                Text(sub, style: G.label(size: 11, color: G.faint)),
-              ]),
-            ),
-            Icon(Icons.chevron_right_rounded, size: 18, color: G.faint),
+            Expanded(child: Text(title, style: G.text(18, height: 1.25))),
+            Icon(Icons.chevron_right_rounded, color: G.faint),
           ]),
         ),
       );

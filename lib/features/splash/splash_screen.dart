@@ -4,9 +4,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../auth/bloc/auth_bloc.dart';
 import '../guide/guide_style.dart';
 
-/// Branded launch screen shown while the app boots / resolves auth state.
-///
-/// Nocturne Sanctuary: calm bedtime threshold mark with subtle fade.
+/// Shown for a moment while the app starts and checks who is signed in.
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
 
@@ -65,41 +63,16 @@ class _SplashScreenState extends State<SplashScreen>
             const Spacer(flex: 5),
             FadeTransition(
               opacity: _logoFade,
-              child: Transform.scale(
-                scale: _logoScale.value,
-                child: Container(
-                  width: 108,
-                  height: 108,
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(24),
-                    border: Border.all(color: G.lineSoft, width: 0.5),
-                  ),
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(24),
-                    child: Image.asset(
-                      'assets/logo/app_icon.png',
-                      width: 108,
-                      height: 108,
-                      fit: BoxFit.cover,
-                    ),
-                  ),
-                ),
-              ),
+              child: ScaleTransition(scale: _logoScale, child: const AllyOrb(size: 112)),
             ),
             const SizedBox(height: 24),
             FadeTransition(
               opacity: _textFade,
               child: Column(
                 children: [
-                  Text(
-                    'Ally',
-                    style: G.voice(24, color: G.ink),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    'Always on your side.',
-                    style: G.label(size: 11.5, color: G.muted),
-                  ),
+                  Text('Ally', style: G.text(44, w: FontWeight.w600, height: 1.05, letterSpacing: -1.3)),
+                  const SizedBox(height: 6),
+                  Text('Always on your side.', style: G.text(18, color: G.muted, height: 1.3)),
                 ],
               ),
             ),
@@ -115,36 +88,23 @@ class _SplashScreenState extends State<SplashScreen>
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           Text(
-                            "Connecting to server…",
+                            "Can't connect right now.",
                             textAlign: TextAlign.center,
-                            style: G.voice(13.5, color: G.muted),
+                            style: G.text(17, color: G.muted, height: 1.35),
                           ),
                           const SizedBox(height: 14),
-                          OutlinedButton(
-                            onPressed: () => context
-                                .read<AuthBloc>()
-                                .add(const AuthStarted()),
-                            style: OutlinedButton.styleFrom(
-                              side: BorderSide(color: G.lineSoft, width: 0.5),
-                              shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(4)),
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 18, vertical: 8),
-                            ),
-                            child: Text('Retry',
-                                style: G.label(size: 11, color: G.accent)),
+                          SizedBox(
+                            width: 180,
+                            child: GPill('Try again', onTap: () => context.read<AuthBloc>().add(const AuthStarted())),
                           ),
                         ],
                       ),
                     );
                   }
                   return SizedBox(
-                    width: 20,
-                    height: 20,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 1.5,
-                      color: G.accent,
-                    ),
+                    width: 24,
+                    height: 24,
+                    child: CircularProgressIndicator(strokeWidth: 2, color: G.accent),
                   );
                 },
               ),

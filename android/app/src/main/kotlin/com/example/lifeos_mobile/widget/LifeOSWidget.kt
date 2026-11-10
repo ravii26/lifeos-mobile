@@ -50,16 +50,14 @@ private val NOW_ID_KEY = ActionParameters.Key<String>("nowId")
 private val NOW_MIN_KEY = ActionParameters.Key<String>("nowMinutes")
 private val NOW_COUNT_KEY = ActionParameters.Key<String>("nowCount")
 
-/** Reads the app's live theme (AppColors) out of the snapshot instead of a
- * hardcoded guess, so the widget re-skins itself with whatever accent/mode
- * the user picked in Settings. Defaults match AppColors' dark palette +
- * default chartreuse accent for the pre-first-sync cold start. */
+/** Reads the app's theme (AppColors) out of the snapshot. Defaults are the
+ * same Plum colors, for the moment before the app has synced for the first time. */
 private class WidgetTheme(json: JSONObject?) {
-    val bg = colorOf(json, "bgColor", 0xFF0A0B0DL)
-    val fg = colorOf(json, "textColor", 0xFFECEEF0L)
-    val fgMuted = colorOf(json, "mutedTextColor", 0xFFA6ABB3L)
-    val accent = colorOf(json, "accentColor", 0xFFC5F23FL)
-    val accentInk = colorOf(json, "accentInkColor", 0xFF11160AL)
+    val bg = colorOf(json, "bgColor", 0xFF1C1026L)
+    val fg = colorOf(json, "textColor", 0xFFFBF1ECL)
+    val fgMuted = colorOf(json, "mutedTextColor", 0xFFD9C8D6L)
+    val accent = colorOf(json, "accentColor", 0xFFF6C9B2L)
+    val accentInk = colorOf(json, "accentInkColor", 0xFF2A1420L)
 
     private fun colorOf(json: JSONObject?, key: String, default: Long): Color =
         Color(json?.optLong(key, default)?.toInt() ?: default.toInt())
@@ -89,11 +87,11 @@ class LifeOSWidget : GlanceAppWidget() {
             modifier = GlanceModifier
                 .fillMaxSize()
                 .background(day = theme.bg, night = theme.bg)
-                .cornerRadius(20.dp)
+                .cornerRadius(26.dp)
                 .clickable(onClick = openApp(context, headerUri(snapshot))),
             contentAlignment = if (compact) Alignment.CenterStart else Alignment.TopStart,
         ) {
-            Column(modifier = GlanceModifier.padding(14.dp)) {
+            Column(modifier = GlanceModifier.padding(16.dp)) {
                 Row(verticalAlignment = Alignment.Vertical.Top) {
                     Box(modifier = GlanceModifier.padding(end = 8.dp)) {
                         HeaderRow(snapshot, theme)
@@ -124,32 +122,20 @@ class LifeOSWidget : GlanceAppWidget() {
             }
         }
         Column {
-            // Eyebrow — uppercase, letter-spaced, accent-colored (mirrors
-            // the app's `Eyebrow` component), with a small accent tab under
-            // it instead of the app's mono font (not bundled into the widget).
             Text(
                 eyebrow,
                 style = TextStyle(
                     color = solid(theme.accent),
-                    fontSize = 10.5.sp,
-                    fontWeight = FontWeight.Medium,
+                    fontSize = 14.sp,
                 ),
             )
             Spacer(modifier = GlanceModifier.height(4.dp))
-            Box(
-                modifier = GlanceModifier
-                    .width(24.dp)
-                    .height(3.dp)
-                    .background(day = theme.accent, night = theme.accent)
-                    .cornerRadius(2.dp),
-            ) {}
-            Spacer(modifier = GlanceModifier.height(8.dp))
             Text(
                 label,
                 maxLines = 2,
                 style = TextStyle(
                     color = solid(theme.fg),
-                    fontSize = 15.sp,
+                    fontSize = 20.sp,
                     fontWeight = FontWeight.Medium,
                 ),
             )
@@ -183,7 +169,7 @@ class LifeOSWidget : GlanceAppWidget() {
                         maxLines = 1,
                         style = TextStyle(
                             color = solid(if (done) theme.fgMuted else theme.fg),
-                            fontSize = 13.sp,
+                            fontSize = 15.sp,
                         ),
                     )
                 }
@@ -191,7 +177,7 @@ class LifeOSWidget : GlanceAppWidget() {
             if (habits.length() == 0) {
                 Text(
                     "No habits yet",
-                    style = TextStyle(color = solid(theme.fgMuted), fontSize = 12.sp),
+                    style = TextStyle(color = solid(theme.fgMuted), fontSize = 14.sp),
                 )
             }
         }
@@ -207,19 +193,19 @@ class LifeOSWidget : GlanceAppWidget() {
         if (focusActive || id.isEmpty() || id == "null" || type !in setOf("TASK", "HABIT", "PROJECT")) return
         val minutes = if (snapshot?.isNull("nextMinutes") != false) "" else snapshot.optInt("nextMinutes").toString()
         val count = if (snapshot?.isNull("nextCount") != false) "" else snapshot.optInt("nextCount").toString()
-        Spacer(modifier = GlanceModifier.height(8.dp))
+        Spacer(modifier = GlanceModifier.height(10.dp))
         Box(
             modifier = GlanceModifier
-                .background(day = theme.accent, night = theme.accent)
-                .cornerRadius(14.dp)
-                .padding(horizontal = 14.dp, vertical = 6.dp)
+                .background(day = theme.fg, night = theme.fg)
+                .cornerRadius(22.dp)
+                .padding(horizontal = 22.dp, vertical = 10.dp)
                 .clickable(
                     actionRunCallback<NowDoneAction>(
                         actionParametersOf(NOW_TYPE_KEY to type, NOW_ID_KEY to id, NOW_MIN_KEY to minutes, NOW_COUNT_KEY to count),
                     ),
                 ),
         ) {
-            Text("Done", style = TextStyle(color = solid(theme.accentInk), fontSize = 13.sp, fontWeight = FontWeight.Medium))
+            Text("Done", style = TextStyle(color = solid(theme.accentInk), fontSize = 16.sp, fontWeight = FontWeight.Medium))
         }
     }
 
@@ -232,14 +218,14 @@ class LifeOSWidget : GlanceAppWidget() {
     private fun MicButton(context: Context, theme: WidgetTheme) {
         Box(
             modifier = GlanceModifier
-                .width(28.dp)
-                .height(28.dp)
+                .width(44.dp)
+                .height(44.dp)
                 .background(day = theme.accent, night = theme.accent)
-                .cornerRadius(14.dp)
+                .cornerRadius(22.dp)
                 .clickable(onClick = openApp(context, Uri.parse("lifeos://capture?voice=1"))),
             contentAlignment = Alignment.Center,
         ) {
-            Text("🎙", style = TextStyle(color = solid(theme.accentInk), fontSize = 13.sp))
+            Text("🎙", style = TextStyle(color = solid(theme.accentInk), fontSize = 18.sp))
         }
     }
 

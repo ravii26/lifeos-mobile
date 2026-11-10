@@ -82,12 +82,13 @@ class _HowAllyWorksScreenState extends State<HowAllyWorksScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: G.bg,
-      appBar: const GTopBar('How Ally works for you', subtitle: 'Change it any time', showBack: true),
+      appBar: gBar(),
       body: _loading
-          ? const Center(child: CircularProgressIndicator())
+          ? Center(child: CircularProgressIndicator(strokeWidth: 2, color: G.accent))
           : ListView(
-              padding: const EdgeInsets.fromLTRB(20, 8, 20, 40),
+              padding: const EdgeInsets.fromLTRB(22, 0, 22, 28),
               children: [
+                const GTitle('How Ally works for me', sub: 'Change it any time.'),
                 const GHeading('What should Ally help with most?'),
                 for (final f in _focuses)
                   _Choice(title: f.$2, sub: f.$3, selected: _focus == f.$1, onTap: () => _save(focus: f.$1)),
@@ -98,11 +99,11 @@ class _HowAllyWorksScreenState extends State<HowAllyWorksScreen> {
                 if (_error != null)
                   Padding(
                     padding: const EdgeInsets.only(top: 16),
-                    child: Text(_error!, style: G.text(13, color: G.muted, height: 1.4)),
+                    child: Text(_error!, style: G.text(16, color: G.accent, height: 1.35)),
                   ),
                 const SizedBox(height: 16),
-                Text('You can also just tell Ally in chat: "be more direct" or "I only want reminders".',
-                    style: G.text(13, color: G.muted, height: 1.4)),
+                Text('You can also just say it in Talk, like "be more direct" or "I only want reminders".',
+                    style: G.text(16, color: G.muted, height: 1.35)),
               ],
             ),
     );
@@ -117,22 +118,20 @@ class _Choice extends StatelessWidget {
   const _Choice({required this.title, required this.sub, required this.selected, required this.onTap});
 
   @override
-  Widget build(BuildContext context) => InkWell(
+  Widget build(BuildContext context) => GCard(
         onTap: onTap,
-        child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 13),
-          decoration: BoxDecoration(border: Border(top: BorderSide(color: G.lineSoft, width: 0.5))),
-          child: Row(children: [
-            Icon(selected ? Icons.radio_button_checked : Icons.radio_button_unchecked, size: 20, color: selected ? G.accent : G.faint),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text(title, style: G.text(15, w: FontWeight.w500)),
-                const SizedBox(height: 2),
-                Text(sub, style: G.text(13, color: G.muted, height: 1.4)),
-              ]),
-            ),
-          ]),
-        ),
+        margin: const EdgeInsets.only(bottom: 8),
+        padding: const EdgeInsets.all(16),
+        child: Row(children: [
+          Icon(selected ? Icons.radio_button_checked : Icons.radio_button_unchecked, size: 24, color: selected ? G.accent : G.faint),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(title, style: G.text(19, w: FontWeight.w500, height: 1.25)),
+              const SizedBox(height: 2),
+              Text(sub, style: G.text(16, color: G.muted, height: 1.3)),
+            ]),
+          ),
+        ]),
       );
 }

@@ -7,10 +7,11 @@ import '../../core/di/service_locator.dart';
 import '../../data/models/area.dart';
 import '../../data/repositories/life_repository.dart';
 import '../guide/guide_style.dart';
+import '../habits/habits_screen.dart' show habitWeekLine;
 import '../shell/life_cubit.dart';
 import '../tasks/task_detail_screen.dart';
 import '../tasks/task_row.dart';
-import 'areas_screen.dart' show openAreaForm;
+import 'areas_screen.dart' show areaLine, openAreaForm;
 
 class AreaDetailScreen extends StatefulWidget {
   final String areaId;
@@ -39,125 +40,36 @@ class _AreaDetailScreenState extends State<AreaDetailScreen> {
         if (a == null) {
           return Scaffold(
             backgroundColor: G.bg,
-            appBar: const GTopBar('Area', showBack: true),
+            appBar: gBar(),
             body: Center(
-              child: Text('Area not found', style: G.voice(15, color: G.muted)),
+              child: Text("Couldn't find this.", style: G.text(18, color: G.muted, height: 1.35)),
             ),
           );
         }
         final area = a;
-        final tasks =
-            s.openTasks.where((t) => t.areaId == area.id).toList();
-        final habits =
-            s.habits.where((h) => h.areaId == area.id).toList();
+        final tasks = s.openTasks.where((t) => t.areaId == area.id).toList();
+        final habits = s.habits.where((h) => h.areaId == area.id).toList();
 
         return Scaffold(
           backgroundColor: G.bg,
-          appBar: GTopBar(
-            area.name,
-            subtitle: area.type == 'PRIMARY' ? 'Primary focus' : 'Maintenance',
-            showBack: true,
-            trailing: IconButton(
-              icon: Icon(Icons.edit_outlined, size: 18, color: G.muted),
+          appBar: gBar(actions: [
+            IconButton(
+              tooltip: 'Edit',
+              icon: Icon(Icons.edit_outlined, size: 23, color: G.ink),
               onPressed: () => openAreaForm(context, area: area),
             ),
-          ),
+          ]),
           body: ListView(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 40),
+            padding: const EdgeInsets.fromLTRB(22, 0, 22, 28),
             children: [
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: G.card,
-                  border: Border.all(color: G.lineSoft, width: 0.5),
-                  borderRadius: BorderRadius.circular(4),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Row(
-                          children: [
-                            Container(
-                              width: 8,
-                              height: 8,
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                color: area.color,
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            Text(
-                              'Area Balance',
-                              style: G.label(size: 11, color: G.faint),
-                            ),
-                          ],
-                        ),
-                        Text(
-                          '${area.score}%',
-                          style: G.numeral(24, color: G.ink),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    Row(
-                      children: [
-                        Text('${area.tasksDone}/${area.tasksTotal} tasks done',
-                            style: G.label(size: 11, color: G.muted)),
-                        Text(' · ', style: G.label(size: 11, color: G.faint)),
-                        Text('${area.streak}d streak',
-                            style: G.label(size: 11, color: G.muted)),
-                        Text(' · ', style: G.label(size: 11, color: G.faint)),
-                        Text('${area.focusMins}m focus',
-                            style: G.label(size: 11, color: G.muted)),
-                      ],
-                    ),
-                    const SizedBox(height: 10),
-                    Container(
-                      height: 3,
-                      decoration: BoxDecoration(
-                        color: G.inset,
-                        borderRadius: BorderRadius.circular(1.5),
-                      ),
-                      child: FractionallySizedBox(
-                        alignment: Alignment.centerLeft,
-                        widthFactor: (area.score / 100).clamp(0.0, 1.0),
-                        child: Container(
-                          decoration: BoxDecoration(
-                            color: area.color,
-                            borderRadius: BorderRadius.circular(1.5),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 20),
-              Padding(
-                padding: const EdgeInsets.only(left: 2, bottom: 8),
-                child: Text('OPEN TASKS (${tasks.length})',
-                    style: G.label(size: 11, color: G.faint)),
-              ),
+              GTitle(area.name, sub: areaLine(area.tasksDone, area.tasksTotal, area.focusMins)),
+              const GHeading('To-dos'),
               if (tasks.isEmpty)
-                Container(
-                  padding: const EdgeInsets.all(20),
-                  decoration: BoxDecoration(
-                    color: G.card,
-                    border: Border.all(color: G.lineSoft, width: 0.5),
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                  child: Center(
-                    child: Text('No open tasks in this area.',
-                        style: G.voice(13.5, color: G.muted)),
-                  ),
-                )
+                const GEmpty('Nothing open here.')
               else
                 for (final t in tasks)
                   Padding(
-                    padding: const EdgeInsets.only(bottom: 6),
+                    padding: const EdgeInsets.only(bottom: 8),
                     child: GestureDetector(
                       onTap: () {
                         final cubit = context.read<LifeCubit>();
@@ -171,69 +83,23 @@ class _AreaDetailScreenState extends State<AreaDetailScreen> {
                       child: TaskRow(
                         task: t,
                         area: area,
-                        onComplete: () =>
-                            context.read<LifeCubit>().completeTask(t.id),
-                        onDelete: () =>
-                            context.read<LifeCubit>().deleteTask(t.id),
+                        onComplete: () => context.read<LifeCubit>().completeTask(t.id),
+                        onDelete: () => context.read<LifeCubit>().deleteTask(t.id),
                       ),
                     ),
                   ),
-              const SizedBox(height: 20),
-              Padding(
-                padding: const EdgeInsets.only(left: 2, bottom: 8),
-                child: Text('HABITS (${habits.length})',
-                    style: G.label(size: 11, color: G.faint)),
-              ),
+              const GHeading('Habits'),
               if (habits.isEmpty)
-                Container(
-                  padding: const EdgeInsets.all(20),
-                  decoration: BoxDecoration(
-                    color: G.card,
-                    border: Border.all(color: G.lineSoft, width: 0.5),
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                  child: Center(
-                    child: Text('No habits in this area.',
-                        style: G.voice(13.5, color: G.muted)),
-                  ),
-                )
+                const GEmpty('No habits here yet.')
               else
                 for (final h in habits)
-                  Container(
-                    margin: const EdgeInsets.only(bottom: 6),
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 14, vertical: 12),
-                    decoration: BoxDecoration(
-                      color: G.card,
-                      borderRadius: BorderRadius.circular(4),
-                      border: Border.all(color: G.lineSoft, width: 0.5),
-                    ),
-                    child: Row(
-                      children: [
-                        Container(
-                          width: 6,
-                          height: 6,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: area.color,
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: Text(
-                            h.title,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: G.text(14,
-                                w: FontWeight.w400, color: G.ink),
-                          ),
-                        ),
-                        Text(
-                          '${h.currentStreak}d continuity',
-                          style: G.label(size: 11, color: G.faint),
-                        ),
-                      ],
-                    ),
+                  GCard(
+                    margin: const EdgeInsets.only(bottom: 8),
+                    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                      Text(h.title, style: G.text(19, height: 1.3)),
+                      const SizedBox(height: 2),
+                      Text(habitWeekLine(h.history), style: G.text(16, color: G.muted, height: 1.3)),
+                    ]),
                   ),
             ],
           ),

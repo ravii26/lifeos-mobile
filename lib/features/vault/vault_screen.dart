@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../core/di/service_locator.dart';
 import '../../data/models/vault_item.dart';
 import '../../data/repositories/life_repository.dart';
+import '../../widgets/form_kit.dart' show selChip;
 import '../guide/guide_style.dart';
 import 'vault_form.dart';
 
@@ -17,12 +18,6 @@ class _VaultScreenState extends State<VaultScreen> {
   late Future<List<VaultItem>> _future;
   String _filter = 'All';
   static const _kinds = ['All', 'REFLECTION', 'MEMORY', 'MOTIVATION', 'RECOVERY'];
-  static const _icons = {
-    'REFLECTION': Icons.format_quote,
-    'MEMORY': Icons.trending_up,
-    'MOTIVATION': Icons.gps_fixed,
-    'RECOVERY': Icons.sticky_note_2_outlined,
-  };
   static const _mediaIcons = {
     'QUOTE': Icons.format_quote,
     'VIDEO': Icons.videocam_outlined,
@@ -50,24 +45,16 @@ class _VaultScreenState extends State<VaultScreen> {
 
   void _snack(String msg) {
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-      content: Text(msg, style: G.text(13.5, color: G.ink)),
-      backgroundColor: G.card,
-      behavior: SnackBarBehavior.floating,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(4),
-        side: BorderSide(color: G.lineSoft, width: 0.5),
-      ),
-    ));
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
   }
 
   Future<void> _markUsed(VaultItem v) async {
     try {
       await getIt<LifeRepository>().markVaultUsed(v.id);
-      _snack('Pulled from the vault');
+      _snack('Noted');
       _reload();
     } catch (_) {
-      _snack('Could not record that');
+      _snack("Couldn't save that. Try again.");
     }
   }
 
@@ -77,7 +64,7 @@ class _VaultScreenState extends State<VaultScreen> {
       _snack('Glad it helped');
       _reload();
     } catch (_) {
-      _snack('Could not record that');
+      _snack("Couldn't save that. Try again.");
     }
   }
 
@@ -85,15 +72,13 @@ class _VaultScreenState extends State<VaultScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: G.bg,
-      appBar: GTopBar(
-        'Vault',
-        subtitle: 'Support & hard-days reservoir',
-        showBack: true,
-        trailing: IconButton(
-          icon: Icon(Icons.add, size: 20, color: G.accent),
+      appBar: gBar(actions: [
+        IconButton(
+          tooltip: 'Add to the Vault',
+          icon: Icon(Icons.add_rounded, size: 28, color: G.accent),
           onPressed: () => _openForm(),
         ),
-      ),
+      ]),
       body: FutureBuilder<List<VaultItem>>(
         future: _future,
         builder: (context, snap) {
@@ -102,103 +87,28 @@ class _VaultScreenState extends State<VaultScreen> {
               ? all
               : all.where((v) => v.vaultType.toUpperCase() == _filter).toList();
           return ListView(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 80),
+            padding: const EdgeInsets.fromLTRB(22, 0, 22, 28),
             children: [
-              Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                decoration: BoxDecoration(
-                  color: G.inset,
-                  border: Border.all(color: G.lineSoft, width: 0.5),
-                  borderRadius: BorderRadius.circular(4),
-                ),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Icon(Icons.bookmark_border_rounded,
-                        size: 16, color: G.accent),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Text(
-                        'Your reservoir of wins, quotes and protocols — pull from it when you need fuel.',
-                        style: G.voice(13.5, color: G.muted),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 14),
+              const GTitle('Vault', sub: 'Words and wins to come back to on a hard day.'),
               SizedBox(
-                height: 32,
+                height: 46,
                 child: ListView.separated(
                   scrollDirection: Axis.horizontal,
                   itemCount: _kinds.length,
-                  separatorBuilder: (_, __) => const SizedBox(width: 6),
-                  itemBuilder: (_, i) {
-                    final k = _kinds[i];
-                    final on = _filter == k;
-                    return GestureDetector(
-                      onTap: () => setState(() => _filter = k),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 12, vertical: 6),
-                        decoration: BoxDecoration(
-                          color: on ? G.accent.withValues(alpha: 0.15) : G.card,
-                          borderRadius: BorderRadius.circular(4),
-                          border: Border.all(
-                            color: on ? G.accent : G.lineSoft,
-                            width: 0.5,
-                          ),
-                        ),
-                        child: Text(
-                          _label(k),
-                          style: G.text(
-                            12.5,
-                            w: on ? FontWeight.w600 : FontWeight.w400,
-                            color: on ? G.accent : G.muted,
-                          ),
-                        ),
-                      ),
-                    );
-                  },
+                  separatorBuilder: (_, __) => const SizedBox(width: 8),
+                  itemBuilder: (_, i) => selChip(_label(_kinds[i]), _filter == _kinds[i], () => setState(() => _filter = _kinds[i])),
                 ),
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 14),
               if (snap.connectionState != ConnectionState.done)
                 Padding(
                   padding: const EdgeInsets.only(top: 40),
-                  child: Center(
-                    child: CircularProgressIndicator(
-                      color: G.accent,
-                      strokeWidth: 1.5,
-                    ),
-                  ),
+                  child: Center(child: CircularProgressIndicator(color: G.accent, strokeWidth: 2)),
                 )
               else if (list.isEmpty)
-                Container(
-                  padding: const EdgeInsets.all(28),
-                  decoration: BoxDecoration(
-                    color: G.card,
-                    border: Border.all(color: G.lineSoft, width: 0.5),
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                  child: Center(
-                    child: Text(
-                      'Nothing in the vault yet.\nSave words, wins or protocols here for when you have a hard day.',
-                      textAlign: TextAlign.center,
-                      style: G.voice(14, color: G.muted),
-                    ),
-                  ),
-                )
+                const GEmpty('Nothing here yet. Keep the words or wins you want to find on a hard day.')
               else
-                for (final v in list)
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 10),
-                    child: GestureDetector(
-                      onTap: () => _openForm(item: v),
-                      child: _card(v),
-                    ),
-                  ),
+                for (final v in list) _card(v),
             ],
           );
         },
@@ -206,139 +116,59 @@ class _VaultScreenState extends State<VaultScreen> {
     );
   }
 
-  Widget _card(VaultItem v) => Container(
-        padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(
-          color: G.card,
-          border: Border.all(color: G.lineSoft, width: 0.5),
-          borderRadius: BorderRadius.circular(4),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 6, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: G.accent.withValues(alpha: 0.12),
-                        border: Border.all(
-                            color: G.accent.withValues(alpha: 0.3), width: 0.5),
-                        borderRadius: BorderRadius.circular(2),
-                      ),
-                      child: Row(
-                        children: [
-                          Icon(
-                            _icons[v.vaultType.toUpperCase()] ??
-                                Icons.sticky_note_2_outlined,
-                            size: 11,
-                            color: G.accent,
-                          ),
-                          const SizedBox(width: 4),
-                          Text(
-                            _label(v.vaultType),
-                            style: G.label(size: 10, color: G.accent),
-                          ),
-                        ],
-                      ),
-                    ),
-                    if (_mediaIcons.containsKey(v.mediaType.toUpperCase())) ...[
-                      const SizedBox(width: 6),
-                      Icon(_mediaIcons[v.mediaType.toUpperCase()],
-                          size: 13, color: G.faint),
-                    ],
-                  ],
-                ),
-                Text(
-                  'used ${v.usedCount}×${v.helpfulCount > 0 ? ' · helped ${v.helpfulCount}×' : ''}',
-                  style: G.label(size: 10, color: G.faint),
-                ),
-              ],
-            ),
-            const SizedBox(height: 10),
-            Text(
-              v.title,
-              style: G.text(15, w: FontWeight.w600, color: G.ink),
-            ),
-            if (v.content.isNotEmpty) ...[
-              const SizedBox(height: 6),
-              Container(
-                padding: const EdgeInsets.only(left: 8),
-                decoration: BoxDecoration(
-                  border: Border(
-                    left: BorderSide(
-                      color: G.lineSoft,
-                      width: 1.5,
-                    ),
-                  ),
-                ),
-                child: Text(
-                  v.content,
-                  style: G.voice(13.5, color: G.muted),
-                ),
-              ),
+  Widget _card(VaultItem v) {
+    final mediaIcon = _mediaIcons[v.mediaType.toUpperCase()];
+    final uses = [
+      if (v.usedCount > 0) 'Used ${v.usedCount} ${v.usedCount == 1 ? 'time' : 'times'}',
+      if (v.helpfulCount > 0) 'helped ${v.helpfulCount} ${v.helpfulCount == 1 ? 'time' : 'times'}',
+    ].join(', ');
+    return GCard(
+      onTap: () => _openForm(item: v),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(children: [
+            Text(_label(v.vaultType), style: G.text(16, color: G.accent, height: 1.2)),
+            if (mediaIcon != null) ...[
+              const SizedBox(width: 8),
+              Icon(mediaIcon, size: 18, color: G.accent),
             ],
-            if (v.triggerTags.isNotEmpty) ...[
-              const SizedBox(height: 10),
-              Wrap(
-                spacing: 6,
-                runSpacing: 4,
-                children: [
-                  for (final t in v.triggerTags)
-                    Text(
-                      '#$t',
-                      style: G.label(size: 11, color: G.faint),
-                    ),
-                ],
-              ),
-            ],
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                _vaultAction(
-                  Icons.bolt_outlined,
-                  'Used it',
-                  () => _markUsed(v),
-                ),
-                const SizedBox(width: 8),
-                _vaultAction(
-                  Icons.favorite_outline,
-                  'This helped',
-                  () => _markHelpful(v),
-                  accent: true,
-                ),
-              ],
-            ),
+          ]),
+          const SizedBox(height: 6),
+          Text(v.title, style: G.text(23, w: FontWeight.w500, height: 1.2)),
+          if (v.content.isNotEmpty) ...[
+            const SizedBox(height: 6),
+            Text(v.content, style: G.text(17, color: G.muted, height: 1.4)),
           ],
-        ),
-      );
-
-  Widget _vaultAction(IconData icon, String label, VoidCallback onTap,
-      {bool accent = false}) {
-    final fg = accent ? G.good : G.muted;
-    return OutlinedButton.icon(
-      onPressed: onTap,
-      icon: Icon(icon, size: 14, color: fg),
-      label: Text(
-        label,
-        style: G.text(12, w: FontWeight.w500, color: fg),
-      ),
-      style: OutlinedButton.styleFrom(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-        minimumSize: const Size(0, 30),
-        side: BorderSide(
-          color: accent ? G.good.withValues(alpha: 0.4) : G.lineSoft,
-          width: 0.5,
-        ),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
-        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+          if (v.triggerTags.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Text('For when: ${v.triggerTags.join(', ')}', style: G.text(15, color: G.muted, height: 1.3)),
+          ],
+          if (uses.isNotEmpty) ...[
+            const SizedBox(height: 4),
+            Text('$uses.', style: G.text(15, color: G.muted, height: 1.3)),
+          ],
+          const SizedBox(height: 14),
+          Row(
+            children: [
+              Expanded(child: _action('Used it', () => _markUsed(v))),
+              const SizedBox(width: 8),
+              Expanded(child: _action('This helped', () => _markHelpful(v))),
+            ],
+          ),
+        ],
       ),
     );
   }
+
+  Widget _action(String label, VoidCallback onTap) => SizedBox(
+        height: 48,
+        child: TextButton(
+          onPressed: onTap,
+          style: TextButton.styleFrom(backgroundColor: G.surfaceHigh, foregroundColor: G.ink, shape: const StadiumBorder()),
+          child: FittedBox(fit: BoxFit.scaleDown, child: Text(label, style: G.text(16, height: 1.2))),
+        ),
+      );
 
   static String _label(String k) =>
       k == 'All' ? 'All' : k[0] + k.substring(1).toLowerCase();

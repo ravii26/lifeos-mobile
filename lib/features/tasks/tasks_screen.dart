@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../data/models/task.dart';
+import '../../widgets/form_kit.dart' show chipWrap, gFieldStyle, selChip;
 import '../guide/guide_style.dart';
 import '../shell/life_cubit.dart';
 import 'task_detail_screen.dart';
@@ -53,63 +54,41 @@ class _TasksScreenState extends State<TasksScreen> {
     return BlocBuilder<LifeCubit, LifeState>(
       builder: (context, s) {
         final list = _laneTasks(s);
-        final counts = {
-          'today': s.openTasks
-              .where((t) =>
-                  t.dueDate != null &&
-                  DateUtils.isSameDay(t.dueDate, DateTime.now()))
-              .length,
-          'backlog': s.openTasks.length,
-          'done': s.doneTasks.length,
-        };
+        final today = s.openTasks
+            .where((t) => t.dueDate != null && DateUtils.isSameDay(t.dueDate, DateTime.now()))
+            .length;
+        final later = s.openTasks.length - today;
 
         return Scaffold(
           backgroundColor: G.bg,
-          appBar: GTopBar(
-            'Tasks',
-            subtitle:
-                '${counts['today']} due today · ${counts['backlog']} open',
-            showBack: true,
-            trailing: IconButton(
-              icon: Icon(Icons.add, size: 20, color: G.accent),
+          appBar: gBar(actions: [
+            IconButton(
+              tooltip: 'Add a to-do',
+              icon: Icon(_adding ? Icons.close_rounded : Icons.add_rounded, size: 28, color: G.accent),
               onPressed: () => setState(() => _adding = !_adding),
             ),
-          ),
+          ]),
           body: RefreshIndicator(
             color: G.accent,
             backgroundColor: G.card,
             onRefresh: () => context.read<LifeCubit>().refresh(),
             child: ListView(
-              padding: const EdgeInsets.fromLTRB(16, 16, 16, 80),
+              padding: const EdgeInsets.fromLTRB(22, 0, 22, 28),
               children: [
-                _segmented(counts),
+                GTitle('All to-dos', sub: '$today for today, $later for later.'),
+                _lanes(),
                 const SizedBox(height: 14),
-                if (_adding) _addTaskCard(context, s),
-                const SizedBox(height: 6),
+                if (_adding) _addCard(context),
                 if (list.isEmpty)
-                  Container(
-                    padding: const EdgeInsets.all(28),
-                    decoration: BoxDecoration(
-                      color: G.card,
-                      border: Border.all(color: G.lineSoft, width: 0.5),
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                    child: Center(
-                      child: Text(
-                        _lane == 'done'
-                            ? 'Complete a task to see it here.'
-                            : _lane == 'backlog'
-                                ? 'Backlog is empty. Clear minds rest better.'
-                                : 'Nothing scheduled for today.',
-                        textAlign: TextAlign.center,
-                        style: G.voice(14, color: G.muted),
-                      ),
-                    ),
-                  )
-                else
+                  GEmpty(_lane == 'done'
+                      ? 'Finished to-dos will show up here.'
+                      : _lane == 'backlog'
+                          ? 'Nothing waiting for later.'
+                          : 'Nothing set for today.')
+                else ...[
                   for (final t in list)
                     Padding(
-                      padding: const EdgeInsets.only(bottom: 6),
+                      padding: const EdgeInsets.only(bottom: 8),
                       child: GestureDetector(
                         onTap: () {
                           final cubit = context.read<LifeCubit>();
@@ -135,20 +114,17 @@ class _TasksScreenState extends State<TasksScreen> {
                         child: TaskRow(
                           task: t,
                           area: s.areaById(t.areaId),
-                          onComplete: () =>
-                              context.read<LifeCubit>().completeTask(t.id),
-                          onDelete: () =>
-                              context.read<LifeCubit>().deleteTask(t.id),
+                          onComplete: () => context.read<LifeCubit>().completeTask(t.id),
+                          onDelete: () => context.read<LifeCubit>().deleteTask(t.id),
                         ),
                       ),
                     ),
-                const SizedBox(height: 10),
-                Center(
-                  child: Text(
-                    'Swipe right to complete · left to remove',
-                    style: G.label(size: 10.5, color: G.faint),
-                  ),
-                ),
+                  if (_lane != 'done')
+                    Padding(
+                      padding: const EdgeInsets.only(top: 8),
+                      child: Text('Swipe right when done, left to remove.', textAlign: TextAlign.center, style: G.text(15, color: G.muted, height: 1.3)),
+                    ),
+                ],
               ],
             ),
           ),
@@ -157,26 +133,20 @@ class _TasksScreenState extends State<TasksScreen> {
     );
   }
 
-  Widget _segmented(Map<String, int> counts) {
-    Widget seg(String id, String label) {
+  Widget _lanes() {
+    Widget lane(String id, String label) {
       final on = _lane == id;
       return Expanded(
-        child: GestureDetector(
-          onTap: () => setState(() => _lane = id),
-          child: Container(
-            padding: const EdgeInsets.symmetric(vertical: 8),
-            decoration: BoxDecoration(
-              color: on ? G.accent.withValues(alpha: 0.15) : Colors.transparent,
-              borderRadius: BorderRadius.circular(3),
-            ),
-            child: Center(
-              child: Text(
-                '$label (${counts[id]})',
-                style: G.text(
-                  12.5,
-                  w: on ? FontWeight.w600 : FontWeight.w400,
-                  color: on ? G.accent : G.muted,
-                ),
+        child: Material(
+          color: on ? G.accent : Colors.transparent,
+          shape: const StadiumBorder(),
+          clipBehavior: Clip.antiAlias,
+          child: InkWell(
+            onTap: () => setState(() => _lane = id),
+            child: SizedBox(
+              height: 46,
+              child: Center(
+                child: Text(label, style: G.text(16, w: on ? FontWeight.w600 : FontWeight.w400, color: on ? G.onInk : G.ink, height: 1.2)),
               ),
             ),
           ),
@@ -185,118 +155,36 @@ class _TasksScreenState extends State<TasksScreen> {
     }
 
     return Container(
-      padding: const EdgeInsets.all(3),
-      decoration: BoxDecoration(
-        color: G.inset,
-        borderRadius: BorderRadius.circular(4),
-        border: Border.all(color: G.lineSoft, width: 0.5),
-      ),
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(color: G.card, borderRadius: BorderRadius.circular(27)),
       child: Row(children: [
-        seg('today', 'Today'),
-        seg('backlog', 'Backlog'),
-        seg('done', 'Done'),
+        lane('today', 'Today'),
+        lane('backlog', 'Later'),
+        lane('done', 'Done'),
       ]),
     );
   }
 
-  Widget _addTaskCard(BuildContext context, LifeState s) {
-    return Container(
+  Widget _addCard(BuildContext context) {
+    return GCard(
       margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: G.card,
-        borderRadius: BorderRadius.circular(4),
-        border: Border.all(color: G.lineSoft, width: 0.5),
-      ),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           TextField(
             controller: _title,
             autofocus: true,
-            style: G.text(14.5, color: G.ink),
-            decoration: InputDecoration(
-              hintText: 'What needs doing?',
-              hintStyle: G.text(14, color: G.faint),
-              filled: true,
-              fillColor: G.inset,
-              contentPadding:
-                  const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(4),
-                borderSide: BorderSide(color: G.lineSoft, width: 0.5),
-              ),
-              enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(4),
-                borderSide: BorderSide(color: G.lineSoft, width: 0.5),
-              ),
-              focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(4),
-                borderSide: BorderSide(color: G.accent, width: 0.8),
-              ),
-            ),
+            cursorColor: G.accent,
+            style: G.text(18, height: 1.3),
+            decoration: gFieldStyle('What needs doing?', fill: G.surfaceHigh),
           ),
-          const SizedBox(height: 10),
-          Row(
-            children: [
-              for (final p in ['P1', 'P2', 'P3'])
-                Padding(
-                  padding: const EdgeInsets.only(right: 6),
-                  child: GestureDetector(
-                    onTap: () => setState(() => _priority = p),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 10, vertical: 5),
-                      decoration: BoxDecoration(
-                        color: _priority == p
-                            ? G.accent.withValues(alpha: 0.15)
-                            : G.inset,
-                        borderRadius: BorderRadius.circular(3),
-                        border: Border.all(
-                          color: _priority == p ? G.accent : G.lineSoft,
-                          width: 0.5,
-                        ),
-                      ),
-                      child: Text(
-                        p,
-                        style: G.text(
-                          12,
-                          w: _priority == p ? FontWeight.w600 : FontWeight.w400,
-                          color: _priority == p ? G.accent : G.muted,
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              const Spacer(),
-              TextButton(
-                onPressed: () => setState(() {
-                  _adding = false;
-                  _title.clear();
-                  _areaId = null;
-                  _goalId = null;
-                  _projectId = null;
-                }),
-                child: Text('Cancel', style: G.label(size: 12, color: G.faint)),
-              ),
-              const SizedBox(width: 4),
-              OutlinedButton(
-                onPressed: () => _save(context),
-                style: OutlinedButton.styleFrom(
-                  backgroundColor: G.accent.withValues(alpha: 0.12),
-                  side: BorderSide(
-                      color: G.accent.withValues(alpha: 0.4), width: 0.5),
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(4)),
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                ),
-                child: Text('Add',
-                    style: G.text(13,
-                        w: FontWeight.w600, color: G.accent)),
-              ),
-            ],
-          ),
+          const SizedBox(height: 12),
+          chipWrap([
+            for (final p in const [('P1', 'High'), ('P2', 'Normal'), ('P3', 'Low')])
+              selChip(p.$2, _priority == p.$1, () => setState(() => _priority = p.$1)),
+          ]),
+          const SizedBox(height: 14),
+          GPill('Add it', primary: true, onTap: () => _save(context)),
         ],
       ),
     );

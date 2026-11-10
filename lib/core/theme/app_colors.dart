@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-/// Ally color tokens — Nocturne Sanctuary palette.
+/// Ally color tokens, the Plum palette (older screens and the home widget use these).
 /// Fields are mutable statics — call [AppColors.apply] whenever mode/accent
 /// changes, then rebuild the widget tree.
 class AppColors {
@@ -9,12 +9,12 @@ class AppColors {
   static bool isLight = false;
 
   // Surfaces
-  static Color bg = const Color(0xFF111214);
-  static Color surface1 = const Color(0xFF1B1C1E);
-  static Color surface2 = const Color(0xFF1F2022);
-  static Color surface3 = const Color(0xFF292A2C);
-  static Color surface4 = const Color(0xFF343537);
-  static Color inset = const Color(0xFF0D0E10);
+  static Color bg = const Color(0xFF1C1026);
+  static Color surface1 = const Color(0xFF2F1D3D);
+  static Color surface2 = const Color(0xFF2F1D3D);
+  static Color surface3 = const Color(0xFF4A2A58);
+  static Color surface4 = const Color(0xFF5A3A68);
+  static Color inset = const Color(0xFF2B1A39);
 
   // Hairlines — Nocturne: deep rail #2A2B2E
   static Color line = const Color(0x332A2B2E);
@@ -22,9 +22,9 @@ class AppColors {
   static Color line3 = const Color(0x88454652);
 
   // Text — on-surface / on-surface-variant
-  static Color tx = const Color(0xFFE3E2E4);
-  static Color tx2 = const Color(0xFFC5C5D3);
-  static Color tx3 = const Color(0xFF8F909D);
+  static Color tx = const Color(0xFFFBF1EC);
+  static Color tx2 = const Color(0xFFD9C8D6);
+  static Color tx3 = const Color(0xFFBCA9BE);
   static Color tx4 = const Color(0xFF454652);
 
   // Glass recipe (kept for compatibility; Nocturne is flat — avoid glass)
@@ -33,12 +33,12 @@ class AppColors {
   static Color glassBorder = const Color(0x1AFFFFFF);
 
   // Accent (driven by AppAccent — defaults to Nocturne slate-indigo)
-  static Color accent = const Color(0xFFB9C3FF);
-  static Color accent2 = const Color(0xFF8FA2FF);
-  static Color accentInk = const Color(0xFF0D267F);
-  static Color accentSoft = const Color(0x21B9C3FF);
-  static Color accentLine = const Color(0x59B9C3FF);
-  static Color accentGlow = const Color(0x38B9C3FF);
+  static Color accent = const Color(0xFFF6C9B2);
+  static Color accent2 = const Color(0xFFF6C9B2);
+  static Color accentInk = const Color(0xFF2A1420);
+  static Color accentSoft = const Color(0x21F6C9B2);
+  static Color accentLine = const Color(0x59F6C9B2);
+  static Color accentGlow = const Color(0x38F6C9B2);
 
   // Life-area hues (mode-independent)
   static const career = Color(0xFF8FA2FF);       // primary-container
@@ -81,18 +81,18 @@ class AppColors {
       glassBg2 = const Color(0xBDFFFFFF);
       glassBorder = const Color(0x14000000);
     } else {
-      bg = const Color(0xFF111214);
-      surface1 = const Color(0xFF1B1C1E);
-      surface2 = const Color(0xFF1F2022);
-      surface3 = const Color(0xFF292A2C);
-      surface4 = const Color(0xFF343537);
-      inset = const Color(0xFF0D0E10);
+      bg = const Color(0xFF1C1026);
+      surface1 = const Color(0xFF2F1D3D);
+      surface2 = const Color(0xFF2F1D3D);
+      surface3 = const Color(0xFF4A2A58);
+      surface4 = const Color(0xFF5A3A68);
+      inset = const Color(0xFF2B1A39);
       line = const Color(0x332A2B2E);
       line2 = const Color(0x55454652);
       line3 = const Color(0x88454652);
-      tx = const Color(0xFFE3E2E4);
-      tx2 = const Color(0xFFC5C5D3);
-      tx3 = const Color(0xFF8F909D);
+      tx = const Color(0xFFFBF1EC);
+      tx2 = const Color(0xFFD9C8D6);
+      tx3 = const Color(0xFFBCA9BE);
       tx4 = const Color(0xFF454652);
       glassBg = const Color(0x941F2022);
       glassBg2 = const Color(0xA8292A2C);
@@ -117,13 +117,13 @@ class AppAccent {
     required this.glow,
   });
 
-  /// Nocturne Sanctuary default — Calm Slate-Indigo (#B9C3FF).
+  /// The default accent: Plum's peach.
   static const nocturne = AppAccent(
-    color: Color(0xFFB9C3FF),
-    ink: Color(0xFF0D267F),
-    soft: Color(0x21B9C3FF),
-    line: Color(0x59B9C3FF),
-    glow: Color(0x38B9C3FF),
+    color: Color(0xFFF6C9B2),
+    ink: Color(0xFF2A1420),
+    soft: Color(0x21F6C9B2),
+    line: Color(0x59F6C9B2),
+    glow: Color(0x38F6C9B2),
   );
 
   /// All legacy accents remapped to Nocturne palette tokens.

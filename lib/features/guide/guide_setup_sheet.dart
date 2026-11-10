@@ -223,15 +223,15 @@ class _GuideSetupState extends State<_GuideSetup> {
         contentPadding:
             const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
         border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(4),
+          borderRadius: BorderRadius.circular(18),
           borderSide: BorderSide(color: G.lineSoft, width: 0.5),
         ),
         enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(4),
+          borderRadius: BorderRadius.circular(18),
           borderSide: BorderSide(color: G.lineSoft, width: 0.5),
         ),
         focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(4),
+          borderRadius: BorderRadius.circular(18),
           borderSide: BorderSide(color: G.accent, width: 0.8),
         ),
       );
@@ -239,12 +239,12 @@ class _GuideSetupState extends State<_GuideSetup> {
   Widget _timeRow(String text, VoidCallback onTap, {Widget? trailing}) =>
       InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(4),
+        borderRadius: BorderRadius.circular(18),
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
           decoration: BoxDecoration(
             color: G.card,
-            borderRadius: BorderRadius.circular(4),
+            borderRadius: BorderRadius.circular(18),
             border: Border.all(color: G.lineSoft, width: 0.5),
           ),
           child: Row(children: [
@@ -307,7 +307,7 @@ class _GuideSetupState extends State<_GuideSetup> {
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
                 color: G.card,
-                borderRadius: BorderRadius.circular(4),
+                borderRadius: BorderRadius.circular(18),
                 border: Border.all(color: G.lineSoft, width: 0.5),
               ),
               child: Column(
@@ -345,7 +345,7 @@ class _GuideSetupState extends State<_GuideSetup> {
                             color: r.tier == value
                                 ? G.accent.withValues(alpha: 0.15)
                                 : G.inset,
-                            borderRadius: BorderRadius.circular(3),
+                            borderRadius: BorderRadius.circular(10),
                             border: Border.all(
                               color: r.tier == value
                                   ? G.accent
@@ -387,7 +387,7 @@ class _GuideSetupState extends State<_GuideSetup> {
                         horizontal: 10, vertical: 5),
                     decoration: BoxDecoration(
                       color: G.inset,
-                      borderRadius: BorderRadius.circular(3),
+                      borderRadius: BorderRadius.circular(10),
                       border: Border.all(color: G.lineSoft, width: 0.5),
                     ),
                     child: Text('+ $name',

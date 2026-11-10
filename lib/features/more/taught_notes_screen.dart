@@ -4,12 +4,12 @@ import '../../core/api/api_exception.dart';
 import '../../core/di/service_locator.dart';
 import '../../core/links/open_link.dart';
 import '../../data/repositories/life_repository.dart';
+import '../../widgets/form_kit.dart' show gConfirm, gFieldStyle;
 import '../guide/guide_style.dart';
 
-const _template = {'LIST': 'List', 'ROUTINE': 'Steps in order', 'PLAYBOOK': 'When X, do Y', 'INFO': 'Info'};
+const _template = {'LIST': 'List', 'ROUTINE': 'Steps in order', 'PLAYBOOK': 'When this, do that', 'INFO': 'Info'};
 
 /// Everything you taught Ally, grouped by collection. See it, fix it, remove it.
-/// Styled according to Nocturne Sanctuary (ally_notes_saves).
 class TaughtNotesScreen extends StatefulWidget {
   const TaughtNotesScreen({super.key});
 
@@ -66,31 +66,32 @@ class _TaughtNotesScreenState extends State<TaughtNotesScreen> {
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: G.card,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(4),
-          side: BorderSide(color: G.lineSoft, width: 0.5),
-        ),
-        title: Text('${n['title']}', style: G.text(16, w: FontWeight.w600)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
+        title: Text('${n['title']}', style: G.text(26, w: FontWeight.w600, height: 1.15)),
         content: TextField(
           controller: c,
           autofocus: true,
           minLines: 4,
           maxLines: 12,
-          style: G.text(14),
+          style: G.text(18, height: 1.3),
           cursorColor: G.accent,
-          decoration: InputDecoration(
+          decoration: gFieldStyle('', fill: G.surfaceHigh).copyWith(
+            hintText: '',
             helperText: isList ? 'One per line' : null,
-            helperStyle: G.label(size: 11, color: G.faint),
-            filled: true,
-            fillColor: G.inset,
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(4), borderSide: BorderSide(color: G.lineSoft, width: 0.5)),
-            enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(4), borderSide: BorderSide(color: G.lineSoft, width: 0.5)),
-            focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(4), borderSide: BorderSide(color: G.accent, width: 1)),
+            helperStyle: G.text(15, color: G.muted, height: 1.3),
           ),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: Text('Cancel', style: G.label(size: 12, color: G.faint))),
-          TextButton(onPressed: () => Navigator.pop(ctx, c.text), child: Text('Save', style: G.label(size: 12, color: G.accent, w: FontWeight.w600))),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            style: TextButton.styleFrom(foregroundColor: G.ink, minimumSize: const Size(64, 48)),
+            child: Text('Cancel', style: G.text(17, height: 1.2)),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, c.text),
+            style: TextButton.styleFrom(foregroundColor: G.accent, minimumSize: const Size(64, 48)),
+            child: Text('Save', style: G.text(17, w: FontWeight.w600, color: G.accent, height: 1.2)),
+          ),
         ],
       ),
     );
@@ -109,23 +110,14 @@ class _TaughtNotesScreenState extends State<TaughtNotesScreen> {
   }
 
   Future<void> _delete(Map<String, dynamic> n) async {
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: G.card,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(4),
-          side: BorderSide(color: G.lineSoft, width: 0.5),
-        ),
-        title: Text('Remove "${n['title']}"?', style: G.text(16, w: FontWeight.w600)),
-        content: Text("Ally will stop answering from it. You can undo this right after.", style: G.text(13.5, color: G.muted)),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text('Keep it', style: G.label(size: 12, color: G.faint))),
-          TextButton(onPressed: () => Navigator.pop(ctx, true), child: Text('Remove', style: G.label(size: 12, color: Colors.redAccent, w: FontWeight.w600))),
-        ],
-      ),
+    final ok = await gConfirm(
+      context,
+      title: 'Remove "${n['title']}"?',
+      message: 'Ally will stop answering from it. You can undo this right after.',
+      yes: 'Remove',
+      no: 'Keep it',
     );
-    if (ok != true) return;
+    if (!ok) return;
     try {
       final undo = await _repo.deleteAllyNote('${n['id']}');
       await _load();
@@ -144,110 +136,63 @@ class _TaughtNotesScreenState extends State<TaughtNotesScreen> {
     }
     return Scaffold(
       backgroundColor: G.bg,
-      appBar: GTopBar(
-        'Taught Notes',
-        subtitle: 'What you taught Ally to answer from',
-      ),
+      appBar: gBar(),
       body: RefreshIndicator(
+        color: G.accent,
+        backgroundColor: G.card,
         onRefresh: _load,
         child: ListView(
-          padding: const EdgeInsets.fromLTRB(20, 16, 20, 36),
+          padding: const EdgeInsets.fromLTRB(22, 0, 22, 28),
           children: [
-            Text(
-              'Ally answers from these, and only these. To add one, tell Ally in chat, like "my breakfasts are poha, oats, eggs".',
-              style: G.voice(14, color: G.muted),
-            ),
-            const SizedBox(height: 14),
-            Container(height: 0.5, color: G.lineSoft),
-            const SizedBox(height: 14),
+            const GTitle('What I taught Ally', sub: 'Ally answers from these, and only these. To add one, just say it in Talk, like "my breakfasts are poha, oats, eggs".'),
             if (_error != null)
               Padding(
                 padding: const EdgeInsets.only(bottom: 12),
-                child: Text(_error!, style: G.label(size: 12, color: Colors.redAccent)),
+                child: Text(_error!, style: G.text(16, color: G.accent, height: 1.3)),
               ),
             if (notes == null && _error == null)
-              const Center(
+              Center(
                 child: Padding(
-                  padding: EdgeInsets.all(32),
-                  child: CircularProgressIndicator(strokeWidth: 1.5),
+                  padding: const EdgeInsets.all(32),
+                  child: CircularProgressIndicator(strokeWidth: 2, color: G.accent),
                 ),
               ),
             if (notes != null && notes.isEmpty)
-              Container(
-                padding: const EdgeInsets.all(14),
-                decoration: BoxDecoration(
-                  color: G.card,
-                  border: Border.all(color: G.lineSoft, width: 0.5),
-                  borderRadius: BorderRadius.circular(4),
-                ),
-                child: Text(
-                  'Nothing yet. Teach Ally your breakfasts, a gym warm-up, or how a client likes things done.',
-                  style: G.voice(14, color: G.muted),
-                ),
-              ),
+              const GEmpty('Nothing yet. Teach Ally your breakfasts, a gym warm-up, or how a client likes things done.'),
             for (final entry in groups.entries) ...[
-              Padding(
-                padding: const EdgeInsets.only(top: 8, bottom: 6),
-                child: Text(entry.key.toUpperCase(), style: G.label(size: 10, color: G.faint, w: FontWeight.w600)),
-              ),
+              GHeading(entry.key),
               for (final n in entry.value)
-                Container(
-                  margin: const EdgeInsets.only(bottom: 10),
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: G.card,
-                    border: Border.all(color: G.lineSoft, width: 0.5),
-                    borderRadius: BorderRadius.circular(4),
-                  ),
+                GCard(
+                  padding: const EdgeInsets.fromLTRB(18, 10, 8, 16),
                   child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: G.inset,
-                          borderRadius: BorderRadius.circular(3),
-                        ),
-                        child: Text(
-                          'TEMPLATE: ${_template['${n['template']}'] ?? '${n['template']}'}'.toUpperCase(),
-                          style: G.label(size: 9.5, color: G.accent, w: FontWeight.w600),
-                        ),
+                    Row(children: [
+                      Expanded(
+                        child: Text(_template['${n['template']}'] ?? '${n['template']}', style: G.text(16, color: G.accent, height: 1.2)),
                       ),
-                      Row(children: [
-                        IconButton(
-                          tooltip: 'Edit',
-                          padding: EdgeInsets.zero,
-                          constraints: const BoxConstraints(),
-                          onPressed: () => _edit(n),
-                          icon: Icon(Icons.edit_outlined, size: 16, color: G.faint),
-                        ),
-                        const SizedBox(width: 12),
-                        IconButton(
-                          tooltip: 'Remove',
-                          padding: EdgeInsets.zero,
-                          constraints: const BoxConstraints(),
-                          onPressed: () => _delete(n),
-                          icon: Icon(Icons.close_rounded, size: 16, color: G.faint),
-                        ),
-                      ]),
+                      IconButton(tooltip: 'Edit', onPressed: () => _edit(n), icon: Icon(Icons.edit_outlined, size: 22, color: G.ink)),
+                      IconButton(tooltip: 'Remove', onPressed: () => _delete(n), icon: Icon(Icons.close_rounded, size: 24, color: G.ink)),
                     ]),
-                    const SizedBox(height: 6),
-                    Text('${n['title']}', style: G.text(15, w: FontWeight.w600)),
-                    const SizedBox(height: 6),
-                    if (((n['items'] as List?) ?? const []).isNotEmpty)
-                      for (var i = 0; i < (n['items'] as List).length; i++)
-                        Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 2),
-                          child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                            Text(n['template'] == 'ROUTINE' ? '${i + 1}. ' : '• ',
-                                style: G.label(size: 12, color: G.faint)),
-                            Expanded(child: Text('${(n['items'] as List)[i]}', style: G.text(13, color: G.muted))),
-                          ]),
-                        ),
-                    // A video summary keeps its link as the note's text: show it as a button.
-                    if (_link(n['text']) != null)
-                      OpenSourceButton(_link(n['text'])!)
-                    else if (n['text'] != null && '${n['text']}'.isNotEmpty)
-                      Text('${n['text']}', style: G.text(13, color: G.muted)),
+                    Padding(
+                      padding: const EdgeInsets.only(right: 10),
+                      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                        Text('${n['title']}', style: G.text(23, w: FontWeight.w500, height: 1.2)),
+                        const SizedBox(height: 8),
+                        if (((n['items'] as List?) ?? const []).isNotEmpty)
+                          for (var i = 0; i < (n['items'] as List).length; i++)
+                            Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 3),
+                              child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                                Text(n['template'] == 'ROUTINE' ? '${i + 1}.  ' : '•  ', style: G.text(17, color: G.muted, height: 1.35)),
+                                Expanded(child: Text('${(n['items'] as List)[i]}', style: G.text(17, color: G.muted, height: 1.35))),
+                              ]),
+                            ),
+                        // A video summary keeps its link as the note's text: show it as a button.
+                        if (_link(n['text']) != null)
+                          OpenSourceButton(_link(n['text'])!)
+                        else if (n['text'] != null && '${n['text']}'.isNotEmpty)
+                          Text('${n['text']}', style: G.text(17, color: G.muted, height: 1.35)),
+                      ]),
+                    ),
                   ]),
                 ),
             ],

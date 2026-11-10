@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
-import '../../core/theme/app_colors.dart';
 import '../../data/models/area.dart';
 import '../../data/models/task.dart';
 import '../../widgets/form_kit.dart';
@@ -90,14 +89,14 @@ class _TaskFormState extends State<TaskForm> {
     }).toList();
 
     return FormSheet(
-      title: 'Edit task',
+      title: 'Edit this to-do',
       children: [
-        formField(_title, 'Task title'),
+        formField(_title, 'What needs doing?'),
         const SizedBox(height: 16),
-        formLabel('Priority'),
+        formLabel('How important?'),
         chipWrap([
-          for (final p in const ['P1', 'P2', 'P3'])
-            selChip(p, _priority == p, () => setState(() => _priority = p)),
+          for (final p in const [('P1', 'High'), ('P2', 'Normal'), ('P3', 'Low')])
+            selChip(p.$2, _priority == p.$1, () => setState(() => _priority = p.$1)),
         ]),
         const SizedBox(height: 16),
         formLabel('Status'),
@@ -108,7 +107,7 @@ class _TaskFormState extends State<TaskForm> {
         ]),
         if (widget.areas.isNotEmpty) ...[
           const SizedBox(height: 16),
-          formLabel('Area'),
+          formLabel('Part of life'),
           chipWrap([
             selChip('None', _areaId == null, () {
               setState(() {
@@ -176,36 +175,26 @@ class _TaskFormState extends State<TaskForm> {
           ]),
         ],
         const SizedBox(height: 16),
-        formLabel('Due date'),
+        formLabel('By when?'),
         Row(
           children: [
-            OutlinedButton.icon(
-              onPressed: () async {
-                final now = DateTime.now();
-                final picked = await showDatePicker(
-                  context: context,
-                  initialDate: _due ?? now,
-                  firstDate: DateTime(now.year - 1),
-                  lastDate: DateTime(now.year + 5),
-                );
-                if (picked != null) setState(() => _due = picked);
-              },
-              icon: const Icon(Icons.event, size: 16),
-              label: Text(_due == null ? 'Set due date' : _fmtDate(_due!)),
-              style: OutlinedButton.styleFrom(
-                  foregroundColor: AppColors.tx2,
-                  side: BorderSide(color: AppColors.line2)),
-            ),
-            if (_due != null)
-              TextButton(
-                  onPressed: () => setState(() => _due = null),
-                  child: const Text('Clear')),
+            formPick(Icons.event, _due == null ? 'Pick a date' : _fmtDate(_due!), () async {
+              final now = DateTime.now();
+              final picked = await showDatePicker(
+                context: context,
+                initialDate: _due ?? now,
+                firstDate: DateTime(now.year - 1),
+                lastDate: DateTime(now.year + 5),
+              );
+              if (picked != null) setState(() => _due = picked);
+            }),
+            if (_due != null) formClear(() => setState(() => _due = null)),
           ],
         ),
         const SizedBox(height: 22),
         saveButton(_saving, _save, 'Save changes'),
         const SizedBox(height: 6),
-        deleteRow(context, 'Delete task', () async {
+        deleteRow(context, 'Delete this to-do', () async {
           if (await confirmDelete(
               context, '“${widget.task.title}” will be removed.')) {
             if (!context.mounted) return;

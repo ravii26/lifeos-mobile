@@ -9,16 +9,15 @@ import '../guide/guide_style.dart';
 
 const _kindLabel = {
   'FACT': 'About you',
-  'PREFERENCE': 'Preferences',
-  'GOAL': 'Goals',
-  'STRUGGLE': 'Struggles',
+  'PREFERENCE': 'What you like',
+  'GOAL': 'What you want',
+  'STRUGGLE': 'What is hard',
   'FEELING': 'How you felt',
   'PERSON': 'People',
   'EVENT': 'What happened',
 };
 
-/// Everything the assistant remembers from chat, grouped, each deletable.
-/// Nocturne Sanctuary bedside pattern: trust through visible and erasable memory.
+/// Everything Ally remembers, grouped, each one changeable or deletable.
 class MemoriesScreen extends StatefulWidget {
   const MemoriesScreen({super.key});
 
@@ -40,11 +39,13 @@ class _MemoriesScreenState extends State<MemoriesScreen> {
   Future<void> _load() async {
     try {
       final items = await _repo.memories();
-      setState(() => _items = items);
+      if (mounted) setState(() => _items = items);
     } on ApiException catch (e) {
-      setState(() => _error = e.message);
+      if (mounted) setState(() => _error = e.message);
     }
   }
+
+  void _say(String text) => ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
 
   Future<void> _forget(MemoryItem m) async {
     setState(() => _items = _items!.where((x) => x.id != m.id).toList());
@@ -52,8 +53,7 @@ class _MemoriesScreenState extends State<MemoriesScreen> {
       await _repo.deleteMemory(m.id);
     } on ApiException catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text(e.message)));
+      _say(e.message);
       _load();
     }
   }
@@ -63,11 +63,43 @@ class _MemoriesScreenState extends State<MemoriesScreen> {
       await _repo.setMemoryPrivate(m.id, !m.sensitive);
       await _load();
     } on ApiException catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text(e.message)));
+      if (mounted) _say(e.message);
     }
   }
+
+  Widget _card(MemoryItem m) => Container(
+        margin: const EdgeInsets.only(bottom: 8),
+        padding: const EdgeInsets.fromLTRB(18, 14, 6, 8),
+        decoration: BoxDecoration(color: G.card, borderRadius: BorderRadius.circular(20)),
+        child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Expanded(
+            child: Padding(
+              padding: const EdgeInsets.only(bottom: 6),
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text(m.content, style: G.text(19, height: 1.28)),
+                const SizedBox(height: 5),
+                Text(
+                  [
+                    m.saidByYou ? 'You said this on ${DateFormat('d MMM').format(m.createdAt)}' : 'Noticed on ${DateFormat('d MMM').format(m.createdAt)}',
+                    if (m.sensitive) 'private',
+                  ].join(' · '),
+                  style: G.text(15, color: m.sensitive ? G.accent : G.muted, height: 1.25),
+                ),
+              ]),
+            ),
+          ),
+          IconButton(
+            tooltip: m.sensitive ? 'Private: Ally will not bring this up' : 'Make private',
+            onPressed: () => _togglePrivate(m),
+            icon: Icon(m.sensitive ? Icons.lock_rounded : Icons.lock_open_rounded, size: 20, color: m.sensitive ? G.accent : G.muted),
+          ),
+          IconButton(
+            tooltip: 'Forget this',
+            onPressed: () => _forget(m),
+            icon: Icon(Icons.close_rounded, size: 20, color: G.muted),
+          ),
+        ]),
+      );
 
   @override
   Widget build(BuildContext context) {
@@ -78,164 +110,24 @@ class _MemoriesScreenState extends State<MemoriesScreen> {
     }
     return Scaffold(
       backgroundColor: G.bg,
-      appBar: const GTopBar(
-        'Memories',
-        subtitle: 'What Ally holds for you',
-        showBack: true,
-      ),
+      appBar: AppBar(backgroundColor: G.bg, surfaceTintColor: G.bg, foregroundColor: G.ink, elevation: 0),
       body: ListView(
-        padding: const EdgeInsets.fromLTRB(16, 16, 16, 40),
+        padding: const EdgeInsets.fromLTRB(22, 0, 22, 28),
         children: [
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-            decoration: BoxDecoration(
-              color: G.inset,
-              border: Border.all(color: G.lineSoft, width: 0.5),
-              borderRadius: BorderRadius.circular(4),
-            ),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Icon(Icons.shield_outlined, size: 16, color: G.accent),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Text(
-                    'Kept so you never have to repeat yourself. Private items are never surfaced unless you bring them up first.',
-                    style: G.voice(13.5, color: G.muted),
-                  ),
-                ),
-              ],
-            ),
-          ),
+          Text('What I know about you', style: G.text(42, w: FontWeight.w600, height: 1.05, letterSpacing: -1.2)),
+          const SizedBox(height: 10),
+          Text("Change or remove anything. It's yours. Private things only come up if you raise them.", style: G.text(18, color: G.muted, height: 1.35)),
           const SizedBox(height: 18),
-          if (_error != null)
-            Padding(
-              padding: const EdgeInsets.only(top: 20),
-              child: Text(_error!, style: G.text(14, color: G.carried)),
-            ),
-          if (items == null && _error == null)
-            Padding(
-              padding: const EdgeInsets.only(top: 40),
-              child: Center(
-                  child: CircularProgressIndicator(
-                      color: G.accent, strokeWidth: 1.5)),
-            ),
-          if (items != null && items.isEmpty)
-            Padding(
-              padding: const EdgeInsets.only(top: 40),
-              child: Center(
-                child: Text(
-                  'Nothing stored yet.\nTalk to Ally in chat to teach your preferences and rhythms.',
-                  textAlign: TextAlign.center,
-                  style: G.voice(14.5, color: G.muted),
-                ),
-              ),
-            ),
+          if (_error != null) Text(_error!, style: G.text(17, color: G.muted, height: 1.4)),
+          if (items == null && _error == null) Text('Loading…', style: G.text(18, color: G.muted)),
+          if (items != null && items.isEmpty) Text('Nothing yet. Talk to Ally and it will start to learn.', style: G.text(19, height: 1.35)),
           for (final kind in _kindLabel.keys)
-            if (groups[kind] != null && groups[kind]!.isNotEmpty) ...[
-              const SizedBox(height: 16),
+            if (groups[kind]?.isNotEmpty ?? false) ...[
               Padding(
-                padding: const EdgeInsets.only(bottom: 8, left: 2),
-                child: Text(
-                  _kindLabel[kind]!.toUpperCase(),
-                  style: G.label(size: 11, color: G.faint),
-                ),
+                padding: const EdgeInsets.only(top: 8, bottom: 8),
+                child: Text(_kindLabel[kind]!, style: G.text(16, color: G.muted, height: 1.2)),
               ),
-              for (final m in groups[kind]!)
-                Container(
-                  margin: const EdgeInsets.only(bottom: 6),
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                  decoration: BoxDecoration(
-                    color: G.card,
-                    border: Border.all(color: G.lineSoft, width: 0.5),
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Container(
-                        width: 3,
-                        height: 36,
-                        margin: const EdgeInsets.only(top: 2, right: 12),
-                        decoration: BoxDecoration(
-                          color: m.sensitive
-                              ? G.carried
-                              : (m.saidByYou ? G.accent : G.good),
-                          borderRadius: BorderRadius.circular(1.5),
-                        ),
-                      ),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              m.content,
-                              style: G.text(14.5,
-                                  w: FontWeight.w400, color: G.ink),
-                            ),
-                            const SizedBox(height: 4),
-                            Row(
-                              children: [
-                                Text(
-                                  DateFormat('d MMM').format(m.createdAt),
-                                  style: G.label(size: 11, color: G.faint),
-                                ),
-                                Text(' · ',
-                                    style: G.label(size: 11, color: G.faint)),
-                                Text(
-                                  m.saidByYou ? 'Told by you' : 'Inferred',
-                                  style: G.label(size: 11, color: G.muted),
-                                ),
-                                if (m.sensitive) ...[
-                                  const SizedBox(width: 8),
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(
-                                        horizontal: 6, vertical: 2),
-                                    decoration: BoxDecoration(
-                                      color: G.carried.withValues(alpha: 0.15),
-                                      border: Border.all(
-                                          color:
-                                              G.carried.withValues(alpha: 0.4),
-                                          width: 0.5),
-                                      borderRadius: BorderRadius.circular(2),
-                                    ),
-                                    child: Text(
-                                      'Private',
-                                      style: G.label(
-                                          size: 10, color: G.carried),
-                                    ),
-                                  ),
-                                ],
-                              ],
-                            ),
-                          ],
-                        ),
-                      ),
-                      IconButton(
-                        tooltip: m.sensitive
-                            ? 'Private: Ally will not volunteer this'
-                            : 'Make private',
-                        onPressed: () => _togglePrivate(m),
-                        icon: Icon(
-                          m.sensitive
-                              ? Icons.lock_rounded
-                              : Icons.lock_open_rounded,
-                          size: 17,
-                          color: m.sensitive ? G.carried : G.faint,
-                        ),
-                        visualDensity: VisualDensity.compact,
-                      ),
-                      IconButton(
-                        tooltip: 'Forget this',
-                        onPressed: () => _forget(m),
-                        icon: Icon(Icons.close_rounded,
-                            size: 17, color: G.faint),
-                        visualDensity: VisualDensity.compact,
-                      ),
-                    ],
-                  ),
-                ),
+              for (final m in groups[kind]!) _card(m),
             ],
         ],
       ),

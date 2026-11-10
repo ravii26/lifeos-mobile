@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
-import '../../core/theme/app_colors.dart';
 import '../../data/models/area.dart';
 import '../../data/models/habit.dart';
 import '../../widgets/form_kit.dart';
@@ -99,11 +98,11 @@ class _HabitFormState extends State<HabitForm> {
   @override
   Widget build(BuildContext context) {
     return FormSheet(
-      title: _isEdit ? 'Edit habit' : 'New habit',
+      title: _isEdit ? 'Edit this habit' : 'A new habit',
       children: [
-        formField(_title, 'Habit title', autofocus: !_isEdit),
+        formField(_title, 'Like a walk after dinner', autofocus: !_isEdit),
         const SizedBox(height: 16),
-        formLabel('Area'),
+        formLabel('Part of life'),
         chipWrap([
           for (final a in widget.areas)
             selChip(a.name, _areaId == a.id,
@@ -111,19 +110,19 @@ class _HabitFormState extends State<HabitForm> {
                 color: a.color),
         ]),
         const SizedBox(height: 16),
-        formLabel('Type'),
+        formLabel('How do you want to track it?'),
         chipWrap([
           for (final t in const ['BOOLEAN', 'COUNT', 'TIMER'])
             selChip(_typeLabel(t), _type == t, () => setState(() => _type = t)),
         ]),
         if (_type != 'BOOLEAN') ...[
           const SizedBox(height: 14),
-          formLabel(_type == 'TIMER' ? 'Target minutes/day' : 'Target count/day'),
+          formLabel(_type == 'TIMER' ? 'Minutes a day' : 'How many a day'),
           formField(_target, _type == 'TIMER' ? 'e.g. 30' : 'e.g. 8',
               keyboard: TextInputType.number),
         ],
         const SizedBox(height: 16),
-        formLabel('Frequency'),
+        formLabel('How often?'),
         chipWrap([
           for (final f in const ['DAILY', 'WEEKLY'])
             selChip(titleCaseWord(f), _frequency == f,
@@ -133,32 +132,20 @@ class _HabitFormState extends State<HabitForm> {
         formLabel('Reminder'),
         Row(
           children: [
-            OutlinedButton.icon(
-              onPressed: () async {
-                final picked = await showTimePicker(
-                    context: context,
-                    initialTime: _reminder ?? const TimeOfDay(hour: 8, minute: 0));
-                if (picked != null) setState(() => _reminder = picked);
-              },
-              icon: const Icon(Icons.alarm, size: 16),
-              label: Text(_reminder == null
-                  ? 'Set reminder'
-                  : _reminder!.format(context)),
-              style: OutlinedButton.styleFrom(
-                  foregroundColor: AppColors.tx2,
-                  side: BorderSide(color: AppColors.line2)),
-            ),
-            if (_reminder != null)
-              TextButton(
-                  onPressed: () => setState(() => _reminder = null),
-                  child: const Text('Clear')),
+            formPick(Icons.alarm, _reminder == null ? 'Pick a time' : _reminder!.format(context), () async {
+              final picked = await showTimePicker(
+                  context: context,
+                  initialTime: _reminder ?? const TimeOfDay(hour: 8, minute: 0));
+              if (picked != null) setState(() => _reminder = picked);
+            }),
+            if (_reminder != null) formClear(() => setState(() => _reminder = null)),
           ],
         ),
         const SizedBox(height: 22),
-        saveButton(_saving, _save, _isEdit ? 'Save changes' : 'Create habit'),
+        saveButton(_saving, _save, _isEdit ? 'Save changes' : 'Add it'),
         if (_isEdit) ...[
           const SizedBox(height: 6),
-          deleteRow(context, 'Delete habit', () async {
+          deleteRow(context, 'Delete this habit', () async {
             if (await confirmDelete(
                 context, '“${widget.habit!.title}” will be removed.')) {
               if (!context.mounted) return;
@@ -173,7 +160,7 @@ class _HabitFormState extends State<HabitForm> {
 
   static String _typeLabel(String t) => switch (t) {
         'COUNT' => 'Count',
-        'TIMER' => 'Timer',
-        _ => 'Yes/No',
+        'TIMER' => 'Minutes',
+        _ => 'Done or not',
       };
 }

@@ -20,6 +20,12 @@ void openAreaForm(BuildContext context, {Area? area}) {
   );
 }
 
+/// One plain line about a part of life. Says what happened and never scores it.
+String areaLine(int done, int total, int focusMinutes) {
+  final todos = total == 0 ? 'No to-dos yet' : '$done of $total to-dos done';
+  return focusMinutes > 0 ? '$todos. $focusMinutes min focused.' : '$todos.';
+}
+
 class AreasScreen extends StatelessWidget {
   final VoidCallback? onOpenMore;
   const AreasScreen({super.key, this.onOpenMore});
@@ -30,175 +36,51 @@ class AreasScreen extends StatelessWidget {
       builder: (context, s) {
         return Scaffold(
           backgroundColor: G.bg,
-          appBar: GTopBar(
-            'Life Areas',
-            subtitle: 'Balance · ${s.avgScore} avg',
-            showBack: true,
-            trailing: IconButton(
-              icon: Icon(Icons.add, size: 20, color: G.accent),
+          appBar: gBar(actions: [
+            IconButton(
+              tooltip: 'Add a part of life',
+              icon: Icon(Icons.add_rounded, size: 28, color: G.accent),
               onPressed: () => openAreaForm(context),
             ),
-          ),
+          ]),
           body: RefreshIndicator(
             color: G.accent,
             backgroundColor: G.card,
             onRefresh: () => context.read<LifeCubit>().refresh(),
             child: ListView(
-              padding: const EdgeInsets.fromLTRB(16, 16, 16, 80),
+              padding: const EdgeInsets.fromLTRB(22, 0, 22, 28),
               children: [
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                  decoration: BoxDecoration(
-                    color: G.inset,
-                    border: Border.all(color: G.lineSoft, width: 0.5),
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Icon(Icons.category_outlined, size: 16, color: G.accent),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: Text(
-                          'Your life pillars. Ally balances daily suggestions across what matters most without guilt.',
-                          style: G.voice(13.5, color: G.muted),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 16),
+                const GTitle('Parts of my life', sub: 'Ally spreads your days across these, so nothing important goes quiet.'),
                 if (s.areas.isEmpty)
-                  Container(
-                    padding: const EdgeInsets.all(28),
-                    decoration: BoxDecoration(
-                      color: G.card,
-                      border: Border.all(color: G.lineSoft, width: 0.5),
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                    child: Center(
-                      child: Text(
-                        'No life areas set up yet.\nCreate areas like Health, Career, or Mind to organize goals.',
-                        textAlign: TextAlign.center,
-                        style: G.voice(14, color: G.muted),
-                      ),
-                    ),
-                  )
+                  const GEmpty('Nothing here yet. Add the big parts of your life, like Health, Work or Family.')
                 else
                   for (final a in s.areas)
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 8),
-                      child: GestureDetector(
-                        onTap: () {
-                          final cubit = context.read<LifeCubit>();
-                          Navigator.of(context).push(MaterialPageRoute(
-                            builder: (_) => BlocProvider.value(
-                              value: cubit,
-                              child: AreaDetailScreen(areaId: a.id),
-                            ),
-                          ));
-                        },
-                        onLongPress: () => openAreaForm(context, area: a),
-                        child: _AreaCard(area: a),
-                      ),
+                    GCard(
+                      onTap: () {
+                        final cubit = context.read<LifeCubit>();
+                        Navigator.of(context).push(MaterialPageRoute(
+                          builder: (_) => BlocProvider.value(
+                            value: cubit,
+                            child: AreaDetailScreen(areaId: a.id),
+                          ),
+                        ));
+                      },
+                      onLongPress: () => openAreaForm(context, area: a),
+                      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                        Row(children: [
+                          Container(width: 12, height: 12, decoration: BoxDecoration(shape: BoxShape.circle, color: a.color)),
+                          const SizedBox(width: 12),
+                          Expanded(child: Text(a.name, style: G.text(23, w: FontWeight.w500, height: 1.2))),
+                        ]),
+                        const SizedBox(height: 6),
+                        Text(areaLine(a.tasksDone, a.tasksTotal, a.focusMins), style: G.text(16, color: G.muted, height: 1.3)),
+                      ]),
                     ),
               ],
             ),
           ),
         );
       },
-    );
-  }
-}
-
-class _AreaCard extends StatelessWidget {
-  final Area area;
-  const _AreaCard({required this.area});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: G.card,
-        border: Border.all(color: G.lineSoft, width: 0.5),
-        borderRadius: BorderRadius.circular(4),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                width: 8,
-                height: 8,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: area.color,
-                ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Text(
-                  area.name,
-                  style: G.text(15, w: FontWeight.w600, color: G.ink),
-                ),
-              ),
-              Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                decoration: BoxDecoration(
-                  color: G.inset,
-                  border: Border.all(color: G.lineSoft, width: 0.5),
-                  borderRadius: BorderRadius.circular(2),
-                ),
-                child: Text(
-                  '${area.score}%',
-                  style: G.label(size: 11, color: G.faint),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 10),
-          Row(
-            children: [
-              Text(
-                '${area.tasksDone}/${area.tasksTotal} tasks',
-                style: G.label(size: 11, color: G.muted),
-              ),
-              Text(' · ', style: G.label(size: 11, color: G.faint)),
-              Text(
-                '${area.streak}d streak',
-                style: G.label(size: 11, color: G.muted),
-              ),
-              Text(' · ', style: G.label(size: 11, color: G.faint)),
-              Text(
-                '${area.focusMins}m focus',
-                style: G.label(size: 11, color: G.muted),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Container(
-            height: 3,
-            decoration: BoxDecoration(
-              color: G.inset,
-              borderRadius: BorderRadius.circular(1.5),
-            ),
-            child: FractionallySizedBox(
-              alignment: Alignment.centerLeft,
-              widthFactor: (area.score / 100).clamp(0.0, 1.0),
-              child: Container(
-                decoration: BoxDecoration(
-                  color: area.color.withValues(alpha: 0.85),
-                  borderRadius: BorderRadius.circular(1.5),
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
     );
   }
 }

@@ -3,17 +3,11 @@ import 'package:flutter/material.dart';
 import '../../core/api/api_exception.dart';
 import '../../core/di/service_locator.dart';
 import '../../data/repositories/life_repository.dart';
+import '../chat/starters.dart';
 import '../guide/guide_style.dart';
+import '../places/you_screen.dart' show goalProgress;
 
-const _kindText = {
-  'MILESTONE': 'Milestone Project',
-  'OUTCOME': 'Outcome Project',
-  'PRACTICE': 'Weekly Practice',
-  'WORK': 'Work with a Deadline',
-};
-
-/// Where you stand: stages, trend and pace on each goal.
-/// Styled according to Nocturne Sanctuary (ally_you_progress_where_you_stand).
+/// Goals: how far along each one is, worked out from what was actually done.
 class WhereYouStandScreen extends StatefulWidget {
   const WhereYouStandScreen({super.key});
 
@@ -35,11 +29,40 @@ class _WhereYouStandScreenState extends State<WhereYouStandScreen> {
   Future<void> _load() async {
     try {
       final items = await _repo.progress();
-      if (!mounted) return;
-      setState(() => _items = items);
+      if (mounted) setState(() => _items = items);
     } on ApiException catch (e) {
       if (mounted) setState(() => _error = e.message);
     }
+  }
+
+  Widget _card(Map<String, dynamic> p) {
+    final progress = goalProgress(p);
+    final why = '${p['why'] ?? ''}';
+    final paused = p['status'] == 'PAUSED';
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(color: G.card, borderRadius: BorderRadius.circular(24)),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text('${p['title']}${paused ? ' (paused)' : ''}', style: G.text(24, w: FontWeight.w600, height: 1.15, letterSpacing: -0.4)),
+        const SizedBox(height: 6),
+        Text('${p['message']}', style: G.text(17, color: G.muted, height: 1.35)),
+        if (why.isNotEmpty) Padding(padding: const EdgeInsets.only(top: 8), child: Text('Why it matters: $why', style: G.text(16, height: 1.35))),
+        // Only a number the server worked out: an invented bar would be a lie.
+        if (progress != null) ...[
+          const SizedBox(height: 14),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(4),
+            child: LinearProgressIndicator(
+              value: progress,
+              minHeight: 7,
+              backgroundColor: G.surfaceHigh,
+              valueColor: AlwaysStoppedAnimation<Color>(G.accent),
+            ),
+          ),
+        ],
+      ]),
+    );
   }
 
   @override
@@ -47,109 +70,20 @@ class _WhereYouStandScreenState extends State<WhereYouStandScreen> {
     final items = _items;
     return Scaffold(
       backgroundColor: G.bg,
-      appBar: GTopBar(
-        'Where you stand',
-        subtitle: 'How far along each goal is',
-      ),
+      appBar: AppBar(backgroundColor: G.bg, surfaceTintColor: G.bg, foregroundColor: G.ink, elevation: 0),
       body: RefreshIndicator(
         onRefresh: _load,
         child: ListView(
-          padding: const EdgeInsets.fromLTRB(20, 16, 20, 36),
+          padding: const EdgeInsets.fromLTRB(22, 0, 22, 28),
           children: [
-            Text(
-              'Worked out from what you actually did. To log something, tell Ally in chat, like "I solved 10 problems".',
-              style: G.voice(14, color: G.muted),
-            ),
-            const SizedBox(height: 14),
-            Container(height: 0.5, color: G.lineSoft),
-            const SizedBox(height: 14),
-            if (_error != null)
-              Padding(
-                padding: const EdgeInsets.only(bottom: 12),
-                child: Text(_error!, style: G.label(size: 12, color: Colors.redAccent)),
-              ),
-            if (items == null && _error == null)
-              const Center(
-                child: Padding(
-                  padding: EdgeInsets.all(32),
-                  child: CircularProgressIndicator(strokeWidth: 1.5),
-                ),
-              ),
-            if (items != null && items.isEmpty)
-              Container(
-                padding: const EdgeInsets.all(14),
-                decoration: BoxDecoration(
-                  color: G.card,
-                  border: Border.all(color: G.lineSoft, width: 0.5),
-                  borderRadius: BorderRadius.circular(4),
-                ),
-                child: Text(
-                  'No active goals yet. Tell Ally a goal in chat to track stages or metrics.',
-                  style: G.voice(14, color: G.muted),
-                ),
-              ),
-            for (final p in items ?? const <Map<String, dynamic>>[])
-              Container(
-                margin: const EdgeInsets.only(bottom: 12),
-                padding: const EdgeInsets.all(14),
-                decoration: BoxDecoration(
-                  color: G.card,
-                  border: Border.all(color: G.lineSoft, width: 0.5),
-                  borderRadius: BorderRadius.circular(4),
-                ),
-                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-                    Text(
-                      (_kindText['${p['kind']}'] ?? 'PROJECT').toUpperCase(),
-                      style: G.label(size: 10, color: G.accent, w: FontWeight.w600),
-                    ),
-                    if (p['status'] == 'PAUSED')
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
-                        decoration: BoxDecoration(
-                          color: G.inset,
-                          borderRadius: BorderRadius.circular(3),
-                        ),
-                        child: Text('Paused', style: G.label(size: 10, color: G.faint)),
-                      ),
-                  ]),
-                  const SizedBox(height: 6),
-                  Text('${p['title']}', style: G.text(15, w: FontWeight.w600, height: 1.3)),
-                  const SizedBox(height: 6),
-                  Text('${p['message']}', style: G.text(13, color: G.muted, height: 1.4)),
-                  if (p['why'] != null && '${p['why']}'.isNotEmpty) ...[
-                    const SizedBox(height: 10),
-                    Container(
-                      padding: const EdgeInsets.fromLTRB(10, 6, 10, 6),
-                      decoration: BoxDecoration(
-                        color: G.inset,
-                        border: Border(left: BorderSide(color: G.accent, width: 2)),
-                        borderRadius: const BorderRadius.horizontal(right: Radius.circular(3)),
-                      ),
-                      child: Text(
-                        '“${p['why']}”',
-                        style: G.voice(13, color: G.muted),
-                      ),
-                    ),
-                  ],
-                  const SizedBox(height: 12),
-                  // Flat Progress Bar
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(2),
-                    child: Container(
-                      height: 3,
-                      color: G.inset,
-                      child: Align(
-                        alignment: Alignment.centerLeft,
-                        child: FractionallySizedBox(
-                          widthFactor: 0.45,
-                          child: Container(color: G.accent),
-                        ),
-                      ),
-                    ),
-                  ),
-                ]),
-              ),
+            Text('My goals', style: G.text(44, w: FontWeight.w600, height: 1.05, letterSpacing: -1.3)),
+            const SizedBox(height: 8),
+            Text('Worked out from what you actually did.', style: G.text(19, color: G.muted, height: 1.3)),
+            const SizedBox(height: 18),
+            if (_error != null) Text(_error!, style: G.text(17, color: G.muted, height: 1.4)),
+            if (items == null && _error == null) Text('Loading…', style: G.text(18, color: G.muted)),
+            if (items != null && items.isEmpty) GPill('Plan a goal', primary: true, onTap: () => starterRequest.value = Starter.goal),
+            for (final p in items ?? const <Map<String, dynamic>>[]) _card(p),
           ],
         ),
       ),
