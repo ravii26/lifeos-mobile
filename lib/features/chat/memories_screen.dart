@@ -67,6 +67,41 @@ class _MemoriesScreenState extends State<MemoriesScreen> {
     }
   }
 
+  Future<void> _stillTrue(MemoryItem m) async {
+    try {
+      await _repo.restoreMemory(m.id);
+      await _load();
+    } on ApiException catch (e) {
+      if (mounted) _say(e.message);
+    }
+  }
+
+  /// Something that stopped being true: kept as history, and fixable if Ally got it wrong.
+  Widget _pastCard(MemoryItem m) => Container(
+        margin: const EdgeInsets.only(bottom: 8),
+        padding: const EdgeInsets.fromLTRB(18, 14, 6, 6),
+        decoration: BoxDecoration(color: G.card, borderRadius: BorderRadius.circular(20)),
+        child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Expanded(
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(m.content, style: G.text(19, color: G.muted, height: 1.28)),
+              const SizedBox(height: 5),
+              Text('Until ${DateFormat('d MMM y').format(m.endedAt!)}', style: G.text(15, color: G.muted, height: 1.25)),
+              TextButton(
+                onPressed: () => _stillTrue(m),
+                style: TextButton.styleFrom(foregroundColor: G.accent, padding: EdgeInsets.zero, minimumSize: const Size(64, 44), alignment: Alignment.centerLeft),
+                child: Text('Still true', style: G.text(17, color: G.accent, height: 1.2)),
+              ),
+            ]),
+          ),
+          IconButton(
+            tooltip: 'Forget this',
+            onPressed: () => _forget(m),
+            icon: Icon(Icons.close_rounded, size: 20, color: G.muted),
+          ),
+        ]),
+      );
+
   Widget _card(MemoryItem m) => Container(
         margin: const EdgeInsets.only(bottom: 8),
         padding: const EdgeInsets.fromLTRB(18, 14, 6, 8),
@@ -77,10 +112,15 @@ class _MemoriesScreenState extends State<MemoriesScreen> {
               padding: const EdgeInsets.only(bottom: 6),
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                 Text(m.content, style: G.text(19, height: 1.28)),
+                if (m.quote != null) ...[
+                  const SizedBox(height: 5),
+                  Text('“${m.quote}”', style: G.text(16, color: G.muted, height: 1.3)),
+                ],
                 const SizedBox(height: 5),
                 Text(
                   [
                     m.saidByYou ? 'You said this on ${DateFormat('d MMM').format(m.createdAt)}' : 'Noticed on ${DateFormat('d MMM').format(m.createdAt)}',
+                    if (m.endedAt != null) 'until ${DateFormat('d MMM').format(m.endedAt!)}',
                     if (m.sensitive) 'private',
                   ].join(' · '),
                   style: G.text(15, color: m.sensitive ? G.accent : G.muted, height: 1.25),
@@ -105,9 +145,15 @@ class _MemoriesScreenState extends State<MemoriesScreen> {
   Widget build(BuildContext context) {
     final items = _items;
     final groups = <String, List<MemoryItem>>{};
+    final past = <MemoryItem>[];
     for (final m in items ?? const <MemoryItem>[]) {
-      groups.putIfAbsent(m.kind, () => []).add(m);
+      if (m.isCurrent) {
+        groups.putIfAbsent(m.kind, () => []).add(m);
+      } else {
+        past.add(m);
+      }
     }
+    past.sort((a, b) => b.endedAt!.compareTo(a.endedAt!));
     return Scaffold(
       backgroundColor: G.bg,
       appBar: AppBar(backgroundColor: G.bg, surfaceTintColor: G.bg, foregroundColor: G.ink, elevation: 0),
@@ -129,6 +175,13 @@ class _MemoriesScreenState extends State<MemoriesScreen> {
               ),
               for (final m in groups[kind]!) _card(m),
             ],
+          if (past.isNotEmpty) ...[
+            Padding(
+              padding: const EdgeInsets.only(top: 18, bottom: 8),
+              child: Text('No longer true', style: G.text(16, color: G.muted, height: 1.2)),
+            ),
+            for (final m in past) _pastCard(m),
+          ],
         ],
       ),
     );

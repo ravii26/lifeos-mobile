@@ -1152,6 +1152,9 @@ class LifeRepository {
 
   Future<void> deleteMemory(String id) => _api.delete('/assistant/memories/$id');
 
+  /// "Still true": puts back a memory Ally retired by mistake.
+  Future<void> restoreMemory(String id) => _api.post('/assistant/memories/$id/restore');
+
   Future<List<Reminder>> reminders() async {
     final data = await _api.get('/assistant/reminders');
     return (data as List).whereType<Json>().map(Reminder.fromJson).toList();

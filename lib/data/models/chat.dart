@@ -311,7 +311,11 @@ class MemoryItem {
   final DateTime createdAt;
   final bool saidByYou; // true = you told Ally, false = Ally guessed
   final bool sensitive; // private: never brought up unless you raise it
-  const MemoryItem(this.id, this.content, this.kind, this.createdAt, {this.saidByYou = false, this.sensitive = false});
+  final String? quote; // your exact words this came from
+  final DateTime? endedAt; // past: no longer true; future: true until then
+  const MemoryItem(this.id, this.content, this.kind, this.createdAt, {this.saidByYou = false, this.sensitive = false, this.quote, this.endedAt});
+
+  bool get isCurrent => endedAt == null || endedAt!.isAfter(DateTime.now());
 
   factory MemoryItem.fromJson(Json j) => MemoryItem(
         asString(j['id']),
@@ -320,5 +324,7 @@ class MemoryItem {
         asDate(j['createdAt'])?.toLocal() ?? DateTime.now(),
         saidByYou: asString(j['source']) == 'SAID',
         sensitive: asBool(j['sensitive']),
+        quote: asString(j['quote']).isEmpty ? null : asString(j['quote']),
+        endedAt: asDate(j['endedAt'])?.toLocal(),
       );
 }
