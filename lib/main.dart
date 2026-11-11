@@ -26,8 +26,10 @@ Future<void> main() async {
     statusBarIconBrightness: Brightness.light,
   ));
   await setupLocator();
-  await NotificationService.instance.init();
-  await getIt<WidgetSyncService>().init();
+  // Neither of these may keep the app from opening: reminders or the widget
+  // failing is a small problem, a phone stuck on the logo is a big one.
+  await _bestEffort(() => NotificationService.instance.init());
+  await _bestEffort(() => getIt<WidgetSyncService>().init());
   runApp(const LifeOSApp());
   // Deferred to after the first frame so `rootNavigatorKey.currentState` is
   // attached before a cold-start `lifeos://` link tries to push a route.
@@ -35,6 +37,14 @@ Future<void> main() async {
     DeepLinkService(rootNavigatorKey).init();
     getIt<ShareIntentService>().init();
   });
+}
+
+Future<void> _bestEffort(Future<void> Function() start) async {
+  try {
+    await start().timeout(const Duration(seconds: 8));
+  } catch (e) {
+    debugPrint('Startup step skipped: $e');
+  }
 }
 
 /// Used by [DeepLinkService] to push routes (e.g. the focus screen) from

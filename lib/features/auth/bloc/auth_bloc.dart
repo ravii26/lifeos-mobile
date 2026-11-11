@@ -20,11 +20,13 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
   }
 
   Future<void> _onStarted(AuthStarted e, Emitter<AuthState> emit) async {
-    if (!await _repo.hasSession()) {
-      emit(state.copyWith(status: AuthStatus.unauthenticated));
-      return;
-    }
+    // Clears any earlier error, so Try again shows the spinner.
+    if (state.error != null) emit(const AuthState(status: AuthStatus.unknown));
     try {
+      if (!await _repo.hasSession()) {
+        emit(state.copyWith(status: AuthStatus.unauthenticated));
+        return;
+      }
       final user = await _repo.me();
       await LocalData.claimFor(user.id);
       emit(state.copyWith(status: AuthStatus.authenticated, user: user));
@@ -37,6 +39,9 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
         // let the user retry instead of being kicked to login.
         emit(state.copyWith(status: AuthStatus.unknown, error: e.message));
       }
+    } catch (e) {
+      // Anything else must still end in a screen with a way forward, never an endless spinner.
+      emit(state.copyWith(status: AuthStatus.unknown, error: 'Something went wrong while starting. ($e)'));
     }
   }
 

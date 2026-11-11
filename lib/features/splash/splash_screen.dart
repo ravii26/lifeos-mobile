@@ -92,6 +92,14 @@ class _SplashScreenState extends State<SplashScreen>
                             textAlign: TextAlign.center,
                             style: G.text(17, color: G.muted, height: 1.35),
                           ),
+                          const SizedBox(height: 6),
+                          Text(
+                            state.error!,
+                            textAlign: TextAlign.center,
+                            maxLines: 4,
+                            overflow: TextOverflow.ellipsis,
+                            style: G.text(15, color: G.faint, height: 1.3),
+                          ),
                           const SizedBox(height: 14),
                           SizedBox(
                             width: 180,
