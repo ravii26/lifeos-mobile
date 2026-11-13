@@ -14,6 +14,8 @@ class _Repo implements LifeRepository {
   bool get showingSaved => false;
 
   @override
+  Future<Map<String, dynamic>?> nowSaved({bool smallest = false}) async => null;
+  @override
   Future<Map<String, dynamic>> now({bool smallest = false, int? minutes}) async => {
         'kind': 'PICK',
         'message': '',
@@ -23,7 +25,7 @@ class _Repo implements LifeRepository {
       };
 
   @override
-  Future<Map<String, dynamic>> nowAdvice(String sourceType, String sourceId, String choice) async {
+  Future<Map<String, dynamic>> nowAdvice(String sourceType, String sourceId, String choice, {String? reason}) async {
     calls.add('$sourceType/$sourceId/$choice');
     return {'message': 'Moved to tomorrow.', 'activityId': 'a1'};
   }

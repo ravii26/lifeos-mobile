@@ -29,13 +29,22 @@ lib/
   data/models/                  plain models with fromJson (json.dart helpers)
   data/repositories/            life_repository.dart: every API call lives here
   features/
-    shell/home_shell.dart       tabs Now · Plan · Notes · You; provides LifeCubit, TonightCubit, NowCubit, ChatCubit
+    shell/home_shell.dart       tabs Now · [mic → Talk] · My life (Plan, Notes, Habits, Reminders are tiles in My life);
+                                provides LifeCubit, TonightCubit, NowCubit, ChatCubit
     chat/                       chat screen + cubit (actions, undo, offline retry), memories screen,
                                 starters.dart (guided first-use chats → one message; ADR 0026)
     guide/                      today's card, tonight cubit, setup sheet, save sheet, guide_style.dart
     tasks/ habits/ areas/ goals/ vault/ more/ auth/ splash/ …
 ```
 Removed from the UI (code kept, ADR 0012): home, companion, now, projects, learn, library, notebooks, graph, behavior, calendar, review, identity.
+**Frozen (Nov 2026 build plan, Phase 0):** no new work on those removed features, and no new screens outside the plan
+in `../reports/Ally build plan.md`. What Ally does is decided in `../reports/Ally decisions log.md`.
+
+## Launch (keep it instant)
+The app opens from the cached account (`AuthRepository.cachedUser`, wiped on sign-out) and checks `/auth/me` behind it;
+only a 401 signs out. Now shows the phone's copy of `/now` if it is from today and under 3 h old, then the live answer.
+Notifications and the widget start after `runApp`; `NotificationService` waits for its own init instead of skipping work.
+Never put a network call or plugin setup back in front of the first frame.
 
 ## Conventions
 - **All network calls go through `LifeRepository`** → `ApiClient`. Screens never use Dio directly.

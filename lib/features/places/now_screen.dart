@@ -11,6 +11,7 @@ import 'now_cubit.dart';
 import 'now_life_lines.dart';
 import 'timer_screen.dart';
 import '../shrink/shrink_screen.dart';
+import '../season/season_setup_screen.dart';
 
 /// Real tasks are longer than "One DSA problem": the big type steps down to fit.
 double nowTitleSize(String title) {
@@ -65,12 +66,12 @@ class _NowScreenState extends State<NowScreen> {
 
   static String _shown(NowOption o) => o.smaller ? o.minimum.replaceAll(RegExp(r'\.$'), '') : o.title;
 
-  Future<void> _start(BuildContext context, NowOption o) async {
+  Future<void> _start(BuildContext context, NowOption o, {int? minutes}) async {
     final cubit = context.read<NowCubit>();
     final result = await Navigator.of(context).push<TimerResult>(MaterialPageRoute(
       builder: (_) => TimerScreen(
         title: _shown(o),
-        minutes: o.minutes > 0 ? o.minutes : 25,
+        minutes: minutes ?? (o.minutes > 0 ? o.minutes : 25),
         firstStep: !o.smaller && o.minimum.isNotEmpty ? o.minimum.replaceAll(RegExp(r'\.$'), '') : null,
       ),
     ));
@@ -93,10 +94,12 @@ class _NowScreenState extends State<NowScreen> {
     if (choice == DoneChoice.finishedForToday) await cubit.finishForToday();
   }
 
-  // Letting something go is never offered on a low day: that decision can wait.
+  // "What's in the way?" (decisions log #14): one optional tap, and each answer
+  // gets its own fix instead of just a later date. The reason is kept with the
+  // move so a restart can learn from it. Letting go is never offered on a low day.
   Future<void> _notNow(BuildContext context, NowState s, NowOption o) async {
     final cubit = context.read<NowCubit>();
-    final choice = await showModalBottomSheet<String>(
+    final picked = await showModalBottomSheet<({String? reason, String choice})>(
       context: context,
       backgroundColor: G.inset,
       isScrollControlled: true,
@@ -107,15 +110,69 @@ class _NowScreenState extends State<NowScreen> {
         // For a habit the server would make "weekend" permanent, which is not what this asks.
         canWeekend: o.sourceType != 'HABIT',
         canLetGo: !s.lowEnergy,
+        canShrink: !o.smaller,
       ),
     );
-    if (choice == null) return;
-    if (choice == 'SKIP') {
-      await cubit.notNow();
-    } else {
-      await cubit.moveCurrent(choice);
+    if (picked == null || !context.mounted) return;
+    switch (picked.choice) {
+      case 'CLEAR':
+        final go = await _showSteps(context, o);
+        if (go == true && context.mounted) await _start(context, o);
+      case 'SMALLER':
+        await cubit.smaller();
+      case 'FIVE':
+        await _start(context, o, minutes: 5);
+      case 'SKIP':
+        await cubit.notNow(reason: picked.reason);
+      default:
+        await cubit.moveCurrent(picked.choice, reason: picked.reason);
     }
   }
+
+  // "Not clear what to do": the first step, then the rest, so starting needs no decision.
+  Future<bool?> _showSteps(BuildContext context, NowOption o) => showModalBottomSheet<bool>(
+        context: context,
+        backgroundColor: G.inset,
+        isScrollControlled: true,
+        shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(34))),
+        builder: (sheet) {
+          final steps = <String>[
+            if (o.minimum.isNotEmpty) 'First: ${o.minimum.replaceAll(RegExp(r'\.$'), '')}',
+            ...?o.detail?.split('\n').map((l) => l.trim()).where((l) => l.isNotEmpty),
+          ];
+          return SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(22, 22, 22, 16),
+              child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                Text("Here's exactly how to start", style: G.text(28, w: FontWeight.w600, height: 1.12, letterSpacing: -0.5)),
+                const SizedBox(height: 6),
+                Text(o.title, style: G.text(17, color: G.muted, height: 1.3)),
+                const SizedBox(height: 16),
+                for (var i = 0; i < steps.length; i++)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 10),
+                    child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                      Container(
+                        width: 28,
+                        height: 28,
+                        alignment: Alignment.center,
+                        decoration: BoxDecoration(color: i == 0 ? G.accent : G.surfaceHigh, shape: BoxShape.circle),
+                        child: Text('${i + 1}', style: G.text(14, w: FontWeight.w600, color: i == 0 ? G.onInk : G.ink)),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(child: Text(steps[i], style: G.text(16, height: 1.4))),
+                    ]),
+                  ),
+                if (steps.isEmpty) Text('Open it and do the first two minutes. That is the whole first step.', style: G.text(16, height: 1.4)),
+                const SizedBox(height: 6),
+                Text('Only step 1 matters right now.', style: G.text(14, color: G.faint)),
+                const SizedBox(height: 16),
+                GPill('Start step 1', primary: true, onTap: () => Navigator.of(sheet).pop(true)),
+              ]),
+            ),
+          );
+        },
+      );
 
   @override
   Widget build(BuildContext context) {
@@ -138,8 +195,16 @@ class _NowScreenState extends State<NowScreen> {
                   const AllyOrb(),
                   const SizedBox(width: 14),
                   Expanded(
-                    child: Text(nowGreeting(now, lowEnergy: s.lowEnergy || s.sick),
-                        style: G.text(21, w: FontWeight.w500, height: 1.22)),
+                    child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
+                      Text(nowGreeting(now, lowEnergy: s.lowEnergy || s.sick),
+                          style: G.text(21, w: FontWeight.w500, height: 1.22)),
+                      // Which chapter this is ("Switch & Shape · week 2 of 10"), once a season exists.
+                      if (s.season != null)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 2),
+                          child: Text(s.season!, style: G.text(14, color: G.faint, height: 1.2)),
+                        ),
+                    ]),
                   ),
                 ]),
               ),
@@ -159,6 +224,7 @@ class _NowScreenState extends State<NowScreen> {
                             const SizedBox(height: 12),
                             if (s.fromSaved) const _SavedCopyBanner(),
                             if (picking && s.welcomeBack) const _WelcomeBack(),
+                            if (picking && s.restart != null) _RestartCard(restart: s.restart!, busy: s.busy),
                             if (picking)
                               _TaskCard(option: o, focusMessage: s.focus ? s.message : null, shown: _shown(o))
                             else if (s.sick && !loading)
@@ -250,23 +316,48 @@ class _SecondChoices extends StatelessWidget {
   }
 }
 
-class _NotNowSheet extends StatelessWidget {
+/// "What's in the way?" then "When should this come back?" (canvas board P1·D).
+/// Each reason has its own fix: not clear → the steps, too big or tired → the
+/// smaller version, didn't feel like it → just 5 minutes. No time and forgot
+/// pick a "when", and the reason travels with it. Everything is optional.
+class _NotNowSheet extends StatefulWidget {
   final String title;
   final bool isGoal;
   final bool canWeekend;
   final bool canLetGo;
-  const _NotNowSheet({required this.title, required this.isGoal, required this.canWeekend, required this.canLetGo});
+  final bool canShrink; // already the smaller version: "too big" / "tired" just pick a time
+  const _NotNowSheet({required this.title, required this.isGoal, required this.canWeekend, required this.canLetGo, required this.canShrink});
 
-  Widget _choice(BuildContext context, String label, String value) => Padding(
+  @override
+  State<_NotNowSheet> createState() => _NotNowSheetState();
+}
+
+class _NotNowSheetState extends State<_NotNowSheet> {
+  String? _reason; // chosen reason that needs a "when" (no time, forgot, or tired/too big at the smallest size)
+
+  void _pop(String choice, [String? reason]) => Navigator.of(context).pop((reason: reason ?? _reason, choice: choice));
+
+  void _tapReason(String reason) {
+    final fix = switch (reason) {
+      'not clear what to do' => 'CLEAR',
+      'too big' || 'tired' => widget.canShrink ? 'SMALLER' : null,
+      "didn't feel like it" => 'FIVE',
+      _ => null,
+    };
+    if (fix != null) return _pop(fix, reason);
+    setState(() => _reason = _reason == reason ? null : reason);
+  }
+
+  Widget _choice(String label, String value) => Padding(
         padding: const EdgeInsets.only(bottom: 10),
         child: Material(
           color: G.surfaceHigh,
           borderRadius: BorderRadius.circular(20),
           child: InkWell(
             borderRadius: BorderRadius.circular(20),
-            onTap: () => Navigator.of(context).pop(value),
+            onTap: () => _pop(value),
             child: Container(
-              constraints: const BoxConstraints(minHeight: 62),
+              constraints: const BoxConstraints(minHeight: 58),
               alignment: Alignment.centerLeft,
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
               child: Text(label, style: G.text(18, w: FontWeight.w500, height: 1.25)),
@@ -275,31 +366,58 @@ class _NotNowSheet extends StatelessWidget {
         ),
       );
 
+  static const _reasons = [
+    ('Tired', 'tired'),
+    ('No time', 'no time'),
+    ('Too big', 'too big'),
+    ('Not clear what to do', 'not clear what to do'),
+    ('Forgot', 'forgot'),
+    ("Didn't feel like it", "didn't feel like it"),
+  ];
+
   @override
   Widget build(BuildContext context) => SafeArea(
-        child: Padding(
+        child: SingleChildScrollView(
           padding: const EdgeInsets.fromLTRB(22, 14, 22, 16),
           child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
             Center(
               child: Container(
                 width: 44,
                 height: 5,
-                margin: const EdgeInsets.only(bottom: 22),
+                margin: const EdgeInsets.only(bottom: 20),
                 decoration: BoxDecoration(color: G.faint, borderRadius: BorderRadius.circular(10)),
               ),
             ),
-            Text('When should this come back?', style: G.text(32, w: FontWeight.w600, height: 1.12, letterSpacing: -0.6)),
-            const SizedBox(height: 8),
-            Text(title, maxLines: 2, overflow: TextOverflow.ellipsis, style: G.text(18, color: G.muted, height: 1.3)),
-            const SizedBox(height: 18),
-            _choice(context, 'Tomorrow', 'TOMORROW'),
-            if (canWeekend) _choice(context, 'This weekend', 'WEEKEND'),
-            _choice(context, 'Show me something else', 'SKIP'),
-            if (canLetGo)
+            Text("What's in the way?", style: G.text(30, w: FontWeight.w600, height: 1.12, letterSpacing: -0.6)),
+            const SizedBox(height: 6),
+            Text('One tap, optional. It helps me plan better.', style: G.text(16, color: G.muted, height: 1.3)),
+            const SizedBox(height: 14),
+            Wrap(spacing: 8, runSpacing: 8, children: [
+              for (final (label, value) in _reasons)
+                ChoiceChip(
+                  label: Text(label, style: G.text(15, w: _reason == value ? FontWeight.w600 : FontWeight.w400, color: _reason == value ? G.onInk : G.ink)),
+                  selected: _reason == value,
+                  showCheckmark: false,
+                  selectedColor: G.accent,
+                  backgroundColor: G.surfaceHigh,
+                  side: BorderSide.none,
+                  shape: const StadiumBorder(),
+                  onSelected: (_) => _tapReason(value),
+                ),
+            ]),
+            const SizedBox(height: 22),
+            Text('When should this come back?', style: G.text(20, w: FontWeight.w600, height: 1.2)),
+            const SizedBox(height: 4),
+            Text(widget.title, maxLines: 2, overflow: TextOverflow.ellipsis, style: G.text(16, color: G.muted, height: 1.3)),
+            const SizedBox(height: 12),
+            _choice('Tomorrow', 'TOMORROW'),
+            if (widget.canWeekend) _choice('This weekend', 'WEEKEND'),
+            _choice('Show me something else', 'SKIP'),
+            if (widget.canLetGo)
               TextButton(
-                onPressed: () => Navigator.of(context).pop('LET_GO'),
+                onPressed: () => _pop('LET_GO'),
                 style: TextButton.styleFrom(foregroundColor: G.accent, minimumSize: const Size(64, 52)),
-                child: Text(isGoal ? 'Park this goal for now' : 'Let this go',
+                child: Text(widget.isGoal ? 'Park this goal for now' : 'Let this go',
                     style: G.text(17, w: FontWeight.w500, color: G.accent, height: 1.2)),
               ),
           ]),
@@ -375,6 +493,68 @@ class _WelcomeBack extends StatelessWidget {
           Text('No catching up needed. Start with one small thing.', style: G.text(19, color: G.muted, height: 1.35)),
         ]),
       );
+}
+
+/// Back after a week or more (decisions log #14): what got in the way last
+/// time and what to change, a light week, the honest record. Everything here
+/// is offered; "Keep as is" changes nothing.
+class _RestartCard extends StatelessWidget {
+  final NowRestart restart;
+  final bool busy;
+  const _RestartCard({required this.restart, required this.busy});
+
+  Widget _button(String label, VoidCallback? onTap, {bool dark = true}) => Padding(
+        padding: const EdgeInsets.only(top: 8),
+        child: SizedBox(
+          width: double.infinity,
+          child: TextButton(
+            onPressed: busy ? null : onTap,
+            style: TextButton.styleFrom(
+              backgroundColor: dark ? G.onInk : Colors.transparent,
+              foregroundColor: dark ? G.ink : G.onInk,
+              side: dark ? null : BorderSide(color: G.onInk),
+              padding: const EdgeInsets.symmetric(vertical: 13),
+              shape: const StadiumBorder(),
+            ),
+            child: Text(label, style: G.text(16, w: FontWeight.w600, color: dark ? G.ink : G.onInk)),
+          ),
+        ),
+      );
+
+  @override
+  Widget build(BuildContext context) {
+    final cubit = context.read<NowCubit>();
+    final r = restart;
+    final switchTo = r.canLightWeek ? r.suggestBlock : null;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        if (r.insight != null || r.canLightWeek || r.resetup)
+          Container(
+            padding: const EdgeInsets.all(18),
+            decoration: BoxDecoration(color: G.accent, borderRadius: BorderRadius.circular(24)),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              if (r.resetup) ...[
+                Text('A lot may have changed', style: G.text(18, w: FontWeight.w600, color: G.onInk)),
+                const SizedBox(height: 4),
+                Text('It\'s been a while. Pick this season\'s focus again in 2 minutes?', style: G.text(15, color: G.onInk, height: 1.35)),
+                _button('Redo my season', () async {
+                  cubit.dismissRestart();
+                  await openSeasonSetup(context);
+                }),
+              ] else if (r.insight != null)
+                Text(r.insight!, style: G.text(16, color: G.onInk, height: 1.4)),
+              if (switchTo != null && !r.resetup)
+                _button(switchTo == 'MORNING' ? 'Yes, move to mornings' : 'Yes, move to evenings', () => cubit.restartPlan(lightWeek: true, switchTo: switchTo)),
+              if (r.canLightWeek && switchTo == null && !r.resetup) _button('Start with a light week', () => cubit.restartPlan(lightWeek: true)),
+              _button('Keep as is', cubit.dismissRestart, dark: false),
+            ]),
+          ),
+        if (r.record != null)
+          Padding(padding: const EdgeInsets.only(top: 10), child: Text(r.record!, style: G.text(15, color: G.muted, height: 1.35))),
+      ]),
+    );
+  }
 }
 
 /// Sick mode: one kind instruction, and nothing to tick off.

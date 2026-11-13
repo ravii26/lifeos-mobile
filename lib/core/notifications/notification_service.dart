@@ -114,7 +114,24 @@ class NotificationService {
             : null,
       );
 
-  Future<void> init() async {
+  /// Startup no longer waits for this (main.dart runs it after `runApp`), so
+  /// anything that schedules early waits here instead of being skipped.
+  Future<void>? _starting;
+
+  Future<void> init() => _starting ??= _init();
+
+  /// True once the plugin is set up; waits for a start that is still running.
+  Future<bool> _whenReady() async {
+    if (_ready) return true;
+    final starting = _starting;
+    if (starting == null) return false;
+    try {
+      await starting.timeout(const Duration(seconds: 10));
+    } catch (_) {}
+    return _ready;
+  }
+
+  Future<void> _init() async {
     if (_ready || kIsWeb) return;
     tz.initializeTimeZones();
     // Anchor tz.local to the device zone so daily reminders fire at the user's
@@ -145,7 +162,7 @@ class NotificationService {
 
   /// Every scheduled notification goes (signing out: the next account starts clean).
   Future<void> cancelAll() async {
-    if (!_ready || kIsWeb) return;
+    if (kIsWeb || !await _whenReady()) return;
     await _plugin.cancelAll();
   }
 
@@ -179,14 +196,14 @@ class NotificationService {
 
   /// How many reminder notifications are waiting on this phone right now.
   Future<int> pendingReminderCount() async {
-    if (!_ready || kIsWeb) return 0;
+    if (kIsWeb || !await _whenReady()) return 0;
     return (await _plugin.pendingNotificationRequests()).where((p) => (p.id & 0x40000000) != 0).length;
   }
 
   /// "Send me a test reminder": one notification a minute from now, scheduled
   /// exactly like a real reminder, so the person can see reminders work.
   Future<DateTime?> sendTestReminder() async {
-    if (!_ready || kIsWeb) return null;
+    if (kIsWeb || !await _whenReady()) return null;
     await refreshExactMode();
     final at = DateTime.now().add(const Duration(minutes: 1));
     await _schedule(testId, 'Test reminder', 'Reminders are working. This one was set a minute ago.', at);
@@ -194,7 +211,7 @@ class NotificationService {
   }
 
   Future<void> requestPermission() async {
-    if (!_ready) return;
+    if (!await _whenReady()) return;
     await _plugin
         .resolvePlatformSpecificImplementation<
             AndroidFlutterLocalNotificationsPlugin>()
@@ -208,7 +225,7 @@ class NotificationService {
   /// Re-syncs all habit reminders: cancels existing ones and reschedules from
   /// the current habit list. Never touches the nightly nudge.
   Future<void> syncHabitReminders(List<Habit> habits) async {
-    if (!_ready || kIsWeb) return;
+    if (kIsWeb || !await _whenReady()) return;
     for (final p in await _plugin.pendingNotificationRequests()) {
       final isReminder = (p.id & 0x40000000) != 0;
       if (p.id != nightlyId && p.id != morningId && p.id != prepId && p.id != testId && !isAgendaId(p.id) && !isReminder) await _plugin.cancel(p.id);
@@ -347,7 +364,7 @@ class NotificationService {
   /// reminder goes through [syncReminders], which schedules its next times
   /// whether or not the last one was ticked.
   Future<void> scheduleReminder(String id, String text, DateTime at, {DateTime? windowEnd, List<DateTime> later = const []}) async {
-    if (!_ready || kIsWeb) return;
+    if (kIsWeb || !await _whenReady()) return;
     final now = DateTime.now();
     if (at.isAfter(now)) {
       await _schedule(_reminderNotifId(id), 'Reminder', text, at,
@@ -386,7 +403,7 @@ class NotificationService {
   /// (same id → same notification) and cancels ones that no longer exist
   /// (done, undone, or deleted on another device).
   Future<void> syncReminders(List<Reminder> reminders) async {
-    if (!_ready || kIsWeb) return;
+    if (kIsWeb || !await _whenReady()) return;
     await refreshExactMode();
     // With many reminders, fewer upcoming times each, to stay under the alarm limit.
     final times = reminders.isEmpty ? 7 : (_maxReminderAlarms ~/ reminders.length).clamp(1, 7);
@@ -435,7 +452,7 @@ class NotificationService {
   Future<void> scheduleNightly(Tonight tonight) async {
     // Replaced by the agenda's briefing and wrap-up (ADR 0027): the person's
     // nightly time is now the wrap-up time. Old nudges are cleared.
-    if (!_ready || kIsWeb) return;
+    if (kIsWeb || !await _whenReady()) return;
     await _plugin.cancel(nightlyId);
     await _plugin.cancel(morningId);
   }
@@ -446,7 +463,7 @@ class NotificationService {
   /// last one). Works offline once fetched; refreshed on open, after changes,
   /// and hourly in the background.
   Future<void> syncAgenda(Map<String, dynamic> agenda) async {
-    if (!_ready || kIsWeb) return;
+    if (kIsWeb || !await _whenReady()) return;
     await _writePref(_prefsLevel, agenda['level']?.toString() ?? 'NORMAL');
     for (var i = 0; i < _agendaSlots; i++) {
       await _plugin.cancel(agendaBase + i);
@@ -498,7 +515,7 @@ class NotificationService {
 
   /// The app was opened by tapping a notification: its kind, once.
   Future<String?> launchKind() async {
-    if (!_ready || kIsWeb) return null;
+    if (kIsWeb || !await _whenReady()) return null;
     final d = await _plugin.getNotificationAppLaunchDetails();
     if (d?.didNotificationLaunchApp != true) return null;
     return _kindOf(d!.notificationResponse?.payload);

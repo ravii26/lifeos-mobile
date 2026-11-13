@@ -12,6 +12,7 @@ class _FakeRepo implements LifeRepository {
   bool offlineAnswers = false;
   bool serverDown = false;
   int loads = 0;
+  String? lastReason;
 
   Map<String, dynamic> pick(List<String> titles) => {
         'kind': 'PICK',
@@ -23,6 +24,8 @@ class _FakeRepo implements LifeRepository {
         ],
       };
 
+  @override
+  Future<Map<String, dynamic>?> nowSaved({bool smallest = false}) async => null;
   @override
   Future<Map<String, dynamic>> now({bool smallest = false, int? minutes}) async {
     loads++;
@@ -42,7 +45,8 @@ class _FakeRepo implements LifeRepository {
   }
 
   @override
-  Future<String?> respondNow(String sourceType, String sourceId, String action, {int? minutes, int? count}) async {
+  Future<String?> respondNow(String sourceType, String sourceId, String action, {int? minutes, int? count, String? reason}) async {
+    lastReason = reason;
     calls.add('respond($sourceId,$action)');
     if (offlineAnswers) throw QueuedOfflineException();
     return 'undo-$action';
@@ -86,6 +90,14 @@ void main() {
     expect(repo.calls, contains('respond(id-A,SKIP)'));
     expect(cubit.state.current?.title, 'B');
     expect(repo.loads, loadsBefore);
+  });
+
+  test('Not now carries what got in the way, so a restart can learn from it', () async {
+    await cubit.load();
+    await cubit.notNow(reason: 'no time');
+    expect(repo.lastReason, 'no time');
+    await cubit.notNow();
+    expect(repo.lastReason, isNull);
   });
 
   test('Not now on the last option asks the server for a fresh answer', () async {

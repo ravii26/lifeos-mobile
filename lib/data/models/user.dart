@@ -17,6 +17,11 @@ class AppUser {
   String get firstName => name.trim().split(' ').first;
   String get initial => name.trim().isEmpty ? '?' : name.trim()[0].toUpperCase();
 
+  /// Kept on the phone so the app can open signed in without waiting for the server.
+  Json toJson() => {'id': id, 'email': email, 'name': name, if (timezone != null) 'timezone': timezone};
+
+  bool sameAs(AppUser o) => id == o.id && email == o.email && name == o.name && timezone == o.timezone;
+
   factory AppUser.fromJson(Json j) => AppUser(
         id: asString(j['id']),
         email: asString(j['email']),

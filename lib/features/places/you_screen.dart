@@ -22,6 +22,13 @@ import '../more/where_you_stand_screen.dart';
 import '../shell/life_cubit.dart';
 import '../shrink/parked_screen.dart';
 import '../shrink/shrink_screen.dart';
+import '../season/season_setup_screen.dart';
+import '../sleep/sleep_setup_screen.dart';
+import '../weekplan/fitness_setup_screen.dart';
+import '../weekplan/checkin_screen.dart';
+import '../../data/models/fitness_plan.dart';
+import '../../data/models/season.dart';
+import '../../data/models/sleep_plan.dart';
 import 'life_notes_screen.dart';
 import 'notes_screen.dart';
 import 'now_cubit.dart';
@@ -66,12 +73,116 @@ class _YouScreenState extends State<YouScreen> {
   String _level = 'NORMAL';
   String? _error;
   bool _loaded = false; // the first load has come back, so an empty life is really empty
+  SeasonData? _season; // null while loading or if it failed: the card simply waits
+  SleepPlan? _sleep;
+  bool _sleepLoaded = false; // the sleep card only shows once we know whether a plan exists
+  RunningPlan? _fitness;
+  bool _fitnessLoaded = false;
+
+  bool get _checkinDue {
+    final wd = DateTime.now().weekday; // Mon = 1 … Sun = 7
+    return (wd == DateTime.saturday || wd == DateTime.sunday || wd == DateTime.monday) && (_fitness != null || (_sleep != null && !_sleep!.done));
+  }
+
+  Future<void> _loadFitness() async {
+    try {
+      final p = await _repo.fitnessPlanRunning();
+      if (mounted) {
+        setState(() {
+          _fitness = p;
+          _fitnessLoaded = true;
+        });
+      }
+    } catch (_) {
+      // Optional card.
+    }
+  }
+
+  Future<void> _openFitness() async {
+    final undoId = await openFitnessSetup(context);
+    if (!mounted || undoId == null) return;
+    placesRefresh.value++;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: const Text('Fitness plan started. Today\'s piece shows on Now.'),
+      action: undoId.isEmpty ? null : SnackBarAction(label: 'Undo', onPressed: () async {
+        await _repo.undo(undoId);
+        placesRefresh.value++;
+      }),
+    ));
+  }
 
   @override
   void initState() {
     super.initState();
     placesRefresh.addListener(_load);
     _load();
+  }
+
+  // Separate from _load so a season problem never hides the rest of My life.
+  Future<void> _loadSeason() async {
+    try {
+      final s = await _repo.season();
+      if (mounted) setState(() => _season = s);
+    } catch (_) {
+      // Optional card: any failure (offline, an older server without /season) just leaves it out.
+    }
+  }
+
+  Future<void> _loadSleep() async {
+    try {
+      final p = await _repo.sleepPlan();
+      if (mounted) {
+        setState(() {
+          _sleep = p;
+          _sleepLoaded = true;
+        });
+      }
+    } catch (_) {
+      // Optional card, like the season one.
+    }
+  }
+
+  Future<void> _openSleep() async {
+    final undoId = await openSleepSetup(context);
+    if (!mounted || undoId == null) return;
+    placesRefresh.value++;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: const Text('Sleep plan started. Your day now uses this week\'s wake time.'),
+      action: undoId.isEmpty ? null : SnackBarAction(label: 'Undo', onPressed: () async {
+        await _repo.undo(undoId);
+        placesRefresh.value++;
+      }),
+    ));
+  }
+
+  Future<void> _sleepCheckin(int days) async {
+    try {
+      final r = await _repo.sleepCheckin(days);
+      if (!mounted) return;
+      setState(() => _sleep = r.plan);
+      placesRefresh.value++;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(r.message)));
+    } on ApiException catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+    }
+  }
+
+  Future<void> _openSeason() async {
+    final undoId = await openSeasonSetup(context);
+    if (!mounted || undoId == null) return;
+    placesRefresh.value++;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: const Text('Season started. Now shows only what matters this season.'),
+      action: undoId.isEmpty
+          ? null
+          : SnackBarAction(
+              label: 'Undo',
+              onPressed: () async {
+                await _repo.undo(undoId);
+                placesRefresh.value++;
+              },
+            ),
+    ));
   }
 
   @override
@@ -81,6 +192,9 @@ class _YouScreenState extends State<YouScreen> {
   }
 
   Future<void> _load() async {
+    _loadSeason();
+    _loadSleep();
+    _loadFitness();
     try {
       final results = await Future.wait([
         _repo.progress(),
@@ -280,6 +394,37 @@ class _YouScreenState extends State<YouScreen> {
                   padding: const EdgeInsets.only(top: 8),
                   child: Text(_error!, style: G.text(16, color: G.muted, height: 1.3)),
                 ),
+              if (_season != null) ...[
+                const SizedBox(height: 18),
+                _SeasonCard(data: _season!, onOpen: _openSeason),
+              ],
+              // The Sunday check-in: offered Saturday to Monday when there is a plan to check in on.
+              if (_checkinDue) ...[
+                const SizedBox(height: 10),
+                _PlanRow(
+                  title: 'Sunday check-in',
+                  subtitle: 'About two minutes. Next week adjusts itself.',
+                  onTap: () async {
+                    await openCheckin(context);
+                    placesRefresh.value++;
+                  },
+                ),
+              ],
+              if (_sleepLoaded) ...[
+                const SizedBox(height: 10),
+                _SleepCard(plan: _sleep, onOpen: _openSleep, onCheckin: _sleepCheckin),
+              ],
+              if (_fitnessLoaded) ...[
+                const SizedBox(height: 10),
+                _PlanRow(
+                  title: _fitness == null ? 'Make my fitness plan' : 'Fitness plan',
+                  subtitle: _fitness == null
+                      ? 'Five questions, then Ally runs a simple weekly plan with you.'
+                      : '${_fitness!.title} · week ${_fitness!.week} of ${_fitness!.weeks}',
+                  // The plan runs as habits, so a running plan opens them (with their days and smallest versions).
+                  onTap: _fitness == null ? _openFitness : () => _push(HabitsScreen(onOpenMore: () {}), title: 'Habits'),
+                ),
+              ],
               const SizedBox(height: 18),
               Container(
                 padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
@@ -440,3 +585,177 @@ String tierName(String tier) => switch (tier) {
       'LATER' => 'Later',
       _ => tier,
     };
+
+/// The current season at the top of My life (decisions log #7): which chapter
+/// this is, what has the focus, what is kept going, what waits. Before the
+/// first season it offers to set one up.
+class _SeasonCard extends StatelessWidget {
+  final SeasonData data;
+  final VoidCallback onOpen;
+  const _SeasonCard({required this.data, required this.onOpen});
+
+  // The example uses one of this person's own areas that isn't in focus yet.
+  String get _hint {
+    final other = [...data.keepGoing, ...data.background, ...data.parked];
+    if (other.isEmpty) return 'Tap to change.';
+    final name = other.first.name.split(RegExp(r'[:(]')).first.trim();
+    return 'Tap to change. Or say "make $name my focus" in Talk.';
+  }
+
+  Widget _line(String label, List<SeasonPlaceItem> items, {Color? color}) => Padding(
+        padding: const EdgeInsets.only(top: 8),
+        child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          SizedBox(width: 92, child: Text(label, style: G.text(14, color: color ?? G.muted, height: 1.35))),
+          Expanded(child: Text(items.map((i) => i.name).join(' · '), style: G.text(15, color: color ?? G.ink, height: 1.35))),
+        ]),
+      );
+
+  @override
+  Widget build(BuildContext context) {
+    final s = data.season;
+    if (s == null) {
+      return Container(
+        padding: const EdgeInsets.fromLTRB(18, 16, 18, 16),
+        decoration: BoxDecoration(color: G.accent, borderRadius: BorderRadius.circular(24)),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text('Too much at once?', style: G.text(22, w: FontWeight.w600, color: G.onInk, height: 1.15)),
+          const SizedBox(height: 6),
+          Text("Pick this season's 2 focus areas. Everything else waits, safely saved.", style: G.text(16, color: G.onInk, height: 1.35)),
+          const SizedBox(height: 14),
+          SizedBox(
+            width: double.infinity,
+            child: TextButton(
+              onPressed: onOpen,
+              style: TextButton.styleFrom(backgroundColor: G.onInk, foregroundColor: G.ink, padding: const EdgeInsets.symmetric(vertical: 14), shape: const StadiumBorder()),
+              child: Text('Set up a season', style: G.text(17, w: FontWeight.w600)),
+            ),
+          ),
+        ]),
+      );
+    }
+    return Material(
+      color: G.card,
+      borderRadius: BorderRadius.circular(24),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(24),
+        onTap: onOpen,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(18, 16, 18, 16),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Row(children: [
+              Expanded(child: Text(s.title, style: G.text(21, w: FontWeight.w600, height: 1.15))),
+              Text(s.over ? 'time to review' : 'week ${s.week} of ${s.weeks}', style: G.text(14, color: s.over ? G.accent : G.muted)),
+            ]),
+            if ((s.endEvent ?? '').isNotEmpty)
+              Padding(padding: const EdgeInsets.only(top: 2), child: Text('Ends ${s.endEvent}, or after ${s.weeks} weeks', style: G.text(13, color: G.faint))),
+            if (data.focus.isNotEmpty) _line('Focus', data.focus, color: G.accent),
+            if (data.keepGoing.isNotEmpty) _line('Keep going', data.keepGoing),
+            if (data.parked.isNotEmpty) _line('Parked', data.parked, color: G.faint),
+            const SizedBox(height: 10),
+            Text(_hint, style: G.text(13, color: G.faint)),
+          ]),
+        ),
+      ),
+    );
+  }
+}
+
+/// The sleep fix in My life: this week's times, and once a week "how many days
+/// did you wake on time?" which moves the plan on at 5 of 7 (decisions log #13).
+class _SleepCard extends StatelessWidget {
+  final SleepPlan? plan;
+  final VoidCallback onOpen;
+  final Future<void> Function(int days) onCheckin;
+  const _SleepCard({required this.plan, required this.onOpen, required this.onCheckin});
+
+  @override
+  Widget build(BuildContext context) {
+    final p = plan;
+    if (p == null) {
+      return Material(
+        color: G.card,
+        borderRadius: BorderRadius.circular(22),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(22),
+          onTap: onOpen,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(18, 14, 14, 14),
+            child: Row(children: [
+              Expanded(
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Text('Fix my sleep', style: G.text(18, w: FontWeight.w600, height: 1.2)),
+                  const SizedBox(height: 2),
+                  Text('A fixed wake time first. One jump, then a little each week.', style: G.text(14, color: G.muted, height: 1.3)),
+                ]),
+              ),
+              Icon(Icons.chevron_right_rounded, color: G.faint),
+            ]),
+          ),
+        ),
+      );
+    }
+    final s = p.current;
+    // Asked once the week is up; until then the card just shows the times.
+    final due = !p.done && p.stepAt != null && DateTime.now().difference(p.stepAt!).inDays >= 6;
+    return Container(
+      padding: const EdgeInsets.fromLTRB(18, 14, 18, 14),
+      decoration: BoxDecoration(color: G.card, borderRadius: BorderRadius.circular(22)),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(children: [
+          Expanded(child: Text('Sleep', style: G.text(18, w: FontWeight.w600, height: 1.2))),
+          Text(p.done ? 'on target' : 'week ${p.step} of ${p.steps.length}', style: G.text(14, color: G.muted)),
+        ]),
+        const SizedBox(height: 4),
+        Text('Sleep ${clockLabel(s.sleep)} · wake ${clockLabel(s.wake)}', style: G.text(16, color: G.accent, height: 1.3)),
+        if (due) ...[
+          const SizedBox(height: 12),
+          Text('How many days did you wake by ${clockLabel(s.wake)} this week?', style: G.text(15, height: 1.3)),
+          const SizedBox(height: 8),
+          Wrap(spacing: 6, runSpacing: 6, children: [
+            for (var d = 0; d <= 7; d++)
+              SizedBox(
+                width: 40,
+                height: 40,
+                child: TextButton(
+                  onPressed: () => onCheckin(d),
+                  style: TextButton.styleFrom(backgroundColor: G.surfaceHigh, foregroundColor: G.ink, padding: EdgeInsets.zero, shape: const CircleBorder()),
+                  child: Text('$d', style: G.text(15, w: FontWeight.w600)),
+                ),
+              ),
+          ]),
+        ],
+      ]),
+    );
+  }
+}
+
+/// One plan Ally runs (fitness for now): start it, or see where it stands.
+class _PlanRow extends StatelessWidget {
+  final String title;
+  final String subtitle;
+  final VoidCallback onTap;
+  const _PlanRow({required this.title, required this.subtitle, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) => Material(
+        color: G.card,
+        borderRadius: BorderRadius.circular(22),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(22),
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(18, 14, 14, 14),
+            child: Row(children: [
+              Expanded(
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Text(title, style: G.text(18, w: FontWeight.w600, height: 1.2)),
+                  const SizedBox(height: 2),
+                  Text(subtitle, style: G.text(14, color: G.muted, height: 1.3)),
+                ]),
+              ),
+              Icon(Icons.chevron_right_rounded, color: G.faint),
+            ]),
+          ),
+        ),
+      );
+}

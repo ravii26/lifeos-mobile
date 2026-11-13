@@ -21,6 +21,7 @@ class LocalData {
     'guide_nightly_time',
     'guide_morning_time',
     'ally_paused',
+    'cached_user_v1', // AuthRepository.cachedUserKey: lets launch skip the server wait
   ];
 
   /// Removes all of it. Used on sign-out.

@@ -14,6 +14,8 @@ class _FakeRepo implements LifeRepository {
   Map<String, dynamic> next = {};
 
   @override
+  Future<Map<String, dynamic>?> nowSaved({bool smallest = false}) async => null;
+  @override
   Future<Map<String, dynamic>> now({bool smallest = false, int? minutes}) async {
     calls.add('now');
     return next;

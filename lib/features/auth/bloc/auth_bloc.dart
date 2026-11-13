@@ -27,6 +27,16 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
         emit(state.copyWith(status: AuthStatus.unauthenticated));
         return;
       }
+      // Open straight away as the account this phone last used; the server
+      // check runs behind it. Offline reads are cached, so Now has content even
+      // while a sleeping server wakes up (or with no internet at all).
+      final cached = await _repo.cachedUser();
+      if (cached != null) {
+        await LocalData.claimFor(cached.id);
+        emit(state.copyWith(status: AuthStatus.authenticated, user: cached));
+        await _confirmInBackground(cached, emit);
+        return;
+      }
       final user = await _repo.me();
       await LocalData.claimFor(user.id);
       emit(state.copyWith(status: AuthStatus.authenticated, user: user));
@@ -42,6 +52,25 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     } catch (e) {
       // Anything else must still end in a screen with a way forward, never an endless spinner.
       emit(state.copyWith(status: AuthStatus.unknown, error: 'Something went wrong while starting. ($e)'));
+    }
+  }
+
+  /// Checks the cached session with the server after the app is already open.
+  /// Only a 401 signs out; a slow or missing network keeps the person in.
+  Future<void> _confirmInBackground(AppUser cached, Emitter<AuthState> emit) async {
+    try {
+      final user = await _repo.me();
+      if (state.status != AuthStatus.authenticated) return; // signed out meanwhile
+      if (user.id != cached.id) await LocalData.claimFor(user.id);
+      if (!user.sameAs(cached)) emit(state.copyWith(status: AuthStatus.authenticated, user: user));
+    } on ApiException catch (e) {
+      if (e.isUnauthorized && state.status == AuthStatus.authenticated) {
+        await _repo.logout();
+        await LocalData.wipe();
+        emit(const AuthState(status: AuthStatus.unauthenticated));
+      }
+    } catch (_) {
+      // Stay open on the cached account; the next request retries naturally.
     }
   }
 

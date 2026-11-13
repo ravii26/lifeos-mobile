@@ -1,4 +1,7 @@
+import 'dart:convert';
+
 import 'package:flutter_timezone/flutter_timezone.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../core/api/api_client.dart';
 import '../../core/api/token_store.dart';
@@ -47,7 +50,33 @@ class AuthRepository {
 
   Future<AppUser> me() async {
     final data = await _api.get('/auth/me');
-    return AppUser.fromJson(data as Json);
+    final user = AppUser.fromJson(data as Json);
+    await _remember(user);
+    return user;
+  }
+
+  /// The account this phone last opened, so launch never waits on the server
+  /// (a sleeping Render instance can take a minute). Null if never saved or
+  /// unreadable; then the app checks with the server as before.
+  Future<AppUser?> cachedUser() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final raw = prefs.getString(cachedUserKey);
+      if (raw == null) return null;
+      final user = AppUser.fromJson(jsonDecode(raw) as Json);
+      return user.id.isEmpty ? null : user;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  static const cachedUserKey = 'cached_user_v1';
+
+  Future<void> _remember(AppUser user) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(cachedUserKey, jsonEncode(user.toJson()));
+    } catch (_) {}
   }
 
   Future<bool> hasSession() async => (await _tokens.read())?.isNotEmpty ?? false;
@@ -57,6 +86,8 @@ class AuthRepository {
   Future<AppUser> _persist(dynamic data) async {
     final map = data as Json;
     await _tokens.write(asString(map['token']));
-    return AppUser.fromJson(map['user'] as Json);
+    final user = AppUser.fromJson(map['user'] as Json);
+    await _remember(user);
+    return user;
   }
 }

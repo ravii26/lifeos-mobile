@@ -19,6 +19,9 @@ import '../models/json.dart';
 import '../models/note.dart';
 import '../models/notebook.dart';
 import '../models/onboarding.dart';
+import '../models/season.dart';
+import '../models/sleep_plan.dart';
+import '../models/fitness_plan.dart';
 import '../models/project.dart';
 import '../models/resource.dart';
 import '../models/topic.dart';
@@ -39,6 +42,77 @@ class LifeRepository {
   final ActiveFocusStore _focusStore;
   LifeRepository(this._api, [ActiveFocusStore? focusStore])
       : _focusStore = focusStore ?? ActiveFocusStore();
+
+  // ---- Seasons (build plan Phase 1) ----
+
+  /// The current chapter, where every area sits, and the week's load.
+  Future<SeasonData> season() async => SeasonData.fromJson((await _api.get('/season')) as Json);
+
+  /// Starts a season: up to 2 in focus, up to 3 kept going, the rest parked
+  /// (with an optional return date) or in the background. Returns the Undo id.
+  Future<({SeasonData data, String? activityId})> startSeason({
+    String? name,
+    DateTime? endsAt,
+    String? endEvent,
+    required List<String> focusIds,
+    List<String> keepGoingIds = const [],
+    List<({String areaId, DateTime? until})> parked = const [],
+  }) async {
+    final data = (await _api.post('/season', body: {
+      'name': ?name,
+      if (endsAt != null) 'endsAt': endsAt.toIso8601String(),
+      'endEvent': ?endEvent,
+      'focusIds': focusIds,
+      'keepGoingIds': keepGoingIds,
+      'parked': [
+        for (final p in parked) {'areaId': p.areaId, if (p.until != null) 'until': p.until!.toIso8601String()},
+      ],
+    })) as Json;
+    return (data: SeasonData.fromJson(data), activityId: asStringOrNull(data['activityId']));
+  }
+
+  // ---- Sleep plan (Phase 1, decisions log #13) ----
+
+  Future<SleepPlan?> sleepPlan() async => SleepPlan.fromJson(((await _api.get('/sleep')) as Json)['plan']);
+
+  /// Starts the plan; week 1's wake and bedtime go into the day at once.
+  /// [note] is the once-only "most adults need 7 hours" line when under 7.
+  Future<({SleepPlan? plan, String? note, String? activityId})> startSleepPlan({
+    required String nowWake,
+    required String targetWake,
+    required int hours,
+  }) async {
+    final d = (await _api.post('/sleep', body: {'nowWake': nowWake, 'targetWake': targetWake, 'hours': hours})) as Json;
+    return (plan: SleepPlan.fromJson(d['plan']), note: asStringOrNull(d['note']), activityId: asStringOrNull(d['activityId']));
+  }
+
+  /// "How many days did you wake on time?" Moves on at 5 of 7.
+  Future<({SleepPlan? plan, String message, bool moved, String? activityId})> sleepCheckin(int daysOnTime) async {
+    final d = (await _api.post('/sleep/checkin', body: {'daysOnTime': daysOnTime})) as Json;
+    return (plan: SleepPlan.fromJson(d['plan']), message: asString(d['message']), moved: asBool(d['moved']), activityId: asStringOrNull(d['activityId']));
+  }
+
+  // ---- Weekly plans Ally runs (Phase 1, decisions log #1) ----
+
+  /// The running fitness plan, or null.
+  Future<RunningPlan?> fitnessPlanRunning() async => RunningPlan.fromJson(((await _api.get('/weekplan')) as Json)['fitness']);
+
+  /// The plan these answers make; nothing is saved.
+  Future<FitnessPlan> previewFitnessPlan(FitnessAnswers a) async =>
+      FitnessPlan.fromJson((await _api.post('/weekplan/fitness/preview', body: a.toJson())) as Json);
+
+  /// Saves it as a goal, two habits and a rules note. Returns the Undo id.
+  Future<String?> startFitnessPlan(FitnessAnswers a) async =>
+      asStringOrNull(((await _api.post('/weekplan/fitness', body: a.toJson())) as Json)['activityId']);
+
+  /// The Sunday check-in preview (null = no fitness plan). Nothing changes.
+  Future<CheckinPreview?> checkinPreview() async => CheckinPreview.fromJson(((await _api.get('/weekplan/checkin')) as Json)['fitness']);
+
+  /// Applies next week and logs the weigh-in. Returns the Undo id and the weight line.
+  Future<({CheckinPreview? result, String? weightLine, String? activityId})> applyCheckin({double? weightKg}) async {
+    final d = (await _api.post('/weekplan/checkin', body: {'weightKg': ?weightKg})) as Json;
+    return (result: CheckinPreview.fromJson(d['fitness']), weightLine: asStringOrNull(d['weightLine']), activityId: asStringOrNull(d['activityId']));
+  }
 
   // ---- Areas ----
   Future<List<Area>> areas() async {
@@ -1012,13 +1086,26 @@ class LifeRepository {
     return data as Map<String, dynamic>;
   }
 
+  /// The last Now this phone kept, if it is from today and under 3 hours old.
+  /// Shown at once on launch while the server answers (a sleeping server can
+  /// take a minute); older copies could suggest something already done.
+  Future<Map<String, dynamic>?> nowSaved({bool smallest = false}) async {
+    final c = await _api.offline.readCached('/now', smallest ? {'smallest': 'true'} : null);
+    if (c == null || c.data is! Map<String, dynamic>) return null;
+    final now = DateTime.now(), at = c.at.toLocal();
+    final sameDay = at.year == now.year && at.month == now.month && at.day == now.day;
+    if (!sameDay || now.difference(at) > const Duration(hours: 3)) return null;
+    return c.data as Map<String, dynamic>;
+  }
+
   /// Done / Smaller (MINIMUM) / Not now (SKIP) on the Now card. Queues offline. Returns the Undo id.
   /// [minutes] / [count]: what a weekly-target session (sourceType PROJECT) added up to.
-  Future<String?> respondNow(String sourceType, String sourceId, String action, {int? minutes, int? count}) async {
+  Future<String?> respondNow(String sourceType, String sourceId, String action, {int? minutes, int? count, String? reason}) async {
     final data = await _api.post('/now/respond', queueOffline: true, body: {
       'sourceType': sourceType,
       'sourceId': sourceId,
       'action': action,
+      if (reason != null && reason.isNotEmpty) 'reason': reason,
       if (minutes != null && minutes > 0) 'minutes': minutes,
       if (count != null && count > 0) 'count': count,
     });
@@ -1026,8 +1113,18 @@ class LifeRepository {
   }
 
   /// One of the advice buttons on Now (SMALLER / TOMORROW / WEEKEND / LET_GO).
-  Future<Json> nowAdvice(String sourceType, String sourceId, String choice) async =>
-      (await _api.post('/now/advice', body: {'sourceType': sourceType, 'sourceId': sourceId, 'choice': choice})) as Json;
+  Future<Json> nowAdvice(String sourceType, String sourceId, String choice, {String? reason}) async => (await _api.post('/now/advice', body: {
+        'sourceType': sourceType,
+        'sourceId': sourceId,
+        'choice': choice,
+        if (reason != null && reason.isNotEmpty) 'reason': reason,
+      })) as Json;
+
+  /// After a gap: a light week for the plan and/or sessions moved to [switchTo] (MORNING | EVENING).
+  Future<({String message, String? activityId})> restartPlan({bool lightWeek = false, String? switchTo}) async {
+    final d = (await _api.post('/now/restart', body: {'lightWeek': lightWeek, 'switchTo': ?switchTo})) as Json;
+    return (message: asString(d['message']), activityId: asStringOrNull(d['activityId']));
+  }
 
   /// True when the last read came from the phone's saved copy, because the server can't be reached.
   bool get showingSaved => _api.servingFromCache;

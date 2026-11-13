@@ -26,7 +26,8 @@ class NowOption extends Equatable {
   final String minimum;
   final String why;
   final int? count; // a counted session: "apply to 2 jobs"
-  const NowOption(this.sourceType, this.sourceId, this.title, this.minutes, this.smaller, this.minimum, this.why, [this.count]);
+  final String? detail; // the steps (a plan session's exercises), for "Not clear what to do"
+  const NowOption(this.sourceType, this.sourceId, this.title, this.minutes, this.smaller, this.minimum, this.why, [this.count, this.detail]);
 
   factory NowOption.fromJson(Json j) => NowOption(
         asString(j['sourceType'], 'TASK'),
@@ -37,10 +38,42 @@ class NowOption extends Equatable {
         asString(j['minimum']),
         asString(j['why']),
         j['count'] == null ? null : asInt(j['count']),
+        asStringOrNull(j['detail']),
       );
 
   @override
   List<Object?> get props => [sourceType, sourceId, title, minutes, smaller, count];
+}
+
+/// Coming back after a week or more (decisions log #14): what got in the way
+/// last time, the honest record, and what can be offered (a light week,
+/// moving sessions to the time of day that didn't keep failing, a re-setup).
+class NowRestart extends Equatable {
+  final String level; // WEEK | LONG | VERY_LONG
+  final int gapDays;
+  final String? insight;
+  final String? suggestBlock; // MORNING | EVENING
+  final String? record;
+  final bool canLightWeek;
+  final bool resetup;
+  const NowRestart(this.level, this.gapDays, this.insight, this.suggestBlock, this.record, this.canLightWeek, this.resetup);
+
+  static NowRestart? fromJson(Object? v) {
+    if (v is! Json) return null;
+    final i = v['insight'];
+    return NowRestart(
+      asString(v['level']),
+      asInt(v['gapDays']),
+      i is Json ? asStringOrNull(i['line']) : null,
+      i is Json ? asStringOrNull(i['suggestBlock']) : null,
+      asStringOrNull(v['record']),
+      asBool(v['canLightWeek']),
+      asBool(v['resetup']),
+    );
+  }
+
+  @override
+  List<Object?> get props => [level, gapDays, insight, suggestBlock, record, canLightWeek, resetup];
 }
 
 /// The brain's honest "not now" / "better way" (plan 16, Layer 4).
@@ -88,6 +121,8 @@ class NowState extends Equatable {
   final bool welcomeBack; // back after a gap: no catching up asked for
   final bool sick; // sick mode: nothing is asked of them today
   final bool fromSaved; // no connection: this is the last card the phone kept
+  final String? season; // "Switch & Shape · week 2 of 10"; null before the first season
+  final NowRestart? restart; // set after a week or more away
 
   const NowState({
     this.status = NowStatus.loading,
@@ -108,6 +143,8 @@ class NowState extends Equatable {
     this.welcomeBack = false,
     this.sick = false,
     this.fromSaved = false,
+    this.season,
+    this.restart,
   });
 
   NowOption? get current => index < options.length ? options[index] : null;
@@ -128,6 +165,8 @@ class NowState extends Equatable {
     bool clearAdvice = false,
     bool? lowEnergy,
     NowExtras? extras,
+    bool? fromSaved,
+    bool clearRestart = false,
   }) =>
       NowState(
         status: status ?? this.status,
@@ -147,11 +186,13 @@ class NowState extends Equatable {
         restedToday: restedToday,
         welcomeBack: welcomeBack,
         sick: sick,
-        fromSaved: fromSaved,
+        fromSaved: fromSaved ?? this.fromSaved,
+        season: season,
+        restart: clearRestart ? null : restart,
       );
 
   @override
-  List<Object?> get props => [status, kind, message, options, index, busy, error, note, undoId, prep, advice, focus, lowEnergy, extras, restedToday, welcomeBack, sick, fromSaved];
+  List<Object?> get props => [status, kind, message, options, index, busy, error, note, undoId, prep, advice, focus, lowEnergy, extras, restedToday, welcomeBack, sick, fromSaved, season, restart];
 }
 
 /// The card on Now: the right thing for right now, with Done / Smaller / Not now.
@@ -208,12 +249,34 @@ class NowCubit extends Cubit<NowState> {
       emit(NowState(status: NowStatus.ready, kind: 'REST', undoId: state.undoId, restedToday: true, extras: state.extras));
       return;
     }
-    if (state.options.isEmpty) emit(state.copyWith(status: NowStatus.loading));
+    var showingEarly = false;
+    if (state.options.isEmpty) {
+      // A recent copy (today, under 3 h) shows at once, so the first open never
+      // waits on a waking server. The live answer replaces it a moment later.
+      final saved = minutes == null ? await _repo.nowSaved(smallest: smallest || _lowToday) : null;
+      if (saved != null) {
+        emit(_stateFrom(saved, fromSaved: false));
+        showingEarly = true;
+      } else {
+        emit(state.copyWith(status: NowStatus.loading));
+      }
+    }
     try {
       final data = await _repo.now(smallest: smallest || _lowToday, minutes: minutes);
       // The home-screen widget shows the same pick (best effort, never blocks Now).
       WidgetSyncService.instance?.pushNow(data).catchError((_) {});
-      emit(NowState(
+      emit(_stateFrom(data, fromSaved: _repo.showingSaved));
+    } on ApiException catch (e) {
+      if (showingEarly) {
+        // Keep the card; just say it's the phone's copy. No error toast on top.
+        emit(state.copyWith(fromSaved: true));
+        return;
+      }
+      emit(state.copyWith(status: state.options.isEmpty ? NowStatus.error : NowStatus.ready, error: e.message));
+    }
+  }
+
+  NowState _stateFrom(Json data, {required bool fromSaved}) => NowState(
         status: NowStatus.ready,
         kind: asString(data['kind'], 'PICK'),
         message: asString(data['message']),
@@ -226,10 +289,38 @@ class NowCubit extends Cubit<NowState> {
         extras: _extrasOf(data),
         welcomeBack: asBool(data['welcomeBack']),
         sick: asString(data['mode']) == 'SICK',
-        fromSaved: _repo.showingSaved,
-      ));
+        fromSaved: fromSaved,
+        season: asStringOrNull(data['season']),
+        // Answered (or dismissed) today: not asked again on every reload.
+        restart: _restartAnsweredToday ? null : NowRestart.fromJson(data['restart']),
+      );
+
+  DateTime? _restartAnswered;
+  bool get _restartAnsweredToday {
+    final a = _restartAnswered, now = DateTime.now();
+    return a != null && a.year == now.year && a.month == now.month && a.day == now.day;
+  }
+
+  /// "Keep as is": the restart card goes away for today, nothing changes.
+  void dismissRestart() {
+    _restartAnswered = DateTime.now();
+    emit(state.copyWith(clearRestart: true));
+  }
+
+  /// After a gap: a light week and/or sessions moved to the time of day that
+  /// didn't keep failing. Offered on the card, never done silently; Undo keeps it reversible.
+  Future<void> restartPlan({bool lightWeek = false, String? switchTo}) async {
+    if (state.busy) return;
+    emit(state.copyWith(busy: true, clearUndo: true));
+    try {
+      final r = await _repo.restartPlan(lightWeek: lightWeek, switchTo: switchTo);
+      _restartAnswered = DateTime.now();
+      placesRefresh.value++;
+      emit(state.copyWith(busy: false, undoId: r.activityId, clearRestart: true));
+      await load();
+      emit(state.copyWith(note: r.message, clearRestart: true));
     } on ApiException catch (e) {
-      emit(state.copyWith(status: state.options.isEmpty ? NowStatus.error : NowStatus.ready, error: e.message));
+      emit(state.copyWith(busy: false, error: e.message));
     }
   }
 
@@ -282,12 +373,12 @@ class NowCubit extends Cubit<NowState> {
   }
 
   /// True when the answer was saved, or queued to be saved once back online.
-  Future<bool> _answer(String action, {bool reload = true}) async {
+  Future<bool> _answer(String action, {bool reload = true, String? reason}) async {
     final o = state.current;
     if (o == null || state.busy) return false;
     emit(state.copyWith(busy: true, clearUndo: true));
     try {
-      final id = await _repo.respondNow(o.sourceType, o.sourceId, action, minutes: o.minutes, count: o.count);
+      final id = await _repo.respondNow(o.sourceType, o.sourceId, action, minutes: o.minutes, count: o.count, reason: reason);
       placesRefresh.value++;
       emit(state.copyWith(busy: false, undoId: id));
     } on QueuedOfflineException {
@@ -313,12 +404,13 @@ class NowCubit extends Cubit<NowState> {
   Future<bool> done() => _answer('DONE');
 
   /// From the Not now choices: TOMORROW, WEEKEND or LET_GO, each undoable.
-  Future<void> moveCurrent(String choice) async {
+  /// [reason]: what got in the way ("no time", "forgot"), kept so a restart can learn from it.
+  Future<void> moveCurrent(String choice, {String? reason}) async {
     final o = state.current;
     if (o == null || state.busy) return;
     emit(state.copyWith(busy: true, clearUndo: true));
     try {
-      final r = await _repo.nowAdvice(o.sourceType, o.sourceId, choice);
+      final r = await _repo.nowAdvice(o.sourceType, o.sourceId, choice, reason: reason);
       placesRefresh.value++;
       emit(state.copyWith(busy: false, undoId: asStringOrNull(r['activityId'])));
       await load();
@@ -329,9 +421,9 @@ class NowCubit extends Cubit<NowState> {
   }
 
   /// "Not now": log it (with no guilt) and show the next option, if there is one.
-  Future<void> notNow() async {
+  Future<void> notNow({String? reason}) async {
     final hasNext = state.index + 1 < state.options.length;
-    await _answer('SKIP', reload: !hasNext);
+    await _answer('SKIP', reload: !hasNext, reason: reason);
     if (hasNext) emit(state.copyWith(index: state.index + 1));
   }
 

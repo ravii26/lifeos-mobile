@@ -74,6 +74,8 @@ class _Repo implements LifeRepository {
       };
 
   @override
+  Future<Map<String, dynamic>?> nowSaved({bool smallest = false}) async => null;
+  @override
   Future<Map<String, dynamic>> now({bool smallest = false, int? minutes}) async => nowData;
 
   @override

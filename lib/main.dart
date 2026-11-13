@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -26,11 +28,11 @@ Future<void> main() async {
     statusBarIconBrightness: Brightness.light,
   ));
   await setupLocator();
-  // Neither of these may keep the app from opening: reminders or the widget
-  // failing is a small problem, a phone stuck on the logo is a big one.
-  await _bestEffort(() => NotificationService.instance.init());
-  await _bestEffort(() => getIt<WidgetSyncService>().init());
   runApp(const LifeOSApp());
+  // Started after runApp so neither delays the first screen. Anything that
+  // schedules a notification early waits for init inside NotificationService.
+  unawaited(_bestEffort(() => NotificationService.instance.init()));
+  unawaited(_bestEffort(() => getIt<WidgetSyncService>().init()));
   // Deferred to after the first frame so `rootNavigatorKey.currentState` is
   // attached before a cold-start `lifeos://` link tries to push a route.
   WidgetsBinding.instance.addPostFrameCallback((_) {
