@@ -24,6 +24,7 @@ import '../shrink/parked_screen.dart';
 import '../shrink/shrink_screen.dart';
 import '../season/season_setup_screen.dart';
 import '../season/season_review_screen.dart';
+import '../dump/dump_screen.dart';
 import '../sleep/sleep_setup_screen.dart';
 import '../weekplan/fitness_setup_screen.dart';
 import '../weekplan/checkin_screen.dart';
@@ -650,6 +651,14 @@ class _SeasonCard extends StatelessWidget {
               onPressed: onOpen,
               style: TextButton.styleFrom(backgroundColor: G.onInk, foregroundColor: G.ink, padding: const EdgeInsets.symmetric(vertical: 14), shape: const StadiumBorder()),
               child: Text('Set up a season', style: G.text(17, w: FontWeight.w600)),
+            ),
+          ),
+          // Too much to even name the areas? Empty the head first (canvas board 7).
+          GestureDetector(
+            onTap: () => openDump(context),
+            child: Padding(
+              padding: const EdgeInsets.only(top: 12),
+              child: Text('Head too full to pick? Say everything first', style: G.text(15, color: G.onInk, w: FontWeight.w500)),
             ),
           ),
         ]),

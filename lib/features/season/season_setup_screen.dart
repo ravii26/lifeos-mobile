@@ -57,7 +57,8 @@ class SeasonSetupScreen extends StatelessWidget {
           );
         } else {
           body = switch (s.step) {
-            SetupStep.explain => _Explain(onNext: () => cubit.go(SetupStep.areas)),
+            SetupStep.explain => _Explain(onNext: () => cubit.go(s.week != null ? SetupStep.week : SetupStep.areas)),
+            SetupStep.week => _Week(state: s),
             SetupStep.areas => _Areas(state: s),
             SetupStep.pick => _Pick(state: s),
             SetupStep.name => _Name(state: s),
@@ -74,7 +75,7 @@ class SeasonSetupScreen extends StatelessWidget {
               tooltip: 'Back',
               icon: const Icon(Icons.arrow_back_rounded),
               onPressed: () {
-                final back = {SetupStep.pick: SetupStep.areas, SetupStep.name: SetupStep.pick}[s.step];
+                final back = {if (s.week != null) SetupStep.areas: SetupStep.week, SetupStep.pick: SetupStep.areas, SetupStep.name: SetupStep.pick}[s.step];
                 if (back != null && s.status == SetupStatus.ready) {
                   cubit.go(back);
                 } else {
@@ -105,6 +106,80 @@ class _Message extends StatelessWidget {
         Text(body, style: G.text(18, color: G.muted, height: 1.4)),
         if (action != null) ...[const SizedBox(height: 26), GPill(action!, primary: true, onTap: onAction)],
       ]);
+}
+
+/// Your week (decisions log #13): work days and hours, so Saturday and Sunday
+/// are always asked and the hours below compare against real free time.
+class _Week extends StatelessWidget {
+  final SeasonSetupState state;
+  const _Week({required this.state});
+
+  static const _days = [(1, 'Mon'), (2, 'Tue'), (3, 'Wed'), (4, 'Thu'), (5, 'Fri'), (6, 'Sat'), (0, 'Sun')];
+  static const _hours = [('08:00', '17:00'), ('09:00', '18:00'), ('09:00', '19:00'), ('10:00', '19:00'), ('10:00', '20:00')];
+
+  String _t(String hhmm) {
+    final h = int.parse(hhmm.split(':')[0]), m = hhmm.split(':')[1];
+    final h12 = h % 12 == 0 ? 12 : h % 12;
+    return m == '00' ? '$h12' : '$h12:$m';
+  }
+
+  Widget _chip(String label, bool on, VoidCallback onTap) => Padding(
+        padding: const EdgeInsets.only(right: 8, bottom: 8),
+        child: Material(
+          color: on ? G.accent : G.card,
+          shape: const StadiumBorder(),
+          child: InkWell(
+            customBorder: const StadiumBorder(),
+            onTap: onTap,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 11),
+              child: Text(label, style: G.text(16, w: FontWeight.w500, color: on ? G.onInk : G.ink)),
+            ),
+          ),
+        ),
+      );
+
+  @override
+  Widget build(BuildContext context) {
+    final cubit = context.read<SeasonSetupCubit>();
+    final w = state.week!;
+    final hours = {..._hours, (w.start, w.end)}.toList();
+    String weekend(int d, String name) => w.workDays.contains(d) ? '$name: work' : '$name: free';
+    return ListView(padding: const EdgeInsets.fromLTRB(22, 8, 22, 24), children: [
+      Text('Your week', style: G.text(34, w: FontWeight.w600, height: 1.1, letterSpacing: -0.8)),
+      const SizedBox(height: 8),
+      Text('So the hours that follow are honest. Tap to change.', style: G.text(17, color: G.muted, height: 1.35)),
+      const SizedBox(height: 18),
+      Text('Work or college days', style: G.text(15, color: G.muted)),
+      const SizedBox(height: 8),
+      Wrap(children: [
+        for (final (d, label) in _days)
+          _chip(label, w.workDays.contains(d), () {
+            final days = {...w.workDays};
+            days.contains(d) ? days.remove(d) : days.add(d);
+            cubit.setWeek(w.copyWith(workDays: days));
+          }),
+      ]),
+      if (w.workDays.isNotEmpty) ...[
+        const SizedBox(height: 10),
+        Text('Hours, with travel', style: G.text(15, color: G.muted)),
+        const SizedBox(height: 8),
+        Wrap(children: [
+          for (final (a, b) in hours)
+            _chip('${_t(a)}–${_t(b)}', w.start == a && w.end == b, () => cubit.setWeek(w.copyWith(start: a, end: b))),
+        ]),
+      ],
+      const SizedBox(height: 10),
+      Text('${weekend(6, 'Saturday')} · ${weekend(0, 'Sunday')}', style: G.text(17, w: FontWeight.w500)),
+      if (w.changed)
+        Padding(
+          padding: const EdgeInsets.only(top: 8),
+          child: Text('Your day blocks get rebuilt from this. Fine-tune anytime in Talk, like "gym 7 to 8 on weekdays".', style: G.text(14, color: G.faint, height: 1.35)),
+        ),
+      const SizedBox(height: 22),
+      GPill(state.status == SetupStatus.saving ? 'Saving…' : 'Looks right', primary: true, onTap: state.status == SetupStatus.saving ? null : cubit.confirmWeek),
+    ]);
+  }
 }
 
 class _Explain extends StatelessWidget {

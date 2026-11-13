@@ -9,6 +9,15 @@ class _FakeRepo implements LifeRepository {
   Map<String, dynamic>? started;
   bool? startedSame;
   Map<String, DateTime?> parkedUntil = {};
+  List<Map<String, dynamic>>? schedule;
+  Map<String, dynamic>? basics;
+
+  @override
+  Future<List<Map<String, dynamic>>> daySchedule() async => schedule ?? (throw UnimplementedError('no schedule'));
+
+  @override
+  Future<void> setDayBasics({required String wake, required String sleep, List<int> officeDays = const [], String? officeStart, String? officeEnd}) async =>
+      basics = {'wake': wake, 'sleep': sleep, 'days': officeDays, 'start': officeStart, 'end': officeEnd};
 
   @override
   Future<SeasonData> season() async => SeasonData.fromJson(json);
@@ -148,5 +157,62 @@ void main() {
     expect(cubit.state.idsIn(Place.keepGoing), ['career', 'english']);
     await cubit.start();
     expect(repo.startedSame, isFalse);
+  });
+
+  List<Map<String, dynamic>> officeWeek() => [
+        for (var wd = 0; wd < 7; wd++)
+          {
+            'weekday': wd,
+            'custom': true,
+            'blocks': wd == 0 || wd == 6
+                ? [
+                    {'block': 'MORNING', 'start': '07:00', 'end': '12:00', 'freeMinutes': 150},
+                    {'block': 'EVENING', 'start': '12:00', 'end': '24:00', 'freeMinutes': 300},
+                  ]
+                : [
+                    {'block': 'MORNING', 'start': '06:00', 'end': '09:30', 'freeMinutes': 30},
+                    {'block': 'OFFICE', 'start': '09:30', 'end': '19:00', 'freeMinutes': 0},
+                    {'block': 'EVENING', 'start': '19:00', 'end': '24:00', 'freeMinutes': 90},
+                  ],
+          },
+      ];
+
+  test('reads the week from the schedule: office days, hours, wake and sleep', () {
+    final w = WeekShape.fromSchedule(officeWeek());
+    expect(w.workDays, {1, 2, 3, 4, 5});
+    expect((w.start, w.end), ('09:30', '19:00'));
+    expect((w.wake, w.sleep), ('06:00', '00:00')); // midnight sent the way the server accepts
+  });
+
+  test('first season asks the week after the explainer; unchanged, nothing is saved', () async {
+    final repo = _FakeRepo(_data())..schedule = officeWeek();
+    final cubit = SeasonSetupCubit(repo);
+    await cubit.load();
+    expect(cubit.state.step, SetupStep.explain);
+    expect(cubit.state.week, isNotNull);
+    cubit.go(SetupStep.week);
+    await cubit.confirmWeek();
+    expect(repo.basics, isNull);
+    expect(cubit.state.step, SetupStep.areas);
+  });
+
+  test('working Saturdays too: the week is saved, then hours reload', () async {
+    final repo = _FakeRepo(_data())..schedule = officeWeek();
+    final cubit = SeasonSetupCubit(repo);
+    await cubit.load();
+    final w = cubit.state.week!;
+    cubit.setWeek(w.copyWith(workDays: {...w.workDays, 6}, start: '10:00', end: '19:00'));
+    await cubit.confirmWeek();
+    expect(repo.basics, {'wake': '06:00', 'sleep': '00:00', 'days': [1, 2, 3, 4, 5, 6], 'start': '10:00', 'end': '19:00'});
+    expect(cubit.state.step, SetupStep.areas);
+    expect(cubit.state.week!.changed, isFalse);
+  });
+
+  test('editing a running season does not ask the week again', () async {
+    final repo = _FakeRepo(_data(areas: runningAreas, season: running))..schedule = officeWeek();
+    final cubit = SeasonSetupCubit(repo);
+    await cubit.load();
+    expect(cubit.state.week, isNull);
+    expect(cubit.state.step, SetupStep.areas);
   });
 }

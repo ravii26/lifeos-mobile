@@ -5,10 +5,52 @@ import '../../core/api/api_exception.dart';
 import '../../data/models/season.dart';
 import '../../data/repositories/life_repository.dart';
 
+/// The week's shape as setup asks it (decisions log #13: always ask about
+/// Saturday and Sunday): which days are work days, and the hours incl. travel.
+class WeekShape extends Equatable {
+  final Set<int> workDays; // 0 = Sunday … 6 = Saturday
+  final String start; // HH:mm
+  final String end;
+  final String wake;
+  final String sleep;
+  final bool changed;
+  const WeekShape({required this.workDays, required this.start, required this.end, required this.wake, required this.sleep, this.changed = false});
+
+  WeekShape copyWith({Set<int>? workDays, String? start, String? end}) =>
+      WeekShape(workDays: workDays ?? this.workDays, start: start ?? this.start, end: end ?? this.end, wake: wake, sleep: sleep, changed: true);
+
+  /// Read from GET /now/schedule: work days are the ones with an office block.
+  static WeekShape fromSchedule(List<Map<String, dynamic>> days) {
+    final work = <int>{};
+    String? start, end, wake, sleep;
+    for (final d in days) {
+      final wd = (d['weekday'] as num?)?.toInt() ?? -1;
+      final blocks = (d['blocks'] as List? ?? const []).whereType<Map<String, dynamic>>().toList();
+      if (blocks.isEmpty) continue;
+      final office = blocks.where((b) => b['block'] == 'OFFICE').firstOrNull;
+      if (office != null) {
+        work.add(wd);
+        start ??= office['start'] as String?;
+        end ??= office['end'] as String?;
+        wake ??= blocks.first['start'] as String?;
+        sleep ??= blocks.last['end'] as String?;
+      }
+    }
+    wake ??= days.expand((d) => (d['blocks'] as List? ?? const []).whereType<Map<String, dynamic>>()).firstOrNull?['start'] as String?;
+    sleep ??= '23:00';
+    // The server writes midnight as 24:00; the basics call takes 00:00.
+    String clock(String? v, String fallback) => v == null ? fallback : (v == '24:00' ? '00:00' : v);
+    return WeekShape(workDays: work, start: clock(start, '09:00'), end: clock(end, '19:00'), wake: clock(wake, '07:00'), sleep: clock(sleep, '23:00'));
+  }
+
+  @override
+  List<Object?> get props => [workDays, start, end, wake, sleep, changed];
+}
+
 /// Where an area goes this season. Maps to the area's tier on the server.
 enum Place { focus, keepGoing, background, parked }
 
-enum SetupStep { explain, areas, pick, name }
+enum SetupStep { explain, week, areas, pick, name }
 
 enum SetupStatus { loading, ready, error, saving, started }
 
@@ -27,6 +69,7 @@ class SeasonSetupState extends Equatable {
   final Place? swapPlace;
   final String? error;
   final String? undoId;
+  final WeekShape? week; // null until the day schedule loads (or it couldn't)
 
   const SeasonSetupState({
     this.status = SetupStatus.loading,
@@ -39,6 +82,7 @@ class SeasonSetupState extends Equatable {
     this.swapPlace,
     this.error,
     this.undoId,
+    this.week,
   });
 
   int get neededMinutes => minutes.values.fold(0, (a, b) => a + b);
@@ -61,6 +105,7 @@ class SeasonSetupState extends Equatable {
     bool clearSwap = false,
     String? error,
     String? undoId,
+    WeekShape? week,
   }) =>
       SeasonSetupState(
         status: status ?? this.status,
@@ -73,10 +118,11 @@ class SeasonSetupState extends Equatable {
         swapPlace: clearSwap ? null : (swapPlace ?? this.swapPlace),
         error: error,
         undoId: undoId ?? this.undoId,
+        week: week ?? this.week,
       );
 
   @override
-  List<Object?> get props => [status, step, data, minutes, guessed, places, swapFor, swapPlace, error, undoId];
+  List<Object?> get props => [status, step, data, minutes, guessed, places, swapFor, swapPlace, error, undoId, week];
 }
 
 /// Season setup (decisions log #7, canvas board P1·A): explainer (first time
@@ -115,10 +161,19 @@ class SeasonSetupCubit extends Cubit<SeasonSetupState> {
       // A new season gets a new name and end; an edit keeps them.
       name = next == null ? (data.season?.name ?? '') : '';
       endEvent = next == null ? (data.season?.endEvent ?? '') : '';
+      WeekShape? week;
+      if (next != null || data.season == null) {
+        try {
+          week = WeekShape.fromSchedule(await _repo.daySchedule());
+        } catch (_) {
+          // Optional: without the schedule, setup goes straight to the areas.
+        }
+      }
       emit(state.copyWith(
         status: SetupStatus.ready,
-        // The explainer is for the first season only.
-        step: data.season == null ? SetupStep.explain : SetupStep.areas,
+        // The explainer is for the first season only; the week is asked at every new season.
+        step: data.season == null ? SetupStep.explain : (week != null ? SetupStep.week : SetupStep.areas),
+        week: week,
         data: data,
         minutes: minutes,
         guessed: guessed,
@@ -161,6 +216,24 @@ class SeasonSetupCubit extends Cubit<SeasonSetupState> {
                   ? Place.keepGoing
                   : (a.tier == 'LATER' ? Place.parked : Place.background),
       };
+
+  void setWeek(WeekShape w) => emit(state.copyWith(week: w));
+
+  /// "Looks right": saves the week only if it changed, then reloads the hours,
+  /// since free time is what the areas are measured against.
+  Future<void> confirmWeek() async {
+    final w = state.week;
+    if (w == null || !w.changed) return go(SetupStep.areas);
+    emit(state.copyWith(status: SetupStatus.saving));
+    try {
+      final days = (w.workDays.toList()..sort());
+      await _repo.setDayBasics(wake: w.wake, sleep: w.sleep, officeDays: days, officeStart: days.isEmpty ? null : w.start, officeEnd: days.isEmpty ? null : w.end);
+      final data = await _repo.season();
+      emit(state.copyWith(status: SetupStatus.ready, step: SetupStep.areas, data: data, week: WeekShape(workDays: w.workDays, start: w.start, end: w.end, wake: w.wake, sleep: w.sleep)));
+    } on ApiException catch (e) {
+      emit(state.copyWith(status: SetupStatus.ready, error: e.message));
+    }
+  }
 
   void go(SetupStep step) => emit(state.copyWith(step: step, clearSwap: true));
 

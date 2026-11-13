@@ -20,6 +20,7 @@ import '../models/note.dart';
 import '../models/notebook.dart';
 import '../models/onboarding.dart';
 import '../models/season.dart';
+import '../models/dump_result.dart';
 import '../models/sleep_plan.dart';
 import '../models/fitness_plan.dart';
 import '../models/project.dart';
@@ -1139,6 +1140,9 @@ class LifeRepository {
 
   /// True when the last read came from the phone's saved copy, because the server can't be reached.
   bool get showingSaved => _api.servingFromCache;
+
+  /// "My head is full": the dump split, saved with one Undo, sorted, and checked against free time.
+  Future<DumpResult> dump(String text) async => DumpResult.fromJson((await _api.post('/now/dump', body: {'text': text})) as Json);
 
   /// What is parked right now, with the activity to undo to bring each back.
   Future<List<Json>> parked() async => ((await _api.get('/now/pile/parked')) as List).whereType<Json>().toList();

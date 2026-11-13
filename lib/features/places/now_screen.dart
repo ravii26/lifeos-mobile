@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../dump/dump_screen.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -697,16 +698,38 @@ class _StartHere extends StatelessWidget {
         SizedBox(
           height: 72,
           child: TextButton.icon(
-            onPressed: () => talkRequest.value++,
+            // The way in for an overwhelmed person: everything first, then one thing (canvas board 1).
+            onPressed: () => openDump(context),
             style: TextButton.styleFrom(backgroundColor: G.accent, foregroundColor: G.onInk, shape: const StadiumBorder()),
             icon: Icon(Icons.mic_none_rounded, size: 26, color: G.onInk),
-            label: Text('Tell Ally', style: G.text(20, w: FontWeight.w600, color: G.onInk, height: 1.2)),
+            label: Text('My head is full: say everything', style: G.text(19, w: FontWeight.w600, color: G.onInk, height: 1.2)),
           ),
         ),
         const SizedBox(height: 16),
         Text('Or start with', style: G.text(16, color: G.muted, height: 1.2)),
         const SizedBox(height: 10),
       ],
+      if (!fresh)
+        Padding(
+          padding: const EdgeInsets.only(bottom: 10),
+          child: Material(
+            color: G.card,
+            borderRadius: BorderRadius.circular(20),
+            child: InkWell(
+              onTap: () => openDump(context),
+              borderRadius: BorderRadius.circular(20),
+              child: Container(
+                constraints: const BoxConstraints(minHeight: 66),
+                padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+                child: Row(children: [
+                  Icon(Icons.blur_on_rounded, size: 24, color: G.accent),
+                  const SizedBox(width: 14),
+                  Expanded(child: Text('My head is full', style: G.text(18, w: FontWeight.w500, height: 1.25))),
+                ]),
+              ),
+            ),
+          ),
+        ),
       for (final st in nowStarters)
         Padding(
           padding: const EdgeInsets.only(bottom: 10),
