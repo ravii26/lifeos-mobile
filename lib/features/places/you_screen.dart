@@ -23,6 +23,7 @@ import '../shell/life_cubit.dart';
 import '../shrink/parked_screen.dart';
 import '../shrink/shrink_screen.dart';
 import '../season/season_setup_screen.dart';
+import '../season/season_review_screen.dart';
 import '../sleep/sleep_setup_screen.dart';
 import '../weekplan/fitness_setup_screen.dart';
 import '../weekplan/checkin_screen.dart';
@@ -167,12 +168,32 @@ class _YouScreenState extends State<YouScreen> {
     }
   }
 
+  Future<void> _openReview() async {
+    final r = await openSeasonReview(context);
+    if (!mounted || r == null) return;
+    placesRefresh.value++;
+    final undoId = r.undoId;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text(r.message),
+      action: undoId == null
+          ? null
+          : SnackBarAction(
+              label: 'Undo',
+              onPressed: () async {
+                await _repo.undo(undoId);
+                placesRefresh.value++;
+              },
+            ),
+    ));
+  }
+
   Future<void> _openSeason() async {
+    final editing = _season?.season != null;
     final undoId = await openSeasonSetup(context);
     if (!mounted || undoId == null) return;
     placesRefresh.value++;
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-      content: const Text('Season started. Now shows only what matters this season.'),
+      content: Text(editing ? 'Season updated. Same chapter, same week.' : 'Season started. Now shows only what matters this season.'),
       action: undoId.isEmpty
           ? null
           : SnackBarAction(
@@ -396,7 +417,7 @@ class _YouScreenState extends State<YouScreen> {
                 ),
               if (_season != null) ...[
                 const SizedBox(height: 18),
-                _SeasonCard(data: _season!, onOpen: _openSeason),
+                _SeasonCard(data: _season!, onOpen: _season!.season?.over == true ? _openReview : _openSeason, onReview: _openReview),
               ],
               // The Sunday check-in: offered Saturday to Monday when there is a plan to check in on.
               if (_checkinDue) ...[
@@ -592,7 +613,8 @@ String tierName(String tier) => switch (tier) {
 class _SeasonCard extends StatelessWidget {
   final SeasonData data;
   final VoidCallback onOpen;
-  const _SeasonCard({required this.data, required this.onOpen});
+  final VoidCallback onReview;
+  const _SeasonCard({required this.data, required this.onOpen, required this.onReview});
 
   // The example uses one of this person's own areas that isn't in focus yet.
   String get _hint {
@@ -652,7 +674,16 @@ class _SeasonCard extends StatelessWidget {
             if (data.keepGoing.isNotEmpty) _line('Keep going', data.keepGoing),
             if (data.parked.isNotEmpty) _line('Parked', data.parked, color: G.faint),
             const SizedBox(height: 10),
-            Text(_hint, style: G.text(13, color: G.faint)),
+            if (s.over)
+              Text('Tap to review it and pick what comes next.', style: G.text(14, w: FontWeight.w600, color: G.accent))
+            else ...[
+              Text(_hint, style: G.text(13, color: G.faint)),
+              // The event half of "event or date, whichever comes first": the person says it happened.
+              GestureDetector(
+                onTap: onReview,
+                child: Padding(padding: const EdgeInsets.only(top: 8), child: Text('Done early? Review this season', style: G.text(14, color: G.accent))),
+              ),
+            ],
           ]),
         ),
       ),

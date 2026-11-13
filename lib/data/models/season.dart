@@ -108,3 +108,67 @@ class SeasonData {
     );
   }
 }
+
+/// One area in the season being reviewed, with what got done in it.
+class ReviewArea {
+  final String id;
+  final String name;
+  final String place; // FOCUS | KEEP_GOING
+  final int done;
+  const ReviewArea({required this.id, required this.name, required this.place, required this.done});
+
+  factory ReviewArea.fromJson(Json j) =>
+      ReviewArea(id: asString(j['id']), name: asString(j['name']), place: asString(j['place'], 'FOCUS'), done: asInt(j['done']));
+}
+
+/// A parked area offered back at the review, with why ("7 things waiting").
+class ReviewParked {
+  final String id;
+  final String name;
+  final String why;
+  final int waiting;
+  const ReviewParked({required this.id, required this.name, required this.why, required this.waiting});
+
+  factory ReviewParked.fromJson(Json j) =>
+      ReviewParked(id: asString(j['id']), name: asString(j['name']), why: asString(j['why']), waiting: asInt(j['waiting']));
+}
+
+/// GET /season/review (canvas board P1·F): what this season did, what is
+/// waiting, and the next season pre-filled.
+class SeasonReview {
+  final SeasonInfo season;
+  final List<String> lines;
+  final List<ReviewArea> areas;
+  final List<ReviewParked> parked;
+  final int nextNumber;
+  final List<String> nextFocusIds;
+  final List<String> nextKeepGoingIds;
+  final bool canLightWeek;
+
+  const SeasonReview({
+    required this.season,
+    required this.lines,
+    required this.areas,
+    required this.parked,
+    required this.nextNumber,
+    required this.nextFocusIds,
+    required this.nextKeepGoingIds,
+    required this.canLightWeek,
+  });
+
+  static List<String> _ids(dynamic v) => (v is List ? v : const []).map((e) => asString(e)).where((e) => e.isNotEmpty).toList();
+
+  factory SeasonReview.fromJson(Json j) {
+    final next = (j['next'] as Json?) ?? const {};
+    return SeasonReview(
+      season: SeasonInfo.fromJson((j['season'] as Json?) ?? const {}),
+      lines: _ids(j['lines']),
+      areas: ((j['areas'] as List?) ?? const []).whereType<Json>().map(ReviewArea.fromJson).toList(),
+      parked: ((j['parked'] as List?) ?? const []).whereType<Json>().map(ReviewParked.fromJson).toList(),
+      nextNumber: asInt(next['number'], 2),
+      nextFocusIds: _ids(next['focusIds']),
+      nextKeepGoingIds: _ids(next['keepGoingIds']),
+      canLightWeek: asBool(j['canLightWeek']),
+    );
+  }
+}

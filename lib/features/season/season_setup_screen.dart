@@ -7,10 +7,11 @@ import '../guide/guide_style.dart';
 import '../shrink/shrink_cubit.dart' show hoursText;
 import 'season_setup_cubit.dart';
 
-/// Opens season setup. Returns the Undo id when a season was started.
-Future<String?> openSeasonSetup(BuildContext context) => Navigator.of(context).push<String?>(MaterialPageRoute(
+/// Opens season setup. Returns the Undo id when a season was started or
+/// changed. [next] comes from the season review and starts the next season.
+Future<String?> openSeasonSetup(BuildContext context, {NextSeason? next}) => Navigator.of(context).push<String?>(MaterialPageRoute(
       builder: (_) => BlocProvider(
-        create: (_) => SeasonSetupCubit(getIt<LifeRepository>())..load(),
+        create: (_) => SeasonSetupCubit(getIt<LifeRepository>(), next: next)..load(),
         child: const SeasonSetupScreen(),
       ),
     ));
@@ -379,7 +380,8 @@ class _NameState extends State<_Name> {
   Widget build(BuildContext context) {
     final cubit = context.read<SeasonSetupCubit>();
     final s = widget.state;
-    final number = (s.data?.season?.number ?? 0) + 1;
+    final number = cubit.number;
+    final weeks = cubit.editing ? (s.data?.season?.weeks ?? 10) : 10;
     return ListView(padding: const EdgeInsets.fromLTRB(22, 8, 22, 24), children: [
       Text('Season $number · name it (optional)', style: G.text(15, color: G.muted)),
       const SizedBox(height: 8),
@@ -390,7 +392,7 @@ class _NameState extends State<_Name> {
         decoration: _field('e.g. Switch & Shape'),
         onChanged: (v) => cubit.name = v,
       ),
-      Text('Ends in 10 weeks, or earlier when this happens:', style: G.text(15, color: G.muted)),
+      Text(cubit.editing ? 'Ends after $weeks weeks, or earlier when this happens:' : 'Ends in 10 weeks, or earlier when this happens:', style: G.text(15, color: G.muted)),
       const SizedBox(height: 8),
       TextField(
         controller: _event,
@@ -407,7 +409,7 @@ class _NameState extends State<_Name> {
       const SizedBox(height: 8),
       Text('Bills, birthdays and reminders keep running whatever you pick.', style: G.text(14, color: G.faint, height: 1.35)),
       const SizedBox(height: 20),
-      GPill(s.status == SetupStatus.saving ? 'Starting…' : 'Start Season $number',
+      GPill(s.status == SetupStatus.saving ? 'Saving…' : (cubit.editing ? 'Save changes' : 'Start Season $number'),
           primary: true, onTap: s.status == SetupStatus.saving ? null : cubit.start),
     ]);
   }

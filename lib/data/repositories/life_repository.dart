@@ -57,8 +57,10 @@ class LifeRepository {
     required List<String> focusIds,
     List<String> keepGoingIds = const [],
     List<({String areaId, DateTime? until})> parked = const [],
+    bool sameSeason = false,
   }) async {
     final data = (await _api.post('/season', body: {
+      if (sameSeason) 'sameSeason': true,
       'name': ?name,
       if (endsAt != null) 'endsAt': endsAt.toIso8601String(),
       'endEvent': ?endEvent,
@@ -68,6 +70,15 @@ class LifeRepository {
         for (final p in parked) {'areaId': p.areaId, if (p.until != null) 'until': p.until!.toIso8601String()},
       ],
     })) as Json;
+    return (data: SeasonData.fromJson(data), activityId: asStringOrNull(data['activityId']));
+  }
+
+  /// The season-end review: totals, parked areas offered back, the next season pre-filled.
+  Future<SeasonReview> seasonReview() async => SeasonReview.fromJson((await _api.get('/season/review')) as Json);
+
+  /// "Carry it on": [weeks] more on the same season. Returns the Undo id.
+  Future<({SeasonData data, String? activityId})> extendSeason(int weeks) async {
+    final data = (await _api.post('/season/extend', body: {'weeks': weeks})) as Json;
     return (data: SeasonData.fromJson(data), activityId: asStringOrNull(data['activityId']));
   }
 

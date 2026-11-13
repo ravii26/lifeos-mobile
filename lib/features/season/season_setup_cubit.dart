@@ -82,9 +82,22 @@ class SeasonSetupState extends Equatable {
 /// Season setup (decisions log #7, canvas board P1·A): explainer (first time
 /// only) → areas with hours → pick up to 2 focus → name it and start.
 /// Ally pre-selects; the person only confirms or changes.
+/// The next season as the season review pre-filled it.
+typedef NextSeason = ({List<String> focusIds, List<String> keepGoingIds});
+
 class SeasonSetupCubit extends Cubit<SeasonSetupState> {
   final LifeRepository _repo;
-  SeasonSetupCubit(this._repo) : super(const SeasonSetupState());
+
+  /// Set when opened from the season review: start the next season from these picks.
+  final NextSeason? next;
+  SeasonSetupCubit(this._repo, {this.next}) : super(const SeasonSetupState());
+
+  /// Changing a running season keeps it (same number, week and end). Only
+  /// first setup and the season review start a new one.
+  bool get editing => next == null && state.data?.season != null;
+
+  /// The number this flow starts or saves.
+  int get number => (state.data?.season?.number ?? 0) + (editing ? 0 : 1);
 
   String name = '';
   String endEvent = '';
@@ -99,8 +112,9 @@ class SeasonSetupCubit extends Cubit<SeasonSetupState> {
         minutes[a.id] = a.weeklyMinutes > 0 ? a.weeklyMinutes : guessMinutes;
         if (a.weeklyMinutes == 0) guessed.add(a.id);
       }
-      name = data.season?.name ?? '';
-      endEvent = data.season?.endEvent ?? '';
+      // A new season gets a new name and end; an edit keeps them.
+      name = next == null ? (data.season?.name ?? '') : '';
+      endEvent = next == null ? (data.season?.endEvent ?? '') : '';
       emit(state.copyWith(
         status: SetupStatus.ready,
         // The explainer is for the first season only.
@@ -108,7 +122,7 @@ class SeasonSetupCubit extends Cubit<SeasonSetupState> {
         data: data,
         minutes: minutes,
         guessed: guessed,
-        places: _suggest(data, minutes),
+        places: next == null ? _suggest(data, minutes) : _fromNext(data, next!),
       ));
     } on ApiException catch (e) {
       emit(state.copyWith(status: SetupStatus.error, error: e.message));
@@ -137,6 +151,16 @@ class SeasonSetupCubit extends Cubit<SeasonSetupState> {
     }
     return out;
   }
+
+  /// The review's picks; parked areas stay parked unless picked, the rest wait in the background.
+  static Map<String, Place> _fromNext(SeasonData d, NextSeason n) => {
+        for (final a in d.areas)
+          a.id: n.focusIds.contains(a.id)
+              ? Place.focus
+              : n.keepGoingIds.contains(a.id)
+                  ? Place.keepGoing
+                  : (a.tier == 'LATER' ? Place.parked : Place.background),
+      };
 
   void go(SetupStep step) => emit(state.copyWith(step: step, clearSwap: true));
 
@@ -178,7 +202,12 @@ class SeasonSetupCubit extends Cubit<SeasonSetupState> {
         endEvent: endEvent.trim().isEmpty ? null : endEvent.trim(),
         focusIds: state.idsIn(Place.focus),
         keepGoingIds: state.idsIn(Place.keepGoing),
-        parked: [for (final id in state.idsIn(Place.parked)) (areaId: id, until: null)],
+        // Keep each parked area's return date; setup has no date picker, so it must not wipe one.
+        parked: [
+          for (final id in state.idsIn(Place.parked))
+            (areaId: id, until: state.data?.parked.where((p) => p.id == id).firstOrNull?.until),
+        ],
+        sameSeason: editing,
       );
       emit(state.copyWith(status: SetupStatus.started, data: r.data, undoId: r.activityId));
     } on ApiException catch (e) {

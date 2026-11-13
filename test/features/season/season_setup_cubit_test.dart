@@ -7,6 +7,8 @@ class _FakeRepo implements LifeRepository {
   _FakeRepo(this.json);
   final Map<String, dynamic> json;
   Map<String, dynamic>? started;
+  bool? startedSame;
+  Map<String, DateTime?> parkedUntil = {};
 
   @override
   Future<SeasonData> season() async => SeasonData.fromJson(json);
@@ -19,8 +21,11 @@ class _FakeRepo implements LifeRepository {
     required List<String> focusIds,
     List<String> keepGoingIds = const [],
     List<({String areaId, DateTime? until})> parked = const [],
+    bool sameSeason = false,
   }) async {
     started = {'name': name, 'endEvent': endEvent, 'focus': focusIds, 'keep': keepGoingIds, 'parked': parked.map((p) => p.areaId).toList()};
+    startedSame = sameSeason;
+    parkedUntil = {for (final p in parked) p.areaId: p.until};
     return (data: SeasonData.fromJson(json), activityId: 'act-1');
   }
 
@@ -101,5 +106,47 @@ void main() {
     });
     expect(cubit.state.status, SetupStatus.started);
     expect(cubit.state.undoId, 'act-1');
+  });
+
+  final running = {'number': 1, 'name': 'Switch & Shape', 'startedAt': '2026-11-16T00:00:00Z', 'week': 4, 'weeks': 10, 'line': 'x'};
+  final runningAreas = [
+    {'id': 'career', 'name': 'Career', 'tier': 'MAIN', 'weeklyMinutes': 480},
+    {'id': 'fitness', 'name': 'Fitness', 'tier': 'MAIN', 'weeklyMinutes': 180},
+    {'id': 'english', 'name': 'English', 'tier': 'SECONDARY', 'weeklyMinutes': 120},
+    {'id': 'music', 'name': 'Music', 'tier': 'LATER', 'weeklyMinutes': 60},
+  ];
+
+  test('changing a running season keeps it, and keeps parked return dates', () async {
+    final data = _data(areas: runningAreas, season: running)
+      ..['places'] = {
+        'focus': [],
+        'keepGoing': [],
+        'background': [],
+        'parked': [
+          {'id': 'music', 'name': 'Music', 'until': '2027-03-01T00:00:00.000Z'},
+        ],
+      };
+    final repo = _FakeRepo(data);
+    final cubit = SeasonSetupCubit(repo);
+    await cubit.load();
+    expect(cubit.editing, isTrue);
+    expect(cubit.number, 1); // same chapter, not Season 2
+    await cubit.start();
+    expect(repo.startedSame, isTrue);
+    expect(repo.parkedUntil['music'], DateTime.utc(2027, 3, 1));
+  });
+
+  test('from the season review: next season picks, a fresh name, Season 2', () async {
+    final repo = _FakeRepo(_data(areas: runningAreas, season: running));
+    final cubit = SeasonSetupCubit(repo, next: (focusIds: ['fitness', 'music'], keepGoingIds: ['career', 'english']));
+    await cubit.load();
+    expect(cubit.editing, isFalse);
+    expect(cubit.number, 2);
+    expect(cubit.name, ''); // a new chapter gets its own name
+    expect(cubit.state.step, SetupStep.areas); // no explainer the second time
+    expect(cubit.state.idsIn(Place.focus), ['fitness', 'music']);
+    expect(cubit.state.idsIn(Place.keepGoing), ['career', 'english']);
+    await cubit.start();
+    expect(repo.startedSame, isFalse);
   });
 }
