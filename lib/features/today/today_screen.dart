@@ -18,6 +18,8 @@ import '../places/now_cubit.dart';
 import '../areas/areas_overview.dart';
 import '../session/completion_screen.dart';
 import '../session/focus_session_screen.dart';
+import '../dump/dump_screen.dart' show openDump;
+import 'anytime_today.dart';
 import 'day_shape.dart';
 import 'today_sheets.dart';
 
@@ -29,14 +31,11 @@ import 'today_sheets.dart';
 class TodayScreen extends StatefulWidget {
   final String firstName;
 
-  /// Opens the screen this one replaces, while its extras are being rebuilt.
-  final VoidCallback? onOpenPrevious;
-
   /// For tests.
   final LifeRepository? repo;
   final DateTime Function()? clock;
 
-  const TodayScreen({super.key, required this.firstName, this.onOpenPrevious, this.repo, this.clock});
+  const TodayScreen({super.key, required this.firstName, this.repo, this.clock});
 
   @override
   State<TodayScreen> createState() => _TodayScreenState();
@@ -354,6 +353,7 @@ class _TodayScreenState extends State<TodayScreen> {
                     wide: true,
                     onPressed: () => _gotTime(themed, free)),
                 _list(themed, c, open),
+                if (!s.extras.isEmpty) AnytimeToday(extras: s.extras, busy: s.busy, cubit: cubit),
                 if (s.prep.isNotEmpty) _prep(c, s),
                 if (!s.sick && !s.restedToday)
                   Row(children: [
@@ -369,11 +369,11 @@ class _TodayScreenState extends State<TodayScreen> {
                       onChanged: (v) => v ? cubit.lowEnergy() : cubit.endLowEnergy(),
                     ),
                   ]),
-                if (widget.onOpenPrevious != null)
-                  Center(
-                    child: AllyButton('Open the previous Now screen',
-                        kind: AllyButtonKind.ghost, onPressed: widget.onOpenPrevious),
-                  ),
+                // Always within reach: everything on your mind, sorted by Ally.
+                Center(
+                  child: AllyButton('My head is full',
+                      kind: AllyButtonKind.ghost, icon: Icons.blur_on_rounded, onPressed: () => openDump(context)),
+                ),
               ]),
             ],
           ),
@@ -447,6 +447,7 @@ class _TodayScreenState extends State<TodayScreen> {
         s.message.isEmpty ? 'Tell Ally what you want to get done and it will plan the first step.' : s.message,
         'Tell Ally',
         () => talkRequest.value++,
+        second: ('Say everything on your mind', () => openDump(context)),
       );
     }
     // Marigold only when this really is free time.
@@ -494,13 +495,18 @@ class _TodayScreenState extends State<TodayScreen> {
     );
   }
 
-  Widget _plain(AllyColors c, String title, String text, String action, VoidCallback onAction) => AllyCard(
+  Widget _plain(AllyColors c, String title, String text, String action, VoidCallback onAction,
+          {(String, VoidCallback)? second}) =>
+      AllyCard(
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Text(title, style: AllyType.h2(color: c.ink)),
           const SizedBox(height: Sp.x1),
           Text(text, style: AllyType.body(color: c.muted)),
           const SizedBox(height: Sp.x4),
-          AllyButton(action, kind: AllyButtonKind.secondary, onPressed: onAction),
+          Wrap(spacing: Sp.x2, runSpacing: Sp.x2, children: [
+            AllyButton(action, kind: AllyButtonKind.secondary, onPressed: onAction),
+            if (second != null) AllyButton(second.$1, kind: AllyButtonKind.ghost, onPressed: second.$2),
+          ]),
         ]),
       );
 

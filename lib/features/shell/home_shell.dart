@@ -19,7 +19,6 @@ import '../guide/guide_style.dart';
 import '../guide/save_sheet.dart';
 import '../guide/tonight_cubit.dart';
 import '../places/now_cubit.dart';
-import '../places/now_screen.dart';
 import '../places/you_screen.dart';
 import '../today/today_screen.dart';
 import 'life_cubit.dart';
@@ -182,12 +181,7 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
               child: IndexedStack(
                 index: _index,
                 children: [
-                  // Today replaces Now. The previous screen stays one tap away
-                  // until its extras (counts, routine, meal, watch later) are rebuilt.
-                  TodayScreen(
-                    firstName: widget.user.firstName,
-                    onOpenPrevious: () => _openPreviousNow(context),
-                  ),
+                  TodayScreen(firstName: widget.user.firstName),
                   YouScreen(user: widget.user),
                   ChatScreen(onBack: () => setState(() => _index = _nowPlace)),
                   const AreasHomeScreen(),
@@ -209,24 +203,6 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
         );
       }),
     );
-  }
-
-  void _openPreviousNow(BuildContext context) {
-    Navigator.of(context).push(MaterialPageRoute<void>(
-      builder: (_) => MultiBlocProvider(
-        providers: [
-          BlocProvider.value(value: context.read<LifeCubit>()),
-          BlocProvider.value(value: context.read<TonightCubit>()),
-          BlocProvider.value(value: context.read<NowCubit>()),
-          BlocProvider.value(value: context.read<ChatCubit>()),
-        ],
-        child: Scaffold(
-          backgroundColor: G.bg,
-          appBar: AppBar(backgroundColor: G.bg, surfaceTintColor: G.bg, foregroundColor: G.ink, elevation: 0),
-          body: const NowScreen(),
-        ),
-      ),
-    ));
   }
 
   void _openCapture(BuildContext context, {PendingCaptureIntent? pending}) {

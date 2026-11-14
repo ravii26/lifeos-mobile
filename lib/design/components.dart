@@ -79,6 +79,10 @@ class AllyButton extends StatelessWidget {
   /// Fill the available width.
   final bool wide;
 
+  /// What a screen reader says instead of [label], when the label alone is
+  /// not enough ("+1" → "Add one: Water").
+  final String? semanticLabel;
+
   const AllyButton(
     this.label, {
     super.key,
@@ -86,6 +90,7 @@ class AllyButton extends StatelessWidget {
     this.kind = AllyButtonKind.main,
     this.icon,
     this.wide = false,
+    this.semanticLabel,
   });
 
   @override
@@ -125,6 +130,7 @@ class AllyButton extends StatelessWidget {
       opacity: onPressed == null ? 0.45 : 1,
       child: Pressable(
         onTap: onPressed,
+        semanticLabel: semanticLabel,
         child: AnimatedContainer(
           duration: Motion.of(context, Motion.d2),
           curve: Motion.ease,
@@ -136,7 +142,10 @@ class AllyButton extends StatelessWidget {
             borderRadius: BorderRadius.circular(Rad.button),
             border: Border.all(color: border),
           ),
-          child: wide ? content : Center(widthFactor: 1, child: content),
+          child: ExcludeSemantics(
+            excluding: semanticLabel != null,
+            child: wide ? content : Center(widthFactor: 1, child: content),
+          ),
         ),
       ),
     );
