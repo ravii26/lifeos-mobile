@@ -9,12 +9,14 @@ import '../../design/type.dart';
 import '../places/now_cubit.dart';
 import 'day_shape.dart';
 
-/// "I've got time": say how long, get one thing that fits, start it.
+/// "I've got time": say how long, how much energy and where you are, get one
+/// thing that fits, start it.
 ///
-/// Asks the same rules engine as the Today card (`GET /now?minutes=`), so the
-/// answer follows deadlines, the part of the day and the person's mode. If
-/// the server cannot be reached, it falls back to today's list on the phone.
-/// Pops with the option to start, or null.
+/// Asks the free-time rules (`GET /now/free`), which look across every area
+/// and give one pick per area, so "Something else" walks through the others.
+/// A server that does not have that yet is asked the older way
+/// (`GET /now?minutes=`). If nothing can be reached, it falls back to today's
+/// list on the phone. Pops with the option to start, or null.
 class FreeTimeSheet extends StatefulWidget {
   final LifeRepository repo;
 
@@ -34,13 +36,17 @@ class _FreeTimeSheetState extends State<FreeTimeSheet> {
   static const _lengths = [15, 30, 60, 90];
 
   late int _minutes = _nearest(widget.suggestedMinutes ?? 30);
-  bool _low = false;
+  String _energy = 'OKAY'; // LOW | OKAY | GOOD
+  String _place = 'HOME'; // HOME | OUT
   bool _loading = false;
   bool _asked = false;
   bool _offline = false;
   String? _message;
   List<NowOption> _options = const [];
+  // The area each option belongs to, same order; null for a thing with no area.
+  List<String?> _areas = const [];
   int _index = 0;
+  int _asking = 0; // only the latest answer is shown
 
   static int _nearest(int m) {
     var best = _lengths.first;
@@ -50,26 +56,49 @@ class _FreeTimeSheetState extends State<FreeTimeSheet> {
     return best;
   }
 
+  static const _nothingFits = 'Nothing on your list fits that. Rest is a good use of it.';
+
+  /// One pick per area from the free-time rules, or the older single-list
+  /// answer when the server does not have them yet.
+  Future<({List<NowOption> options, List<String?> areas, String message})> _fetch() async {
+    try {
+      final data = await widget.repo.freeTime(minutes: _minutes, energy: _energy, place: _place);
+      final picks = ((data['picks'] as List?) ?? const []).whereType<Json>().toList();
+      return (
+        options: picks.map(NowOption.fromJson).toList(),
+        areas: picks.map((p) => asStringOrNull(p['areaName'])).toList(),
+        message: asString(data['message'], _nothingFits),
+      );
+    } on ApiException catch (e) {
+      if (!e.isNotFound) rethrow;
+      final data = await widget.repo.now(minutes: _minutes, smallest: _energy == 'LOW');
+      final options = ((data['options'] as List?) ?? const []).whereType<Json>().map(NowOption.fromJson).toList();
+      return (options: options, areas: List<String?>.filled(options.length, null), message: asString(data['message'], _nothingFits));
+    }
+  }
+
   Future<void> _ask() async {
+    final asking = ++_asking;
     setState(() {
       _loading = true;
       _asked = true;
       _offline = false;
       _message = null;
       _options = const [];
+      _areas = const [];
       _index = 0;
     });
     try {
-      final data = await widget.repo.now(minutes: _minutes, smallest: _low);
-      if (!mounted) return;
-      final options = ((data['options'] as List?) ?? const []).whereType<Json>().map(NowOption.fromJson).toList();
+      final r = await _fetch();
+      if (!mounted || asking != _asking) return;
       setState(() {
         _loading = false;
-        _options = options;
-        _message = options.isEmpty ? asString(data['message'], 'Nothing on your list fits that. Rest is a good use of it.') : null;
+        _options = r.options;
+        _areas = r.areas;
+        _message = r.options.isEmpty ? r.message : null;
       });
     } on ApiException {
-      if (!mounted) return;
+      if (!mounted || asking != _asking) return;
       final fit = fitFromList(widget.items, _minutes);
       setState(() {
         _loading = false;
@@ -77,9 +106,17 @@ class _FreeTimeSheetState extends State<FreeTimeSheet> {
         _options = fit == null
             ? const []
             : [NowOption(fit.sourceType, fit.id, fit.title, fit.minutes ?? _minutes, false, '', "From today's list.")];
+        _areas = [if (fit != null) null];
         _message = fit == null ? "Can't reach Ally, and nothing on today's list fits. Rest is a good use of it." : null;
       });
     }
+  }
+
+  /// Changing the length, energy or place after an answer asks again, so what
+  /// is on screen always matches what is selected.
+  void _set(VoidCallback change) {
+    setState(change);
+    if (_asked) _ask();
   }
 
   @override
@@ -96,13 +133,24 @@ class _FreeTimeSheetState extends State<FreeTimeSheet> {
         const SizedBox(height: Sp.x3),
         Wrap(spacing: Sp.x2, runSpacing: Sp.x2, children: [
           for (final l in _lengths)
-            AllyChip(duration(l), selected: _minutes == l, onTap: _loading ? null : () => setState(() => _minutes = l)),
+            AllyChip(duration(l), selected: _minutes == l, onTap: () => _set(() => _minutes = l)),
         ]),
-        const SizedBox(height: Sp.x2),
-        Row(children: [
-          Expanded(child: Text('Low on energy', style: AllyType.body(color: c.ink))),
-          AllySwitch(value: _low, semanticLabel: 'Low on energy', onChanged: _loading ? null : (v) => setState(() => _low = v)),
-        ]),
+        const SizedBox(height: Sp.x3),
+        Text('Energy', style: AllyType.small(color: c.muted, w: FontWeight.w500)),
+        const SizedBox(height: Sp.x1),
+        AllySegmented<String>(
+          options: const {'LOW': 'Low', 'OKAY': 'Okay', 'GOOD': 'Good'},
+          value: _energy,
+          onChanged: (v) => _set(() => _energy = v),
+        ),
+        const SizedBox(height: Sp.x3),
+        Text('Where are you?', style: AllyType.small(color: c.muted, w: FontWeight.w500)),
+        const SizedBox(height: Sp.x1),
+        AllySegmented<String>(
+          options: const {'HOME': 'At home', 'OUT': 'Out'},
+          value: _place,
+          onChanged: (v) => _set(() => _place = v),
+        ),
         const SizedBox(height: Sp.x3),
         if (!_asked)
           AllyButton('Show me what fits', wide: true, onPressed: _ask)
@@ -118,6 +166,10 @@ class _FreeTimeSheetState extends State<FreeTimeSheet> {
               key: ValueKey('${o.sourceId}$_index'),
               free: true,
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                if (_index < _areas.length && _areas[_index] != null) ...[
+                  Text(_areas[_index]!, style: AllyType.small(color: c.muted, w: FontWeight.w600)),
+                  const SizedBox(height: Sp.x1),
+                ],
                 Text(o.smaller && o.minimum.isNotEmpty ? o.minimum : o.title, style: AllyType.h2(color: c.ink)),
                 const SizedBox(height: Sp.x1),
                 Text(

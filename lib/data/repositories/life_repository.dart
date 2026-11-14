@@ -1105,6 +1105,15 @@ class LifeRepository {
     return data as Map<String, dynamic>;
   }
 
+  /// "I've got time": the best use of a free window across every area, one pick
+  /// per area (the first is the suggestion). [energy] LOW | OKAY | GOOD,
+  /// [place] HOME | OUT. Rules on the server, no AI. A server that does not have
+  /// this yet answers 404; callers fall back to [now] with minutes.
+  Future<Map<String, dynamic>> freeTime({required int minutes, String energy = 'OKAY', String place = 'HOME'}) async {
+    final data = await _api.get('/now/free', query: {'minutes': '$minutes', 'energy': energy, 'place': place});
+    return data as Map<String, dynamic>;
+  }
+
   /// The last Now this phone kept, if it is from today and under 3 hours old.
   /// Shown at once on launch while the server answers (a sleeping server can
   /// take a minute); older copies could suggest something already done.

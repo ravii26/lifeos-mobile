@@ -53,6 +53,30 @@ class _Repo implements LifeRepository {
     };
   }
 
+  /// A server that does not have the free-time rules yet answers 404.
+  bool oldServer = false;
+  int? freeMinutes;
+  String? askedEnergy;
+  String? askedPlace;
+
+  @override
+  Future<Map<String, dynamic>> freeTime({required int minutes, String energy = 'OKAY', String place = 'HOME'}) async {
+    if (offline) throw const ApiException('No connection');
+    if (oldServer) throw const ApiException('Not found', statusCode: 404);
+    freeMinutes = minutes;
+    askedEnergy = energy;
+    askedPlace = place;
+    return {
+      'kind': 'PICK',
+      'minutes': minutes,
+      'message': '',
+      'picks': [
+        {'sourceType': 'TASK', 'sourceId': 't1', 'title': 'Draft the proposal outline', 'minutes': 25, 'smaller': false, 'minimum': 'Write three headings', 'why': 'Projects is 2 sessions short this week.', 'areaName': 'Projects', 'lane': 'PUSH'},
+        {'sourceType': 'TASK', 'sourceId': 'm1', 'title': 'Three chords on the keyboard', 'minutes': 15, 'smaller': false, 'minimum': '', 'why': "Music hasn't been touched in 3 weeks.", 'areaName': 'Music', 'lane': 'EXPLORE'},
+      ],
+    };
+  }
+
   @override
   Future<List<Map<String, dynamic>>> daySchedule() async => [for (var d = 0; d < 7; d++) _scheduleDay(d)];
 
@@ -225,8 +249,42 @@ void main() {
     await t.pump(const Duration(seconds: 5));
   });
 
-  testWidgets("I've got time: asks for what fits the length, and cycles to something else", (t) async {
+  testWidgets("I've got time: one pick per area, for the length, energy and place chosen", (t) async {
     final repo = await _open(t, at: DateTime(2026, 11, 16, 14));
+    await t.ensureVisible(find.text("I've got time"));
+    await t.pump(const Duration(milliseconds: 400));
+    await t.tap(find.text("I've got time"));
+    await t.pump();
+    await t.pump(const Duration(milliseconds: 700));
+    await t.tap(find.text('1h'));
+    await t.tap(find.text('Low'));
+    await t.tap(find.text('Out'));
+    await t.pump(const Duration(milliseconds: 300));
+    await t.ensureVisible(find.text('Show me what fits'));
+    await t.tap(find.text('Show me what fits'));
+    await t.pump(const Duration(seconds: 1));
+    expect(repo.freeMinutes, 60);
+    expect(repo.askedEnergy, 'LOW');
+    expect(repo.askedPlace, 'OUT');
+    expect(find.text('Projects'), findsOneWidget);
+    expect(find.text('25 min · Projects is 2 sessions short this week.'), findsOneWidget);
+    await t.ensureVisible(find.text('Something else'));
+    await t.tap(find.text('Something else'));
+    await t.pump(const Duration(seconds: 1));
+    expect(find.text('Music'), findsOneWidget);
+    expect(find.text('Three chords on the keyboard'), findsOneWidget);
+    // Changing the place after an answer asks again, so the card always matches what is selected.
+    await t.ensureVisible(find.text('At home'));
+    await t.tap(find.text('At home'));
+    await t.pump(const Duration(seconds: 1));
+    expect(repo.askedPlace, 'HOME');
+    expect(find.text('Projects'), findsOneWidget);
+    expect(t.takeException(), isNull);
+  });
+
+  testWidgets("I've got time still works with a server that has no free-time rules yet", (t) async {
+    final repo = await _open(t, at: DateTime(2026, 11, 16, 14));
+    repo.oldServer = true;
     await t.ensureVisible(find.text("I've got time"));
     await t.pump(const Duration(milliseconds: 400));
     await t.tap(find.text("I've got time"));
