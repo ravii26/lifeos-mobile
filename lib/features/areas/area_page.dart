@@ -12,6 +12,7 @@ import '../chat/starters.dart' show talkRequest;
 import '../places/now_cubit.dart' show placesRefresh;
 import '../today/day_shape.dart' show duration;
 import 'areas_overview.dart';
+import 'step_sheet.dart';
 
 /// One area: where it stands this week, its mode, the time it gets, and what
 /// is next in it.
@@ -32,6 +33,8 @@ class AreaPage extends StatefulWidget {
 }
 
 class _AreaPageState extends State<AreaPage> {
+  // Refreshed after a step changes, so the page always shows what is true.
+  late AreaStanding _area = widget.area;
   late AreaMode _mode = widget.area.mode;
   late int? _weekly = widget.area.weeklyMinutes;
   bool _saving = false;
@@ -116,7 +119,7 @@ class _AreaPageState extends State<AreaPage> {
 
   Widget _page(BuildContext themed) {
     final c = themed.ac;
-    final a = widget.area;
+    final a = _area;
     final color = c.area(widget.colorIndex);
     final resting = _mode == AreaMode.rest;
     return Scaffold(
@@ -198,9 +201,12 @@ class _AreaPageState extends State<AreaPage> {
                 ),
               if (!resting) ...[
                 const SizedBox(height: Sp.x3),
+                AllyButton('Add a step',
+                    kind: AllyButtonKind.secondary, icon: Icons.add_rounded, wide: true, onPressed: () => _openStep(themed, null)),
+                const SizedBox(height: Sp.x2),
                 AllyButton(
                   a.goals.isEmpty ? 'Tell Ally what you want here' : 'Ask Ally for the next step',
-                  kind: AllyButtonKind.secondary,
+                  kind: AllyButtonKind.ghost,
                   wide: true,
                   onPressed: () {
                     Navigator.of(context).popUntil((r) => r.isFirst);
@@ -224,6 +230,60 @@ class _AreaPageState extends State<AreaPage> {
         ],
       ),
     );
+  }
+
+  Future<void> _reload() async {
+    try {
+      final all = (await loadAreasOverview(widget.repo)).areas;
+      final fresh = all.where((x) => x.id == _area.id);
+      if (fresh.isNotEmpty && mounted) setState(() => _area = fresh.first);
+    } on ApiException {
+      // The page keeps what it had; the toast already said what happened.
+    }
+  }
+
+  /// Add (step null) or change a step: one sheet, then one call, with Undo.
+  Future<void> _openStep(BuildContext themed, AreaStep? step) async {
+    final answer = await showAllySheet<StepAnswer>(themed, builder: (_) => StepSheet(step: step, areaName: _area.name));
+    if (answer == null || !mounted) return;
+    final repo = widget.repo;
+    try {
+      final r = switch (answer) {
+        StepSave(:final title, :final minutes, :final energy, :final smaller) => step == null
+            ? await repo.addStep(_area.id, title, minutes: minutes, energy: energy, smaller: smaller)
+            : await repo.editStep(step.id,
+                title: title,
+                minutes: minutes,
+                clearMinutes: minutes == null && step.minutes != null,
+                energy: energy,
+                smaller: smaller),
+        StepMove(when: final to) => await repo.moveStep(step!.id, to),
+        StepLetGo() => await repo.letGoStep(step!.id),
+      };
+      placesRefresh.value++;
+      await _reload();
+      if (!themed.mounted) return;
+      final undoId = r.activityId;
+      showAllyToast(
+        themed,
+        r.message,
+        onUndo: undoId == null
+            ? null
+            : () async {
+                try {
+                  await repo.undo(undoId);
+                  placesRefresh.value++;
+                  await _reload();
+                } on ApiException catch (e) {
+                  if (themed.mounted) showAllyToast(themed, e.message);
+                }
+              },
+      );
+    } on ApiException catch (e) {
+      if (!themed.mounted) return;
+      // A server from before steps existed answers 404 for all of them.
+      showAllyToast(themed, e.isNotFound && step == null ? 'Adding steps needs the latest server. Deploy it, then try again.' : e.message);
+    }
   }
 
   Widget _section(AllyColors c, String title, List<Widget> children) => Column(
@@ -252,12 +312,29 @@ class _AreaPageState extends State<AreaPage> {
 
   Widget _stepRow(BuildContext themed, AllyColors c, AreaStep s) => Row(children: [
         Expanded(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: Sp.x2),
-            child: Text(
-              s.title,
-              style: AllyType.body(color: s.done ? c.faint : c.ink, w: FontWeight.w500)
-                  .copyWith(decoration: s.done ? TextDecoration.lineThrough : null),
+          child: Pressable(
+            scale: 0.985,
+            onTap: s.done ? null : () => _openStep(themed, s),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: Sp.x2),
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text(
+                  s.title,
+                  style: AllyType.body(color: s.done ? c.faint : c.ink, w: FontWeight.w500)
+                      .copyWith(decoration: s.done ? TextDecoration.lineThrough : null),
+                ),
+                if (s.energy == 'HIGH' || s.energy == 'LOW' || (s.smaller != null && s.smaller!.isNotEmpty))
+                  Text(
+                    [
+                      if (s.energy == 'HIGH') 'Demanding',
+                      if (s.energy == 'LOW') 'Light',
+                      if (s.smaller != null && s.smaller!.isNotEmpty) 'Smaller: ${s.smaller}',
+                    ].join(' · '),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: AllyType.small(color: c.faint),
+                  ),
+              ]),
             ),
           ),
         ),

@@ -27,8 +27,14 @@ class AreaStep {
   final String id;
   final String title;
   final int? minutes;
+
+  /// LOW | NORMAL | HIGH; null = normal.
+  final String? energy;
+
+  /// The smaller version, for a hard day.
+  final String? smaller;
   bool done;
-  AreaStep(this.id, this.title, this.minutes, {this.done = false});
+  AreaStep(this.id, this.title, this.minutes, {this.energy, this.smaller, this.done = false});
 }
 
 class AreaRoutine {
@@ -80,7 +86,8 @@ class AreaStanding {
         goals: ((j['goals'] as List?) ?? const []).whereType<Json>().map((g) => asString(g['title'])).toList(),
         nextSteps: ((j['nextSteps'] as List?) ?? const [])
             .whereType<Json>()
-            .map((s) => AreaStep(asString(s['id']), asString(s['title']), s['minutes'] == null ? null : asInt(s['minutes'])))
+            .map((s) => AreaStep(asString(s['id']), asString(s['title']), s['minutes'] == null ? null : asInt(s['minutes']),
+                energy: asStringOrNull(s['energy']), smaller: asStringOrNull(s['smaller'])))
             .toList(),
         routines: ((j['routines'] as List?) ?? const [])
             .whereType<Json>()

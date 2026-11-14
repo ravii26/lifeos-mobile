@@ -178,6 +178,41 @@ class LifeRepository {
   /// A server that predates this answers 404; see `loadAreasOverview`.
   Future<Json> areasOverview() async => (await _api.get('/areas/overview')) as Json;
 
+  // ---- Steps (tasks seen from an area page; every change can be undone) ----
+
+  static ({String message, String? activityId}) _receipt(Object? data) {
+    final j = data is Json ? data : const <String, dynamic>{};
+    return (message: asString(j['message'], 'Saved.'), activityId: asStringOrNull(j['activityId']));
+  }
+
+  /// [energy] LOW | NORMAL | HIGH.
+  Future<({String message, String? activityId})> addStep(String areaId, String title,
+          {int? minutes, String? energy, String? smaller}) async =>
+      _receipt(await _api.post('/steps', body: {
+        'areaId': areaId,
+        'title': title,
+        if (minutes != null) 'sizeMinutes': minutes,
+        if (energy != null) 'energy': energy,
+        if (smaller != null && smaller.trim().isNotEmpty) 'minimumVersion': smaller.trim(),
+      }));
+
+  /// Sends only what is given; an empty [smaller] clears it, [clearMinutes] clears the length.
+  Future<({String message, String? activityId})> editStep(String id,
+          {String? title, int? minutes, bool clearMinutes = false, String? energy, String? smaller}) async =>
+      _receipt(await _api.patch('/steps/$id', body: {
+        if (title != null) 'title': title,
+        if (clearMinutes) 'sizeMinutes': null else if (minutes != null) 'sizeMinutes': minutes,
+        if (energy != null) 'energy': energy,
+        if (smaller != null) 'minimumVersion': smaller.trim().isEmpty ? null : smaller.trim(),
+      }));
+
+  /// [when] TOMORROW | WEEKEND | NEXT_WEEK. Not suggested before then.
+  Future<({String message, String? activityId})> moveStep(String id, String when) async =>
+      _receipt(await _api.post('/steps/$id/move', body: {'when': when}));
+
+  /// Archived, not destroyed; Undo brings it back.
+  Future<({String message, String? activityId})> letGoStep(String id) async => _receipt(await _api.post('/steps/$id/let-go'));
+
   // ---- Tasks ----
   Future<List<Task>> tasks({String? areaId, String? status}) async {
     final data =
