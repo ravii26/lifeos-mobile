@@ -157,9 +157,12 @@ class LifeRepository {
     String? icon,
     bool? isActive,
     String? tier, // MAIN | SECONDARY | MAINTAIN | LATER
+    int? weeklyMinutes,
+    bool clearWeeklyMinutes = false,
   }) async {
     final data = await _api.patch('/areas/$id', body: {
       if (tier != null) 'tier': tier,
+      if (clearWeeklyMinutes) 'weeklyMinutes': null else if (weeklyMinutes != null) 'weeklyMinutes': weeklyMinutes,
       if (name != null) 'name': name,
       if (type != null) 'type': type,
       if (color != null) 'color': color,
@@ -170,6 +173,10 @@ class LifeRepository {
   }
 
   Future<void> deleteArea(String id) => _api.delete('/areas/$id');
+
+  /// Where every area stands this week (mode, time against plan, next steps).
+  /// A server that predates this answers 404; see `loadAreasOverview`.
+  Future<Json> areasOverview() async => (await _api.get('/areas/overview')) as Json;
 
   // ---- Tasks ----
   Future<List<Task>> tasks({String? areaId, String? status}) async {

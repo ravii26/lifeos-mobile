@@ -26,6 +26,7 @@ class OfflineStore {
     '/tasks',
     '/habits',
     '/areas',
+    '/areas/overview',
     '/assistant/reminders',
     '/assistant/memories',
     '/settings',

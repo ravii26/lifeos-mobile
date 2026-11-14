@@ -9,6 +9,8 @@ import '../../core/notifications/agenda_sync.dart';
 import '../../core/notifications/notification_service.dart';
 import '../../data/models/user.dart';
 import '../../data/repositories/life_repository.dart';
+import '../../design/tokens.dart';
+import '../areas/areas_home_screen.dart';
 import '../capture/capture_sheet.dart';
 import '../chat/chat_cubit.dart';
 import '../chat/chat_screen.dart';
@@ -19,12 +21,14 @@ import '../guide/tonight_cubit.dart';
 import '../places/now_cubit.dart';
 import '../places/now_screen.dart';
 import '../places/you_screen.dart';
+import '../today/today_screen.dart';
 import 'life_cubit.dart';
 
 // Where Ally lives: Now and My life, with Talk one tap from either.
 const _nowPlace = 0;
 const _lifePlace = 1;
 const _talkPlace = 2;
+const _areasPlace = 3;
 
 class HomeShell extends StatefulWidget {
   final AppUser user;
@@ -178,9 +182,15 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
               child: IndexedStack(
                 index: _index,
                 children: [
-                  const NowScreen(),
+                  // Today replaces Now. The previous screen stays one tap away
+                  // until its extras (counts, routine, meal, watch later) are rebuilt.
+                  TodayScreen(
+                    firstName: widget.user.firstName,
+                    onOpenPrevious: () => _openPreviousNow(context),
+                  ),
                   YouScreen(user: widget.user),
                   ChatScreen(onBack: () => setState(() => _index = _nowPlace)),
+                  const AreasHomeScreen(),
                 ],
               ),
             ),
@@ -199,6 +209,24 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
         );
       }),
     );
+  }
+
+  void _openPreviousNow(BuildContext context) {
+    Navigator.of(context).push(MaterialPageRoute<void>(
+      builder: (_) => MultiBlocProvider(
+        providers: [
+          BlocProvider.value(value: context.read<LifeCubit>()),
+          BlocProvider.value(value: context.read<TonightCubit>()),
+          BlocProvider.value(value: context.read<NowCubit>()),
+          BlocProvider.value(value: context.read<ChatCubit>()),
+        ],
+        child: Scaffold(
+          backgroundColor: G.bg,
+          appBar: AppBar(backgroundColor: G.bg, surfaceTintColor: G.bg, foregroundColor: G.ink, elevation: 0),
+          body: const NowScreen(),
+        ),
+      ),
+    ));
   }
 
   void _openCapture(BuildContext context, {PendingCaptureIntent? pending}) {
@@ -220,63 +248,75 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
   }
 }
 
-/// Now on the left, My life on the right, and the way to talk to Ally between them.
+/// Today, Areas, the way to talk to Ally, and My life.
+/// Today and Areas are in the new design; My life is still Plum until it is
+/// rebuilt, so the bar takes the colours of the place it is showing.
 class _BottomNav extends StatelessWidget {
   final int index;
   final ValueChanged<int> onTap;
   final VoidCallback onTalk;
   const _BottomNav({required this.index, required this.onTap, required this.onTalk});
 
-  Widget _place(String label, int place, Alignment alignment) => Expanded(
-        child: Semantics(
-          button: true,
-          selected: index == place,
-          child: GestureDetector(
-            behavior: HitTestBehavior.opaque,
-            onTap: () => onTap(place),
-            child: Container(
-              alignment: alignment,
-              padding: const EdgeInsets.symmetric(horizontal: 24),
-              child: Text(
-                label,
-                style: G.text(16,
-                    w: index == place ? FontWeight.w600 : FontWeight.w400,
-                    color: index == place ? G.ink : G.muted,
-                    height: 1.2),
-              ),
+  bool get _newLook => index == _nowPlace || index == _areasPlace;
+
+  Widget _place(String label, int place) {
+    const ally = AllyColors.dark;
+    final on = index == place;
+    final color = _newLook ? (on ? ally.ink : ally.muted) : (on ? G.ink : G.muted);
+    return Expanded(
+      child: Semantics(
+        button: true,
+        selected: on,
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: () => onTap(place),
+          child: Center(
+            child: Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: G.text(16, w: on ? FontWeight.w600 : FontWeight.w400, color: color, height: 1.2),
             ),
           ),
         ),
-      );
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
+    const ally = AllyColors.dark;
     return ColoredBox(
-      color: G.bg,
+      color: _newLook ? ally.bg : G.bg,
       child: SafeArea(
         top: false,
         child: SizedBox(
           height: 72,
           child: Row(children: [
-            _place('Now', _nowPlace, Alignment.centerLeft),
-            Material(
-              color: G.surfaceHigh,
-              shape: const CircleBorder(),
-              child: InkWell(
-                customBorder: const CircleBorder(),
-                onTap: onTalk,
-                child: Semantics(
-                  label: 'Talk to Ally',
-                  button: true,
-                  child: SizedBox(
-                    width: 56,
-                    height: 56,
-                    child: Icon(Icons.mic_none_rounded, size: 25, color: G.ink),
+            _place('Today', _nowPlace),
+            _place('Areas', _areasPlace),
+            Expanded(
+              child: Center(
+                child: Material(
+                  color: _newLook ? ally.raised : G.surfaceHigh,
+                  shape: const CircleBorder(),
+                  child: InkWell(
+                    customBorder: const CircleBorder(),
+                    onTap: onTalk,
+                    child: Semantics(
+                      label: 'Talk to Ally',
+                      button: true,
+                      child: SizedBox(
+                        width: 56,
+                        height: 56,
+                        child: Icon(Icons.mic_none_rounded, size: 25, color: _newLook ? ally.ink : G.ink),
+                      ),
+                    ),
                   ),
                 ),
               ),
             ),
-            _place('My life', _lifePlace, Alignment.centerRight),
+            _place('My life', _lifePlace),
           ]),
         ),
       ),
