@@ -10,6 +10,7 @@ import '../../data/models/user.dart';
 import '../../data/repositories/life_repository.dart';
 import '../../widgets/form_kit.dart' show gFieldStyle;
 import '../auth/bloc/auth_bloc.dart';
+import '../design_preview/design_preview_screen.dart';
 import '../guide/guide_style.dart';
 
 class SettingsScreen extends StatelessWidget {
@@ -43,6 +44,9 @@ class SettingsScreen extends StatelessWidget {
             Navigator.of(context).popUntil((r) => r.isFirst);
             context.read<AuthBloc>().add(const AuthLogoutRequested());
           }),
+          const SizedBox(height: 10),
+          // Temporary: lets the new design system be judged on a phone. Removed before launch.
+          GPill('Preview the new design', onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const DesignPreviewScreen()))),
           const SizedBox(height: 34),
           Text('Deleting removes your goals, notes, memories and history. It cannot be undone.', style: G.text(17, color: G.muted, height: 1.4)),
           const SizedBox(height: 12),

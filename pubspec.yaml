@@ -85,6 +85,19 @@ flutter:
     - assets/logo/
     - assets/avatar3d/
 
+  # Bundled (SIL Open Font License, licences beside the files) so text never
+  # waits on a download. Variable fonts: weight is set in lib/design/type.dart.
+  fonts:
+    - family: Geist
+      fonts:
+        - asset: assets/fonts/Geist.ttf
+    - family: Geist Mono
+      fonts:
+        - asset: assets/fonts/GeistMono.ttf
+    - family: Schibsted Grotesk
+      fonts:
+        - asset: assets/fonts/SchibstedGrotesk.ttf
+
 flutter_launcher_icons:
   android: true
   ios: true
