@@ -137,6 +137,19 @@ FreeWindow? freeWindow(List<DayBlockInfo> blocks, int nowMin) {
   return null;
 }
 
+/// Usable minutes in the free part of the day that runs [start]–[end]: what
+/// is left of it if it has begun, never more than that part allows.
+int? freeMinutesIn(List<DayBlockInfo> blocks, int start, int end, int nowMin) {
+  for (final b in blocks) {
+    if (b.start != start || b.end != end || !b.isFree) continue;
+    final from = nowMin > b.start ? nowMin : b.start;
+    final left = b.end - from;
+    if (left <= 0) return null;
+    return left < b.freeMinutes ? left : b.freeMinutes;
+  }
+  return null;
+}
+
 /// The arcs on the dial. Spoken-for time and sleep are thin and dim, free
 /// parts are marigold, and anything with a set time sits on top in [planned].
 List<DayPart> dialParts(List<DayBlockInfo> blocks, List<TodayItem> items, {required Color planned}) {

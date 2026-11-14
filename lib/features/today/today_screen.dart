@@ -207,11 +207,12 @@ class _TodayScreenState extends State<TodayScreen> {
   }
 
   /// "I've got time": pick a length, get what fits, start it.
-  Future<void> _gotTime(BuildContext themed, FreeWindow? free) async {
+  /// [minutes]: the length to start from, e.g. a free part tapped on the dial.
+  Future<void> _gotTime(BuildContext themed, FreeWindow? free, {int? minutes}) async {
     final cubit = context.read<NowCubit>();
     final o = await showAllySheet<NowOption>(
       themed,
-      builder: (_) => FreeTimeSheet(repo: _repo, items: _items, suggestedMinutes: free != null && free.now ? free.minutes : null),
+      builder: (_) => FreeTimeSheet(repo: _repo, items: _items, suggestedMinutes: minutes ?? (free != null && free.now ? free.minutes : null)),
     );
     if (o == null || !mounted || !themed.mounted) return;
     await _runFree(themed, o);
@@ -344,7 +345,7 @@ class _TodayScreenState extends State<TodayScreen> {
                 ]),
                 if (s.fromSaved) const AllyBanner("You're offline. This is the copy saved on this phone."),
                 if (s.restart != null) _restart(c, cubit, s),
-                if (_blocks.isNotEmpty) _dial(c, free),
+                if (_blocks.isNotEmpty) _dial(themed, c, free),
                 _suggestion(themed, c, cubit, s, free),
                 if (s.advice != null) _advice(c, cubit, s),
                 AllyButton("I've got time",
@@ -382,7 +383,7 @@ class _TodayScreenState extends State<TodayScreen> {
     );
   }
 
-  Widget _dial(AllyColors c, FreeWindow? free) {
+  Widget _dial(BuildContext themed, AllyColors c, FreeWindow? free) {
     final Widget centre;
     final String label;
     if (free == null) {
@@ -410,6 +411,9 @@ class _TodayScreenState extends State<TodayScreen> {
       now: _nowMin,
       parts: dialParts(_blocks, _items, planned: c.muted),
       semanticLabel: label,
+      // The glowing part of the ring is a way in: tap it to use that time.
+      tapHint: "Opens I've got time",
+      onTapFree: (part) => _gotTime(themed, free, minutes: freeMinutesIn(_blocks, part.start, part.end, _nowMin)),
       child: centre,
     );
   }

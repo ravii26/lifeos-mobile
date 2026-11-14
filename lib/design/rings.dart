@@ -138,6 +138,11 @@ class DayDial extends StatefulWidget {
   final double maxSize;
   final String? semanticLabel;
 
+  /// Tapping a free part that is not over yet. Screen readers get the same
+  /// action on the whole dial, for the next free part, described by [tapHint].
+  final ValueChanged<DayPart>? onTapFree;
+  final String? tapHint;
+
   const DayDial({
     super.key,
     required this.parts,
@@ -145,6 +150,8 @@ class DayDial extends StatefulWidget {
     this.child,
     this.maxSize = 300,
     this.semanticLabel,
+    this.onTapFree,
+    this.tapHint,
   });
 
   @override
@@ -184,15 +191,37 @@ class _DayDialState extends State<DayDial> with TickerProviderStateMixin {
   @override
   Widget build(BuildContext context) {
     final c = context.ac;
+    final onTap = widget.onTapFree;
+    final next = onTap == null ? null : nextFreePart(widget.parts, widget.now);
     return Semantics(
       label: widget.semanticLabel,
+      hint: next == null ? null : widget.tapHint,
       container: true,
+      onTap: next == null ? null : () => onTap!(next),
       child: Center(
         child: ConstrainedBox(
           constraints: BoxConstraints(maxWidth: widget.maxSize),
           child: AspectRatio(
             aspectRatio: 1,
-            child: AnimatedBuilder(
+            child: LayoutBuilder(
+              builder: (context, box) => GestureDetector(
+                behavior: HitTestBehavior.translucent,
+                onTapUp: onTap == null
+                    ? null
+                    : (d) {
+                        final part = freePartAt(widget.parts, widget.now, d.localPosition, box.biggest);
+                        if (part != null) onTap(part);
+                      },
+                child: _dial(c),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _dial(AllyColors c) => AnimatedBuilder(
               animation: Listenable.merge([_draw, _halo]),
               builder: (context, child) => CustomPaint(
                 painter: _DialPainter(
@@ -212,12 +241,41 @@ class _DayDialState extends State<DayDial> with TickerProviderStateMixin {
                 // Shrinks to fit at large text sizes rather than clipping.
                 child: FittedBox(fit: BoxFit.scaleDown, child: widget.child),
               ),
-            ),
-          ),
-        ),
-      ),
-    );
+            );
+}
+
+// The dial's ring sits here inside its square (see _DialPainter.paint).
+double _dialRadius(Size size) => size.shortestSide / 2 - _DialPainter._band / 2 - 8;
+
+bool _contains(DayPart p, int minute) =>
+    p.end >= p.start ? minute >= p.start && minute < p.end : minute >= p.start || minute < p.end;
+
+bool _over(DayPart p, int now) => p.end >= p.start && p.end <= now;
+
+/// The free part of the day under a tap on the dial, if it is not over yet.
+/// A tap counts when it lands on the ring or close to it (fingers are wide).
+DayPart? freePartAt(List<DayPart> parts, int now, Offset local, Size size) {
+  const reach = 24.0;
+  final d = local - size.center(Offset.zero);
+  if ((d.distance - _dialRadius(size)).abs() > reach) return null;
+  var a = math.atan2(d.dy, d.dx) - _top;
+  a = (a % _turn + _turn) % _turn;
+  final minute = (a / _turn * 1440).floor() % 1440;
+  for (final p in parts) {
+    if (p.kind == DayPartKind.free && !_over(p, now) && _contains(p, minute)) return p;
   }
+  return null;
+}
+
+/// The free part someone is in, or the next one today.
+DayPart? nextFreePart(List<DayPart> parts, int now) {
+  DayPart? best;
+  for (final p in parts) {
+    if (p.kind != DayPartKind.free || _over(p, now)) continue;
+    if (_contains(p, now)) return p;
+    if (p.start > now && (best == null || p.start < best.start)) best = p;
+  }
+  return best;
 }
 
 class _DialPainter extends CustomPainter {
