@@ -1,7 +1,6 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../core/api/api_client.dart' show QueuedOfflineException;
@@ -14,9 +13,11 @@ import '../../design/rings.dart';
 import '../../design/tokens.dart';
 import '../../design/type.dart';
 import '../chat/starters.dart' show talkRequest;
-import '../places/done_screen.dart';
+import '../places/done_screen.dart' show DoneChoice;
 import '../places/now_cubit.dart';
-import '../places/timer_screen.dart';
+import '../areas/areas_overview.dart';
+import '../session/completion_screen.dart';
+import '../session/focus_session_screen.dart';
 import 'day_shape.dart';
 import 'today_sheets.dart';
 
@@ -94,33 +95,82 @@ class _TodayScreenState extends State<TodayScreen> {
 
   static String _shown(NowOption o) => o.smaller && o.minimum.isNotEmpty ? o.minimum.replaceAll(RegExp(r'\.$'), '') : o.title;
 
-  Future<TimerResult?> _timer(NowOption o, {int? minutes}) => Navigator.of(context).push<TimerResult>(MaterialPageRoute(
-        builder: (_) => TimerScreen(
+  /// Opens the focus session. Null when it was closed with the back button.
+  Future<FocusOutcome?> _focus(NowOption o, {int? minutes}) => Navigator.of(context).push<FocusOutcome>(MaterialPageRoute(
+        builder: (_) => FocusSessionScreen(
           title: _shown(o),
           minutes: minutes ?? (o.minutes > 0 ? o.minutes : 25),
           firstStep: !o.smaller && o.minimum.isNotEmpty ? o.minimum.replaceAll(RegExp(r'\.$'), '') : null,
+          areaName: o.areaName,
         ),
       ));
 
-  /// Start on the Today card.
-  Future<void> _start(NowOption o, {int? minutes}) async {
-    final cubit = context.read<NowCubit>();
-    final result = await _timer(o, minutes: minutes);
-    if (!mounted) return;
-    if (result == TimerResult.finished) {
-      await _done(o);
-    } else if (result == TimerResult.stuck) {
-      await cubit.smaller();
+  /// Where the option's area stands this week, when the server says which
+  /// area it is. Best effort: the completion moment works without it.
+  Future<({AreaStanding area, int index})?> _areaOf(NowOption o) async {
+    final id = o.areaId;
+    if (id == null) return null;
+    try {
+      final all = (await loadAreasOverview(_repo)).areas;
+      final i = all.indexWhere((a) => a.id == id);
+      return i < 0 ? null : (area: all[i], index: i);
+    } on ApiException {
+      return null;
     }
   }
 
-  Future<void> _done(NowOption o) async {
-    final cubit = context.read<NowCubit>();
-    HapticFeedback.lightImpact();
-    if (!await cubit.done() || !mounted) return;
-    final choice = await Navigator.of(context).push<DoneChoice>(MaterialPageRoute(
-      builder: (_) => DoneScreen(title: _shown(o), canUndo: cubit.state.undoId != null),
+  /// "You're free until 23:00." or "Next free time: 18:30." or nothing.
+  String? _nextFreeLine() {
+    final w = freeWindow(_blocks, _nowMin);
+    if (w == null) return null;
+    return w.now ? "You're free until ${clock(w.end)}." : 'Next free time: ${clock(w.start)}.';
+  }
+
+  Future<DoneChoice?> _celebrate(BuildContext themed, NowOption o,
+      {int? minutes, ({AreaStanding area, int index})? before, required bool canUndo}) async {
+    // Read before the await: the colour comes from the theme.
+    final colors = themed.ac;
+    AreaMove? move;
+    if (before != null) {
+      final after = await _areaOf(o);
+      move = AreaMove(
+        name: before.area.name,
+        color: colors.area(before.index),
+        from: before.area.value,
+        to: after?.area.value ?? before.area.value,
+        status: after?.area.status,
+      );
+    }
+    if (!mounted) return null;
+    return Navigator.of(context).push<DoneChoice>(MaterialPageRoute(
+      builder: (_) => CompletionScreen(title: _shown(o), minutes: minutes, area: move, nextLine: _nextFreeLine(), canUndo: canUndo),
     ));
+  }
+
+  /// Start on the Today card.
+  Future<void> _start(BuildContext themed, NowOption o, {int? minutes}) async {
+    final cubit = context.read<NowCubit>();
+    final before = _areaOf(o); // fetched while the session runs
+    final outcome = await _focus(o, minutes: minutes);
+    if (!mounted) return;
+    switch (outcome?.end) {
+      case FocusEnd.done:
+        final was = await before;
+        if (!mounted || !themed.mounted) return;
+        await _done(themed, o, minutes: outcome!.minutes, before: was);
+      case FocusEnd.stuck:
+        await cubit.smaller();
+      case FocusEnd.stopped || null:
+        break;
+    }
+  }
+
+  /// Done, from the card (no timer) or at the end of a session.
+  Future<void> _done(BuildContext themed, NowOption o, {int? minutes, ({AreaStanding area, int index})? before}) async {
+    final cubit = context.read<NowCubit>();
+    final was = before ?? await _areaOf(o);
+    if (!await cubit.done(minutes: minutes) || !mounted || !themed.mounted) return;
+    final choice = await _celebrate(themed, o, minutes: minutes, before: was, canUndo: cubit.state.undoId != null);
     if (choice == DoneChoice.undo) await cubit.undo();
     if (choice == DoneChoice.finishedForToday) await cubit.finishForToday();
   }
@@ -145,11 +195,11 @@ class _TodayScreenState extends State<TodayScreen> {
           themed,
           builder: (_) => StepsSheet(title: o.title, firstStep: o.minimum, detail: o.detail),
         );
-        if (go == true && mounted) await _start(o);
+        if (go == true && mounted && themed.mounted) await _start(themed, o);
       case 'SMALLER':
         await cubit.smaller();
       case 'FIVE':
-        await _start(o, minutes: 5);
+        await _start(themed, o, minutes: 5);
       case 'SKIP':
         await cubit.notNow(reason: picked.reason);
       default:
@@ -164,19 +214,46 @@ class _TodayScreenState extends State<TodayScreen> {
       themed,
       builder: (_) => FreeTimeSheet(repo: _repo, items: _items, suggestedMinutes: free != null && free.now ? free.minutes : null),
     );
-    if (o == null || !mounted) return;
-    final result = await _timer(o);
-    if (!mounted || !themed.mounted || result != TimerResult.finished) return;
+    if (o == null || !mounted || !themed.mounted) return;
+    await _runFree(themed, o);
+    unawaited(cubit.load());
+  }
+
+  /// A pick from "I've got time": not the Today card, so it is answered directly.
+  Future<void> _runFree(BuildContext themed, NowOption o, {int? minutes}) async {
+    final before = _areaOf(o);
+    final outcome = await _focus(o, minutes: minutes);
+    if (!mounted || !themed.mounted) return;
+    if (outcome?.end == FocusEnd.stuck) {
+      // Stuck: the first step written out, then five minutes of it.
+      final go = await showAllySheet<bool>(themed, builder: (_) => StepsSheet(title: o.title, firstStep: o.minimum, detail: o.detail));
+      if (go == true && mounted && themed.mounted) await _runFree(themed, o, minutes: 5);
+      return;
+    }
+    if (outcome?.end != FocusEnd.done) return;
+    final was = await before;
+    String? undoId;
     try {
-      final id = await _repo.respondNow(o.sourceType, o.sourceId, 'DONE', minutes: o.minutes, count: o.count);
+      undoId = await _repo.respondNow(o.sourceType, o.sourceId, 'DONE', minutes: outcome!.minutes, count: o.count);
       placesRefresh.value++;
-      if (themed.mounted) _toast(themed, 'Done. ${_shown(o)}', undoId: id);
     } on QueuedOfflineException {
       if (themed.mounted) _toast(themed, "Saved offline. It'll sync when you're back online.");
+      return;
     } on ApiException catch (e) {
       if (themed.mounted) _toast(themed, e.message);
+      return;
     }
-    unawaited(cubit.load());
+    if (!themed.mounted) return;
+    final choice = await _celebrate(themed, o, minutes: outcome.minutes, before: was, canUndo: undoId != null);
+    if (choice == DoneChoice.undo && undoId != null) {
+      try {
+        await _repo.undo(undoId);
+        placesRefresh.value++;
+      } on ApiException catch (e) {
+        if (themed.mounted) _toast(themed, e.message);
+      }
+    }
+    if (choice == DoneChoice.finishedForToday && mounted) await context.read<NowCubit>().finishForToday();
   }
 
   Future<void> _tick(BuildContext themed, TodayItem item) async {
@@ -401,11 +478,11 @@ class _TodayScreenState extends State<TodayScreen> {
             kind: inFree ? AllyButtonKind.free : AllyButtonKind.main,
             icon: Icons.play_arrow_rounded,
             wide: true,
-            onPressed: s.busy ? null : () => _start(o)),
+            onPressed: s.busy ? null : () => _start(themed, o)),
         const SizedBox(height: Sp.x2),
         Row(children: [
           Expanded(
-            child: AllyButton('Done', kind: AllyButtonKind.secondary, wide: true, onPressed: s.busy ? null : () => _done(o)),
+            child: AllyButton('Done', kind: AllyButtonKind.secondary, wide: true, onPressed: s.busy ? null : () => _done(themed, o)),
           ),
           const SizedBox(width: Sp.x2),
           Expanded(

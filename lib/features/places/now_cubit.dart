@@ -27,7 +27,11 @@ class NowOption extends Equatable {
   final String why;
   final int? count; // a counted session: "apply to 2 jobs"
   final String? detail; // the steps (a plan session's exercises), for "Not clear what to do"
-  const NowOption(this.sourceType, this.sourceId, this.title, this.minutes, this.smaller, this.minimum, this.why, [this.count, this.detail]);
+  // The area it belongs to, when the server says (lets the completion moment move that area's ring).
+  final String? areaId;
+  final String? areaName;
+  const NowOption(this.sourceType, this.sourceId, this.title, this.minutes, this.smaller, this.minimum, this.why,
+      [this.count, this.detail, this.areaId, this.areaName]);
 
   factory NowOption.fromJson(Json j) => NowOption(
         asString(j['sourceType'], 'TASK'),
@@ -39,6 +43,8 @@ class NowOption extends Equatable {
         asString(j['why']),
         j['count'] == null ? null : asInt(j['count']),
         asStringOrNull(j['detail']),
+        asStringOrNull(j['areaId']),
+        asStringOrNull(j['areaName']),
       );
 
   @override
@@ -373,12 +379,12 @@ class NowCubit extends Cubit<NowState> {
   }
 
   /// True when the answer was saved, or queued to be saved once back online.
-  Future<bool> _answer(String action, {bool reload = true, String? reason}) async {
+  Future<bool> _answer(String action, {bool reload = true, String? reason, int? minutes}) async {
     final o = state.current;
     if (o == null || state.busy) return false;
     emit(state.copyWith(busy: true, clearUndo: true));
     try {
-      final id = await _repo.respondNow(o.sourceType, o.sourceId, action, minutes: o.minutes, count: o.count, reason: reason);
+      final id = await _repo.respondNow(o.sourceType, o.sourceId, action, minutes: minutes ?? o.minutes, count: o.count, reason: reason);
       placesRefresh.value++;
       emit(state.copyWith(busy: false, undoId: id));
     } on QueuedOfflineException {
@@ -401,7 +407,10 @@ class NowCubit extends Cubit<NowState> {
     return true;
   }
 
-  Future<bool> done() => _answer('DONE');
+  /// [minutes]: the time actually given, when a focus session measured it.
+  /// It only counts towards a weekly time target (a goal session); a to-do or
+  /// routine is simply done.
+  Future<bool> done({int? minutes}) => _answer('DONE', minutes: minutes);
 
   /// From the Not now choices: TOMORROW, WEEKEND or LET_GO, each undoable.
   /// [reason]: what got in the way ("no time", "forgot"), kept so a restart can learn from it.
