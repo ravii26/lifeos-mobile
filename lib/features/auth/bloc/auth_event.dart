@@ -28,6 +28,19 @@ class AuthRegisterRequested extends AuthEvent {
   List<Object?> get props => [name, email, password];
 }
 
+/// "Get started" on the welcome screen.
+class AuthGuestRequested extends AuthEvent {
+  const AuthGuestRequested();
+}
+
+/// The account changed in place (a guest account was saved).
+class AuthUserUpdated extends AuthEvent {
+  final AppUser user;
+  const AuthUserUpdated(this.user);
+  @override
+  List<Object?> get props => [user];
+}
+
 class AuthLogoutRequested extends AuthEvent {
   const AuthLogoutRequested();
 }

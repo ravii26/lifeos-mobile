@@ -50,20 +50,27 @@ private val NOW_ID_KEY = ActionParameters.Key<String>("nowId")
 private val NOW_MIN_KEY = ActionParameters.Key<String>("nowMinutes")
 private val NOW_COUNT_KEY = ActionParameters.Key<String>("nowCount")
 
-/** Reads the app's theme (AppColors) out of the snapshot. Defaults are the
- * same Plum colors, for the moment before the app has synced for the first time. */
+/** Reads the app's colours out of the snapshot (the new look, following the
+ * person's appearance). Defaults are the dark new look, before the first sync. */
 private class WidgetTheme(json: JSONObject?) {
-    val bg = colorOf(json, "bgColor", 0xFF1C1026L)
-    val fg = colorOf(json, "textColor", 0xFFFBF1ECL)
-    val fgMuted = colorOf(json, "mutedTextColor", 0xFFD9C8D6L)
-    val accent = colorOf(json, "accentColor", 0xFFF6C9B2L)
-    val accentInk = colorOf(json, "accentInkColor", 0xFF2A1420L)
+    val bg = colorOf(json, "bgColor", 0xFF15171DL)
+    val fg = colorOf(json, "textColor", 0xFFF4F2EDL)
+    val fgMuted = colorOf(json, "mutedTextColor", 0xFFABAFBAL)
+    // Marigold: free time only.
+    val free = colorOf(json, "accentColor", 0xFFFFB23EL)
 
     private fun colorOf(json: JSONObject?, key: String, default: Long): Color =
         Color(json?.optLong(key, default)?.toInt() ?: default.toInt())
 }
 
 private fun solid(color: Color) = ColorProvider(color)
+
+/** "45 min", "1 h", "1 h 30". */
+private fun minutesLabel(m: Int): String = when {
+    m < 60 -> "$m min"
+    m % 60 == 0 -> "${m / 60} h"
+    else -> "${m / 60} h ${(m % 60).toString().padStart(2, '0')}"
+}
 
 class LifeOSWidget : GlanceAppWidget() {
     override val stateDefinition = HomeWidgetGlanceStateDefinition()
@@ -78,30 +85,27 @@ class LifeOSWidget : GlanceAppWidget() {
         val snapshot = raw?.let { runCatching { JSONObject(it) }.getOrNull() }
         val theme = WidgetTheme(snapshot)
         val compact = LocalSize.current.width < 180.dp
+        val tall = LocalSize.current.height >= 200.dp
 
-        // Compact (small-size) widgets have no habit list to fill the cell,
-        // so the header is vertically centered rather than pinned to the
-        // top-left — leaving it there stranded a lot of dead background when
-        // the user picks a tall-but-narrow cell size.
         Box(
             modifier = GlanceModifier
                 .fillMaxSize()
                 .background(day = theme.bg, night = theme.bg)
-                .cornerRadius(26.dp)
+                .cornerRadius(24.dp)
                 .clickable(onClick = openApp(context, headerUri(snapshot))),
             contentAlignment = if (compact) Alignment.CenterStart else Alignment.TopStart,
         ) {
             Column(modifier = GlanceModifier.padding(16.dp)) {
                 Row(verticalAlignment = Alignment.Vertical.Top) {
-                    Box(modifier = GlanceModifier.padding(end = 8.dp)) {
+                    Box(modifier = GlanceModifier.defaultWeight().padding(end = 8.dp)) {
                         HeaderRow(snapshot, theme)
                     }
-                    MicButton(context, theme)
+                    PlusButton(context, theme)
                 }
-                NowDoneButton(snapshot, theme)
-                if (!compact) {
-                    Spacer(modifier = GlanceModifier.height(10.dp))
-                    HabitsList(snapshot, theme)
+                PickButtons(snapshot, theme, compact)
+                if (!compact && tall) {
+                    Spacer(modifier = GlanceModifier.height(12.dp))
+                    RoutinesList(snapshot, theme)
                 }
             }
         }
@@ -110,158 +114,124 @@ class LifeOSWidget : GlanceAppWidget() {
     @Composable
     private fun HeaderRow(snapshot: JSONObject?, theme: WidgetTheme) {
         val focusActive = snapshot?.optBoolean("focusActive", false) ?: false
-        val eyebrow = if (focusActive) "Focusing" else "Now"
+        val free = if (snapshot == null || snapshot.isNull("freeMinutes")) 0 else snapshot.optInt("freeMinutes", 0)
+        val eyebrow = when {
+            focusActive -> "FOCUSING"
+            free > 0 -> "FREE NOW · ${minutesLabel(free)}"
+            else -> "NEXT"
+        }
         val label = when {
             focusActive -> {
                 val name = snapshot?.optString("focusLabel", "")
-                if (!name.isNullOrEmpty()) name else "Focus session active"
+                if (!name.isNullOrEmpty()) name else "Focus session"
             }
             else -> {
                 val next = snapshot?.optString("nextActionTitle", "")
-                if (!next.isNullOrEmpty()) next else "Open Ally to plan your day"
+                if (!next.isNullOrEmpty() && next != "null") next else "Open Ally to see your day"
             }
         }
         Column {
             Text(
                 eyebrow,
-                style = TextStyle(
-                    color = solid(theme.accent),
-                    fontSize = 14.sp,
-                ),
+                style = TextStyle(color = solid(if (free > 0 && !focusActive) theme.free else theme.fgMuted), fontSize = 12.sp, fontWeight = FontWeight.Medium),
             )
             Spacer(modifier = GlanceModifier.height(4.dp))
-            Text(
-                label,
-                maxLines = 2,
-                style = TextStyle(
-                    color = solid(theme.fg),
-                    fontSize = 20.sp,
-                    fontWeight = FontWeight.Medium,
-                ),
-            )
+            Text(label, maxLines = 2, style = TextStyle(color = solid(theme.fg), fontSize = 19.sp, fontWeight = FontWeight.Medium))
         }
     }
 
     @Composable
-    private fun HabitsList(snapshot: JSONObject?, theme: WidgetTheme) {
+    private fun RoutinesList(snapshot: JSONObject?, theme: WidgetTheme) {
         val habits: JSONArray = snapshot?.optJSONArray("habits") ?: JSONArray()
+        if (habits.length() == 0) return
         Column(modifier = GlanceModifier.fillMaxWidth()) {
+            Text("ROUTINES TODAY", style = TextStyle(color = solid(theme.fgMuted), fontSize = 11.sp, fontWeight = FontWeight.Medium))
+            Spacer(modifier = GlanceModifier.height(4.dp))
             for (i in 0 until habits.length()) {
                 val h = habits.optJSONObject(i) ?: continue
                 val id = h.optString("id")
-                val title = h.optString("title")
                 val done = h.optBoolean("done", false)
                 Row(
                     modifier = GlanceModifier
                         .fillMaxWidth()
                         .padding(vertical = 5.dp)
-                        .clickable(
-                            actionRunCallback<ToggleHabitAction>(
-                                actionParametersOf(HABIT_ID_KEY to id),
-                            ),
-                        ),
+                        .clickable(actionRunCallback<ToggleHabitAction>(actionParametersOf(HABIT_ID_KEY to id))),
                     verticalAlignment = Alignment.Vertical.CenterVertically,
                 ) {
                     CheckBadge(done, theme)
                     Spacer(modifier = GlanceModifier.width(9.dp))
-                    Text(
-                        title,
-                        maxLines = 1,
-                        style = TextStyle(
-                            color = solid(if (done) theme.fgMuted else theme.fg),
-                            fontSize = 15.sp,
-                        ),
-                    )
+                    Text(h.optString("title"), maxLines = 1, style = TextStyle(color = solid(if (done) theme.fgMuted else theme.fg), fontSize = 15.sp))
                 }
-            }
-            if (habits.length() == 0) {
-                Text(
-                    "No habits yet",
-                    style = TextStyle(color = solid(theme.fgMuted), fontSize = 14.sp),
-                )
             }
         }
     }
 
-    /** Done on Now's pick (ADR 0027): logged in the background like Done in
-     * the app, without opening it. Only when there is a pick to answer. */
+    /** Done, Later and Smaller on the pick (ALLY.md 5.2 #23): each runs in the
+     * background like the same button in the app, without opening it. */
     @Composable
-    private fun NowDoneButton(snapshot: JSONObject?, theme: WidgetTheme) {
+    private fun PickButtons(snapshot: JSONObject?, theme: WidgetTheme, compact: Boolean) {
         val type = snapshot?.optString("nextActionType", "") ?: ""
         val id = snapshot?.optString("nextActionRefId", "") ?: ""
         val focusActive = snapshot?.optBoolean("focusActive", false) ?: false
         if (focusActive || id.isEmpty() || id == "null" || type !in setOf("TASK", "HABIT", "PROJECT")) return
         val minutes = if (snapshot?.isNull("nextMinutes") != false) "" else snapshot.optInt("nextMinutes").toString()
         val count = if (snapshot?.isNull("nextCount") != false) "" else snapshot.optInt("nextCount").toString()
+        val params = actionParametersOf(NOW_TYPE_KEY to type, NOW_ID_KEY to id, NOW_MIN_KEY to minutes, NOW_COUNT_KEY to count)
         Spacer(modifier = GlanceModifier.height(10.dp))
-        Box(
-            modifier = GlanceModifier
-                .background(day = theme.fg, night = theme.fg)
-                .cornerRadius(22.dp)
-                .padding(horizontal = 22.dp, vertical = 10.dp)
-                .clickable(
-                    actionRunCallback<NowDoneAction>(
-                        actionParametersOf(NOW_TYPE_KEY to type, NOW_ID_KEY to id, NOW_MIN_KEY to minutes, NOW_COUNT_KEY to count),
-                    ),
-                ),
-        ) {
-            Text("Done", style = TextStyle(color = solid(theme.accentInk), fontSize = 16.sp, fontWeight = FontWeight.Medium))
+        Row(verticalAlignment = Alignment.Vertical.CenterVertically) {
+            Box(
+                modifier = GlanceModifier
+                    .background(day = theme.fg, night = theme.fg)
+                    .cornerRadius(20.dp)
+                    .padding(horizontal = 18.dp, vertical = 9.dp)
+                    .clickable(actionRunCallback<NowDoneAction>(params)),
+            ) {
+                Text("Done", style = TextStyle(color = solid(theme.bg), fontSize = 15.sp, fontWeight = FontWeight.Medium))
+            }
+            if (!compact) {
+                Spacer(modifier = GlanceModifier.width(6.dp))
+                Box(modifier = GlanceModifier.padding(horizontal = 10.dp, vertical = 9.dp).clickable(actionRunCallback<NowLaterAction>(params))) {
+                    Text("Later", style = TextStyle(color = solid(theme.fg), fontSize = 15.sp))
+                }
+                Box(modifier = GlanceModifier.padding(horizontal = 10.dp, vertical = 9.dp).clickable(actionRunCallback<NowSmallerAction>(params))) {
+                    Text("Smaller", style = TextStyle(color = solid(theme.fg), fontSize = 15.sp))
+                }
+            }
         }
     }
 
-    /** Mic button — opens the app straight into the Capture sheet, already
-     * listening (`lifeos://capture?voice=1`, routed by `DeepLinkService`
-     * through `CaptureIntentBus`). A nested `clickable` inside the
-     * whole-widget tap target, same pattern the habit checkboxes already use
-     * to take priority over the outer header tap. */
+    /** + opens Talk, ready to type or speak (`lifeos://talk`). */
     @Composable
-    private fun MicButton(context: Context, theme: WidgetTheme) {
+    private fun PlusButton(context: Context, theme: WidgetTheme) {
         Box(
             modifier = GlanceModifier
-                .width(44.dp)
-                .height(44.dp)
-                .background(day = theme.accent, night = theme.accent)
-                .cornerRadius(22.dp)
-                .clickable(onClick = openApp(context, Uri.parse("lifeos://capture?voice=1"))),
+                .width(40.dp)
+                .height(40.dp)
+                .background(day = theme.fg, night = theme.fg)
+                .cornerRadius(20.dp)
+                .clickable(onClick = openApp(context, Uri.parse("lifeos://talk"))),
             contentAlignment = Alignment.Center,
         ) {
-            Text("🎙", style = TextStyle(color = solid(theme.accentInk), fontSize = 18.sp))
+            Text("+", style = TextStyle(color = solid(theme.bg), fontSize = 22.sp, fontWeight = FontWeight.Medium))
         }
     }
 
-    /** Filled accent circle + check when done; a thin muted ring when not —
-     * same "solid accent badge" language as the app's checkboxes/dots. */
+    /** Filled check when done; a thin ring when not. Never red. */
     @Composable
     private fun CheckBadge(done: Boolean, theme: WidgetTheme) {
         Box(
             modifier = GlanceModifier
                 .width(20.dp)
                 .height(20.dp)
-                .background(
-                    day = if (done) theme.accent else theme.bg,
-                    night = if (done) theme.accent else theme.bg,
-                )
-                .cornerRadius(10.dp),
+                .background(day = if (done) theme.fg else theme.fgMuted, night = if (done) theme.fg else theme.fgMuted)
+                .cornerRadius(10.dp)
+                .padding(if (done) 0.dp else 1.5.dp),
             contentAlignment = Alignment.Center,
         ) {
             if (done) {
-                Text("✓", style = TextStyle(color = solid(theme.accentInk), fontSize = 11.sp))
+                Text("✓", style = TextStyle(color = solid(theme.bg), fontSize = 11.sp))
             } else {
-                Box(
-                    modifier = GlanceModifier
-                        .width(20.dp)
-                        .height(20.dp)
-                        .background(day = theme.fgMuted, night = theme.fgMuted)
-                        .cornerRadius(10.dp)
-                        .padding(1.5.dp),
-                ) {
-                    Box(
-                        modifier = GlanceModifier
-                            .fillMaxSize()
-                            .background(day = theme.bg, night = theme.bg)
-                            .cornerRadius(9.dp),
-                    ) {}
-                }
+                Box(modifier = GlanceModifier.fillMaxSize().background(day = theme.bg, night = theme.bg).cornerRadius(9.dp)) {}
             }
         }
     }
@@ -309,5 +279,23 @@ class NowDoneAction : ActionCallback {
         val c = parameters[NOW_COUNT_KEY] ?: ""
         val uri = Uri.parse("lifeos-widget://now-done?type=$type&id=$id&m=$m&c=$c")
         HomeWidgetBackgroundIntent.getBroadcast(context, uri).send()
+    }
+}
+
+/** Later on the widget's pick (host `now-later`). */
+class NowLaterAction : ActionCallback {
+    override suspend fun onAction(context: Context, glanceId: GlanceId, parameters: ActionParameters) {
+        val id = parameters[NOW_ID_KEY] ?: return
+        val type = parameters[NOW_TYPE_KEY] ?: "TASK"
+        HomeWidgetBackgroundIntent.getBroadcast(context, Uri.parse("lifeos-widget://now-later?type=$type&id=$id")).send()
+    }
+}
+
+/** Smaller on the widget's pick (host `now-smaller`). */
+class NowSmallerAction : ActionCallback {
+    override suspend fun onAction(context: Context, glanceId: GlanceId, parameters: ActionParameters) {
+        val id = parameters[NOW_ID_KEY] ?: return
+        val type = parameters[NOW_TYPE_KEY] ?: "TASK"
+        HomeWidgetBackgroundIntent.getBroadcast(context, Uri.parse("lifeos-widget://now-smaller?type=$type&id=$id")).send()
     }
 }

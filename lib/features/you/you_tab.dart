@@ -5,6 +5,7 @@ import '../../core/api/api_exception.dart';
 import '../../core/di/service_locator.dart';
 import '../../core/notifications/agenda_sync.dart';
 import '../../data/models/user.dart';
+import '../../data/repositories/auth_repository.dart';
 import '../../data/repositories/life_repository.dart';
 import '../../design/appearance.dart';
 import '../../design/components.dart';
@@ -21,6 +22,7 @@ import '../shell/life_cubit.dart';
 import '../shrink/parked_screen.dart';
 import '../tasks/task_detail_screen.dart';
 import '../design_preview/design_preview_screen.dart';
+import '../firstrun/save_account.dart';
 import '../library/library_page.dart';
 import 'account_page.dart';
 import 'ally_works_page.dart';
@@ -30,6 +32,7 @@ import 'history_page.dart';
 import 'memories_page.dart';
 import 'reminders_page.dart';
 import 'search_page.dart';
+import 'you_page.dart';
 
 /// One row on the You tab.
 class _Entry {
@@ -48,7 +51,10 @@ class YouTab extends StatefulWidget {
 
   /// For tests.
   final LifeRepository? repo;
-  const YouTab({super.key, required this.user, this.repo});
+
+  /// For tests: saving a guest account.
+  final Claim? claim;
+  const YouTab({super.key, required this.user, this.repo, this.claim});
 
   @override
   State<YouTab> createState() => _YouTabState();
@@ -69,6 +75,48 @@ class _YouTabState extends State<YouTab> {
           );
     if (life != null) body = BlocProvider.value(value: life, child: body);
     Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => body));
+  }
+
+  Claim get _claim => widget.claim ?? getIt<AuthRepository>().claim;
+
+  void _saveAccount() {
+    final auth = context.read<AuthBloc?>();
+    _push(YouPage(
+      title: '',
+      children: (themed, c) => [
+        SaveAccountForm(
+          claim: _claim,
+          onSaved: (u) {
+            Navigator.of(themed).pop();
+            auth?.add(AuthUserUpdated(u));
+            showAllyToast(themed, 'Saved. Sign in with ${u.email} on any phone.');
+          },
+        ),
+      ],
+    ));
+  }
+
+  /// An unsaved account cannot be signed back into, so ask first.
+  Future<void> _signOut(BuildContext themed) async {
+    final auth = context.read<AuthBloc?>();
+    if (!widget.user.guest) {
+      auth?.add(const AuthLogoutRequested());
+      return;
+    }
+    final choice = await showAllySheet<String>(
+      themed,
+      builder: (ctx) => Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        Text('Save before signing out?', style: AllyType.h2(color: ctx.ac.ink)),
+        const SizedBox(height: Sp.x1),
+        Text('This account has no email yet, so after signing out nobody can open it again, including you.', style: AllyType.body(color: ctx.ac.muted)),
+        const SizedBox(height: Sp.x4),
+        AllyButton('Save my account', wide: true, onPressed: () => Navigator.of(ctx).pop('save')),
+        const SizedBox(height: Sp.x2),
+        AllyButton('Sign out and lose it', kind: AllyButtonKind.danger, wide: true, onPressed: () => Navigator.of(ctx).pop('out')),
+      ]),
+    );
+    if (choice == 'save') _saveAccount();
+    if (choice == 'out') auth?.add(const AuthLogoutRequested());
   }
 
   void _search() => _push(SearchPage(
@@ -180,10 +228,21 @@ class _YouTabState extends State<YouTab> {
           children: [
             Stagger(children: [
               Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text(widget.user.email.toUpperCase(), maxLines: 1, overflow: TextOverflow.ellipsis, style: AllyType.eyebrow(color: c.faint)),
+                Text(widget.user.guest ? 'NOT SAVED YET' : widget.user.email.toUpperCase(), maxLines: 1, overflow: TextOverflow.ellipsis, style: AllyType.eyebrow(color: c.faint)),
                 const SizedBox(height: Sp.x1),
                 Text(widget.user.name.trim().isEmpty ? 'You' : widget.user.name, style: AllyType.h1(color: c.ink)),
               ]),
+              if (widget.user.guest)
+                AllyCard(
+                  strong: true,
+                  child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                    Text('Save your plan', style: AllyType.h2(color: c.ink)),
+                    const SizedBox(height: Sp.x1),
+                    Text('Add an email so your areas and steps are kept if you change or lose this phone.', style: AllyType.body(color: c.muted)),
+                    const SizedBox(height: Sp.x3),
+                    AllyButton('Save my account', onPressed: _saveAccount),
+                  ]),
+                ),
               Pressable(
                 onTap: _search,
                 semanticLabel: 'Search',
@@ -201,7 +260,7 @@ class _YouTabState extends State<YouTab> {
               _group(c, 'YOUR THINGS', things),
               _group(c, 'ALLY', ally),
               _group(c, 'ACCOUNT', account),
-              AllyButton('Sign out', kind: AllyButtonKind.ghost, onPressed: () => context.read<AuthBloc?>()?.add(const AuthLogoutRequested())),
+              AllyButton('Sign out', kind: AllyButtonKind.ghost, onPressed: () => _signOut(themed)),
             ]),
           ],
         ),

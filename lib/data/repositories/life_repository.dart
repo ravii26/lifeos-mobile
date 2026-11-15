@@ -223,6 +223,13 @@ class LifeRepository {
   /// Archived, not destroyed; Undo brings it back.
   Future<({String message, String? activityId})> letGoStep(String id) async => _receipt(await _api.post('/steps/$id/let-go'));
 
+  /// To-dos with no area yet, each with the area its words suggest (or null).
+  Future<List<Json>> toSort() async => ((await _api.get('/steps/to-sort')) as List).whereType<Json>().toList();
+
+  /// Puts a to-do in an area. Undo takes it back to "to sort".
+  Future<({String message, String? activityId})> sortStep(String id, String areaId) async =>
+      _receipt(await _api.post('/steps/$id/sort', body: {'areaId': areaId}));
+
   // ---- Three small tastes, for an area someone is unsure about ----
 
   /// Three tastes to start from (nothing saved). [byCode] when no AI answered.
@@ -1356,6 +1363,25 @@ class LifeRepository {
     return asStringOrNull((data as Json)['activityId']);
   }
 
+  /// Rules switched on to show before an event, matching something today or tomorrow.
+  Future<List<Json>> rulesForToday() async => ((await _api.get('/ally-notes/for-today')) as List).whereType<Json>().toList();
+
+  /// Show these rules before a matching event, or stop. Returns the Undo id.
+  Future<String?> setWhenNeeded(String id, bool on) async =>
+      asStringOrNull(((await _api.post('/ally-notes/$id/when-needed', body: {'on': on})) as Json)['activityId']);
+
+  /// A message for this person, to copy and send yourself. [byCode] when no AI answered.
+  Future<({String message, bool byCode})> draftForPerson(String id) async {
+    final j = (await _api.post('/ally-notes/$id/draft')) as Json;
+    return (message: asString(j['message']), byCode: asBool(j['byCode']));
+  }
+
+  /// Several saves to watch later (or let go) at once, with one Undo.
+  Future<({int count, String? activityId})> decideManySaves(List<String> ids, String choice) async {
+    final j = (await _api.post('/guide/saves/decide-many', body: {'ids': ids, 'choice': choice})) as Json;
+    return (count: asInt(j['count']), activityId: asStringOrNull(j['activityId']));
+  }
+
   /// Help me decide: a suggestion (pick A | B | EITHER), why, a first step and
   /// when to check in. Drafted by code when no AI answers (`byCode`).
   Future<Json> decide(String a, String b, {List<String> hard = const [], String? note}) async =>
@@ -1438,6 +1464,15 @@ class LifeRepository {
     final data = await _api.get('/now/schedule');
     return (data as List).whereType<Json>().any((d) => d['custom'] == true);
   }
+
+  // ---- First run (ALLY.md 2.1) ----
+
+  /// Everything someone wants → items in areas and a mode for each. Nothing saved.
+  Future<Json> firstRunSort(String text) async => (await _api.post('/firstrun/sort', body: {'text': text})) as Json;
+
+  /// The checked result → areas, goals, to-dos and routines, with one Undo.
+  Future<Json> firstRunApply({required List<Json> areas, required List<Json> items}) async =>
+      (await _api.post('/firstrun/apply', body: {'areas': areas, 'items': items})) as Json;
 
   /// Wake and sleep time, office days (0 = Sunday) and hours → the whole week.
   Future<void> setDayBasics({required String wake, required String sleep, List<int> officeDays = const [], String? officeStart, String? officeEnd}) =>

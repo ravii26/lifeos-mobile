@@ -48,6 +48,16 @@ class AuthRepository {
     return _persist(data);
   }
 
+  /// "Get started": a guest account, so first run can save as it goes.
+  Future<AppUser> startGuest() async {
+    final tz = await _deviceTimezone();
+    return _persist(await _api.post('/auth/guest', body: {'timezone': ?tz}));
+  }
+
+  /// "Save your account": the guest account gets an email and password and keeps everything.
+  Future<AppUser> claim({required String name, required String email, required String password}) async =>
+      _persist(await _api.post('/auth/claim', body: {'name': name, 'email': email, 'password': password}));
+
   Future<AppUser> me() async {
     final data = await _api.get('/auth/me');
     final user = AppUser.fromJson(data as Json);

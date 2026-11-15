@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../core/api/api_exception.dart';
 import '../../core/links/open_link.dart';
@@ -72,6 +73,27 @@ class _LibraryPageState extends State<LibraryPage> {
   Future<void> _newSave(BuildContext themed) async {
     if (await openPasteSaveFlow(themed, repo: widget.repo)) placesRefresh.value++;
     await _load();
+  }
+
+  /// The weekly clean-up: keep the two newest waiting saves, the rest go to
+  /// watch later. Nothing is deleted, and one Undo puts them all back.
+  Future<void> _tidy(BuildContext themed, List<Map<String, dynamic>> rest) async {
+    try {
+      final r = await widget.repo.decideManySaves([for (final s in rest) '${s['id']}'], 'LATER');
+      await _load();
+      final undo = r.activityId;
+      final repo = widget.repo;
+      if (themed.mounted) {
+        showAllyToast(themed, '${r.count} moved to watch later.', onUndo: undo == null ? null : () async {
+          try {
+            await repo.undo(undo);
+            await _load();
+          } on ApiException catch (_) {}
+        });
+      }
+    } on ApiException catch (e) {
+      if (themed.mounted) showAllyToast(themed, e.message);
+    }
   }
 
   Future<void> _watched(BuildContext themed, Map<String, dynamic> s) async {
@@ -173,6 +195,20 @@ class _LibraryPageState extends State<LibraryPage> {
         ]);
     return [
       if (saves.isEmpty) Text('Nothing saved yet.', style: AllyType.body(color: c.muted)),
+      if (waiting.length > 3)
+        AllyCard(
+          strong: true,
+          child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+            Text('${waiting.length} waiting for a decision', style: AllyType.h2(color: c.ink)),
+            const SizedBox(height: Sp.x1),
+            Text('Keep the two newest to decide now, and put the rest in watch later? Nothing is deleted.', style: AllyType.body(color: c.muted)),
+            const SizedBox(height: Sp.x3),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: AllyButton('Move ${waiting.length - 2} to watch later', kind: AllyButtonKind.secondary, onPressed: () => _tidy(themed, waiting.skip(2).toList())),
+            ),
+          ]),
+        ),
       if (waiting.isNotEmpty)
         group('WAITING FOR A DECISION', [
           for (final s in waiting) _row(c, title: title(s), tag: 'Decide what it is for', onTap: () => _decideSave(themed, '${s['id']}')),
@@ -227,6 +263,27 @@ class NotePage extends StatefulWidget {
 
 class _NotePageState extends State<NotePage> {
   late final Set<String> _done = doneOf(widget.note);
+  late bool _whenNeeded = whenNeededOf(widget.note);
+
+  Future<void> _setWhenNeeded(BuildContext themed, bool on) async {
+    setState(() => _whenNeeded = on);
+    try {
+      final undo = await widget.repo.setWhenNeeded('${widget.note['id']}', on);
+      final repo = widget.repo;
+      if (!themed.mounted) return;
+      showAllyToast(themed, on ? 'Ally shows these before a matching event.' : 'Shown only here now.', onUndo: undo == null
+          ? null
+          : () async {
+              try {
+                await repo.undo(undo);
+                if (mounted) setState(() => _whenNeeded = !on);
+              } on ApiException catch (_) {}
+            });
+    } on ApiException catch (e) {
+      if (mounted) setState(() => _whenNeeded = !on);
+      if (themed.mounted) showAllyToast(themed, e.message);
+    }
+  }
 
   Future<void> _tick(BuildContext themed, String item) async {
     final now = !_done.contains(item);
@@ -295,6 +352,19 @@ class _NotePageState extends State<NotePage> {
                     ),
           ]),
         if (text != null) AllyCard(child: Text(text, style: AllyType.body(color: c.ink))),
+        if (items.isNotEmpty && !hasTicks(n) && !isDiet(n))
+          AllyCard(
+            child: Row(children: [
+              Expanded(
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Text('Show me these when I need them', style: AllyType.body(color: c.ink, w: FontWeight.w600)),
+                  Text('Before something on your day that matches, like a party or an interview.', style: AllyType.small(color: c.muted)),
+                ]),
+              ),
+              const SizedBox(width: Sp.x2),
+              AllySwitch(value: _whenNeeded, semanticLabel: 'Show me these when I need them', onChanged: (v) => _setWhenNeeded(themed, v)),
+            ]),
+          ),
         if (items.isEmpty && text == null && !isDiet(n)) Text('Nothing in this note yet.', style: AllyType.body(color: c.muted)),
         Wrap(spacing: Sp.x2, runSpacing: Sp.x2, children: [
           AllyButton('Add to this note', kind: AllyButtonKind.secondary, onPressed: () => tellAlly(context, 'Add to my "${n['title']}" note: ')),
@@ -345,6 +415,7 @@ class PersonPage extends StatelessWidget {
             AllyCard(child: Text(textOf(person)!, style: AllyType.body(color: c.ink))),
           ],
         ]),
+        _DraftCard(person: person, repo: repo, phone: phone, open: open),
         if (phone != null)
           Wrap(spacing: Sp.x2, runSpacing: Sp.x2, children: [
             AllyButton('Call', icon: Icons.call_outlined, kind: AllyButtonKind.secondary, onPressed: () => _contact(context, phone, whatsApp: false)),
@@ -353,6 +424,76 @@ class PersonPage extends StatelessWidget {
         AllyButton('Add something about $name', kind: AllyButtonKind.ghost, onPressed: () => tellAlly(context, 'About $name: ')),
         Text('Private. Nothing here is shown on the lock screen.', style: AllyType.small(color: c.faint)),
       ],
+    );
+  }
+}
+
+/// A message Ally drafts for this person (ALLY.md 5.2 #17). Ally never sends
+/// it: Copy, or open WhatsApp with it filled in, and the person sends it.
+class _DraftCard extends StatefulWidget {
+  final NoteJson person;
+  final LifeRepository repo;
+  final String? phone;
+  final void Function(BuildContext context, String url)? open;
+  const _DraftCard({required this.person, required this.repo, this.phone, this.open});
+
+  @override
+  State<_DraftCard> createState() => _DraftCardState();
+}
+
+class _DraftCardState extends State<_DraftCard> {
+  String? _draft;
+  bool _byCode = false;
+  bool _busy = false;
+
+  Future<void> _write() async {
+    setState(() => _busy = true);
+    try {
+      final r = await widget.repo.draftForPerson('${widget.person['id']}');
+      if (mounted) {
+        setState(() {
+          _draft = r.message;
+          _byCode = r.byCode;
+          _busy = false;
+        });
+      }
+    } on ApiException catch (e) {
+      if (mounted) setState(() => _busy = false);
+      if (mounted) showAllyToast(context, e.message);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.ac;
+    final draft = _draft;
+    if (draft == null) {
+      return Align(
+        alignment: Alignment.centerLeft,
+        child: AllyButton(_busy ? 'Writing…' : 'Draft a message', kind: AllyButtonKind.secondary, icon: Icons.edit_note_rounded, onPressed: _busy ? null : _write),
+      );
+    }
+    return AllyCard(
+      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        Text("ALLY'S DRAFT · YOU SEND IT", style: AllyType.eyebrow(color: c.faint)),
+        const SizedBox(height: Sp.x2),
+        Text(draft, style: AllyType.body(color: c.ink)),
+        if (_byCode) ...[const SizedBox(height: Sp.x1), Text('A plain opener, written without AI.', style: AllyType.small(color: c.faint))],
+        const SizedBox(height: Sp.x3),
+        Wrap(spacing: Sp.x2, runSpacing: Sp.x2, children: [
+          AllyButton('Copy', kind: AllyButtonKind.secondary, icon: Icons.copy_rounded, onPressed: () async {
+            await Clipboard.setData(ClipboardData(text: draft));
+            if (context.mounted) showAllyToast(context, 'Copied. Ally never sends messages for you.');
+          }),
+          if (widget.phone != null)
+            AllyButton('Open in WhatsApp', kind: AllyButtonKind.secondary, onPressed: () {
+              final number = dialable(widget.phone!).replaceAll(RegExp(r'\D'), '');
+              (widget.open ?? openLink)(context, 'https://wa.me/$number?text=${Uri.encodeComponent(draft)}');
+              widget.repo.personContacted('${widget.person['id']}').catchError((_) {});
+            }),
+          AllyButton('Another', kind: AllyButtonKind.ghost, onPressed: _busy ? null : _write),
+        ]),
+      ]),
     );
   }
 }

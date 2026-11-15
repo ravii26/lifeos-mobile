@@ -13,6 +13,7 @@ import '../places/now_cubit.dart' show placesRefresh;
 import '../today/day_shape.dart' show duration;
 import 'area_page.dart';
 import 'areas_overview.dart';
+import 'to_sort_card.dart';
 
 /// Areas: every part of the person's life on one wheel, and where each
 /// stands this week. One screen should answer "where am I with everything?".
@@ -188,6 +189,7 @@ class _AreasHomeScreenState extends State<AreasHomeScreen> {
       else if (data.full && data.neededMinutes > 0 && data.freeMinutes > 0)
         Text('This week asks for ${duration(data.neededMinutes)}. You have about ${duration(data.freeMinutes)} free.',
             textAlign: TextAlign.center, style: AllyType.small(color: c.faint)),
+      ToSortCard(repo: _repo, areas: [for (final a in data.areas) if (a.mode != AreaMode.rest) (id: a.id, name: a.name)]),
       AllyCard(
         padding: const EdgeInsets.symmetric(horizontal: Sp.x4, vertical: Sp.x1),
         child: Column(children: [

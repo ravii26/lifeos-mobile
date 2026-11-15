@@ -64,6 +64,17 @@ class AllyAppearance {
   /// The theme new-look screens wrap themselves in.
   static ThemeData themeOf(BuildContext context) => brightnessOf(context) == Brightness.light ? AllyTheme.light() : AllyTheme.dark();
 
+  /// The colours outside any screen (the home-screen widget), from the saved
+  /// choice and the phone's own setting.
+  static AllyColors colorsNow() {
+    final light = switch (prefs.value.theme) {
+      'LIGHT' => true,
+      'SYSTEM' => WidgetsBinding.instance.platformDispatcher.platformBrightness == Brightness.light,
+      _ => false,
+    };
+    return light ? AllyColors.light : AllyColors.dark;
+  }
+
   static AllyColors colorsOf(BuildContext context) => brightnessOf(context) == Brightness.light ? AllyColors.light : AllyColors.dark;
 
   /// Applies larger text and reduced motion to everything under [child].

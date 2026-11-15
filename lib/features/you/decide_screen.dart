@@ -68,7 +68,7 @@ class _DecideScreenState extends State<DecideScreen> {
     try {
       final r = await widget.repo.chooseDecision(choice, days);
       placesRefresh.value++;
-      if (!mounted) return;
+      if (!mounted || !themed.mounted) return;
       final undoId = r.activityId;
       // The toast lives in the app's overlay, so it stays after this screen closes.
       showAllyToast(themed, r.message,

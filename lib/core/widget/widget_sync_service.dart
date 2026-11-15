@@ -134,6 +134,7 @@ class WidgetSyncService {
       nextActionTitle: pick?['title']?.toString() ?? (now == null ? current.nextActionTitle : now['message']?.toString()),
       nextMinutes: (pick?['minutes'] as num?)?.toInt(),
       nextCount: (pick?['count'] as num?)?.toInt(),
+      freeMinutes: _freeOf(now, pick),
       habits: _topHabits(habits),
       upNext: [
         for (final o in options.skip(1).take(2)) WidgetSuggestion(title: '${o['title']}', urgency: 'MEDIUM'),
@@ -154,8 +155,30 @@ class WidgetSyncService {
       nextActionTitle: pick?['title']?.toString() ?? now['message']?.toString(),
       nextMinutes: (pick?['minutes'] as num?)?.toInt(),
       nextCount: (pick?['count'] as num?)?.toInt(),
+      freeMinutes: _freeOf(now, pick),
       upNext: [for (final o in options.skip(1).take(2)) WidgetSuggestion(title: '${o['title']}', urgency: 'MEDIUM')],
     ));
+  }
+
+  static int? _freeOf(Map<String, dynamic>? now, Map? pick) {
+    final m = (now?['availableMinutes'] as num?)?.toInt();
+    return pick != null && m != null && m > 0 ? m : null;
+  }
+
+  /// Later on the widget's pick: not now (a routine) or tomorrow (a to-do), then refreshed.
+  Future<void> nowLater(String type, String id) async {
+    if (type == 'HABIT') {
+      await _repo.respondNow(type, id, 'SKIP');
+    } else {
+      await _repo.nowAdvice(type, id, 'TOMORROW');
+    }
+    await refreshFromNetwork();
+  }
+
+  /// Smaller on the widget's pick: the two-minute version, then refreshed.
+  Future<void> nowSmaller(String type, String id) async {
+    await _repo.nowAdvice(type, id, 'SMALLER');
+    await refreshFromNetwork();
   }
 
   /// Done on the widget's pick: logged like Done on Now, then refreshed.
@@ -225,15 +248,24 @@ extension _FirstOrNull<T> on Iterable<T> {
 /// has no access to the main isolate's `getIt`, so it wires up its own copy.
 @pragma('vm:entry-point')
 void widgetBackgroundCallback(Uri? uri) async {
-  if (uri == null || (uri.host != 'toggle-habit' && uri.host != 'now-done')) return;
+  if (uri == null || !const {'toggle-habit', 'now-done', 'now-later', 'now-smaller'}.contains(uri.host)) return;
   final id = uri.queryParameters['id'];
   if (id == null) return;
   WidgetsFlutterBinding.ensureInitialized();
   await setupLocator();
   try {
-    if (uri.host == 'now-done') {
+    if (uri.host.startsWith('now-')) {
       final q = uri.queryParameters;
-      await getIt<WidgetSyncService>().nowDone(q['type'] ?? 'TASK', id, int.tryParse(q['m'] ?? ''), int.tryParse(q['c'] ?? ''));
+      final sync = getIt<WidgetSyncService>();
+      final type = q['type'] ?? 'TASK';
+      switch (uri.host) {
+        case 'now-later':
+          await sync.nowLater(type, id);
+        case 'now-smaller':
+          await sync.nowSmaller(type, id);
+        default:
+          await sync.nowDone(type, id, int.tryParse(q['m'] ?? ''), int.tryParse(q['c'] ?? ''));
+      }
       await NotificationService.instance.init();
       await NotificationService.instance.syncAgenda(await getIt<LifeRepository>().agenda());
     } else {

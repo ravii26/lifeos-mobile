@@ -45,6 +45,9 @@ Json _meta(NoteJson n) => n['meta'] is Json ? n['meta'] as Json : const <String,
 
 String? phoneOfNote(NoteJson n) => asStringOrNull(_meta(n)['phone']);
 
+/// Rules switched on to show before a matching event.
+bool whenNeededOf(NoteJson n) => _meta(n)['showBefore'] == true;
+
 DateTime? lastSpokeOf(NoteJson n) => DateTime.tryParse('${_meta(n)['lastContact'] ?? ''}')?.toLocal();
 
 /// "3 Feb", or null.

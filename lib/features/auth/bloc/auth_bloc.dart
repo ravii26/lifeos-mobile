@@ -17,6 +17,8 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     on<AuthLoginRequested>(_onLogin);
     on<AuthRegisterRequested>(_onRegister);
     on<AuthLogoutRequested>(_onLogout);
+    on<AuthGuestRequested>(_onGuest);
+    on<AuthUserUpdated>((e, emit) => emit(state.copyWith(status: AuthStatus.authenticated, user: e.user)));
   }
 
   Future<void> _onStarted(AuthStarted e, Emitter<AuthState> emit) async {
@@ -99,6 +101,17 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     } on ApiException catch (err) {
       emit(state.copyWith(
           status: AuthStatus.unauthenticated, error: err.message));
+    }
+  }
+
+  Future<void> _onGuest(AuthGuestRequested e, Emitter<AuthState> emit) async {
+    emit(state.copyWith(status: AuthStatus.authenticating));
+    try {
+      final user = await _repo.startGuest();
+      await LocalData.claimFor(user.id);
+      emit(state.copyWith(status: AuthStatus.authenticated, user: user));
+    } on ApiException catch (err) {
+      emit(state.copyWith(status: AuthStatus.unauthenticated, error: err.message));
     }
   }
 

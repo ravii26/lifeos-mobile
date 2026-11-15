@@ -1,7 +1,7 @@
 # AGENTS.md: lifeos_mobile (Ally app)
 
 > The main client of **Ally**, a personal assistant app (formerly LifeOS; package and code names keep `lifeos`).
-> Full product context: workspace root `AGENTS.md`, `docs/`, `product-design/12-final-plan.md`. Branch: **`lifeos-2.0`**.
+> **What is built and what is next: `../ALLY.md` (the single source of truth; it wins over this file).** Branch: **`lifeos-2.0`**.
 
 ## Commands
 ```bash
@@ -28,17 +28,16 @@ lib/
     di/ config/ theme/
   data/models/                  plain models with fromJson (json.dart helpers)
   data/repositories/            life_repository.dart: every API call lives here
+  design/                       the design system: tokens.dart (AllyColors, Sp, Rad, Motion), type.dart, components.dart,
+                                rings.dart, appearance.dart (theme, larger text, reduce motion)
   features/
-    shell/home_shell.dart       tabs Now · [mic → Talk] · My life (Plan, Notes, Habits, Reminders are tiles in My life);
-                                provides LifeCubit, TonightCubit, NowCubit, ChatCubit
-    chat/                       chat screen + cubit (actions, undo, offline retry), memories screen,
-                                starters.dart (guided first-use chats → one message; ADR 0026)
-    guide/                      today's card, tonight cubit, setup sheet, save sheet, guide_style.dart
-    tasks/ habits/ areas/ goals/ vault/ more/ auth/ splash/ …
+    shell/home_shell.dart       bottom bar Today · Areas · + (Talk) · Week · You; provides LifeCubit, TonightCubit, NowCubit, ChatCubit
+    firstrun/                   welcome (Get started as a guest), first run (5 steps), save account, the gate in main.dart
+    today/ session/ areas/ week/ routines/ talk/ library/ you/    the new-look screens
+    chat/                       ChatCubit (actions, undo, offline retry) used by talk/; the old chat screen is unreachable
+    places/ guide/ more/ …      older screens, some still opened from You until rebuilt
 ```
-Removed from the UI (code kept, ADR 0012): home, companion, now, projects, learn, library, notebooks, graph, behavior, calendar, review, identity.
-**Frozen (Nov 2026 build plan, Phase 0):** no new work on those removed features, and no new screens outside the plan
-in `../reports/Ally build plan.md`. What Ally does is decided in `../reports/Ally decisions log.md`.
+Old screens are removed as the new ones replace them (ALLY.md section 6 lists each). Build only what ALLY.md lists.
 
 ## Launch (keep it instant)
 The app opens from the cached account (`AuthRepository.cachedUser`, wiped on sign-out) and checks `/auth/me` behind it;
@@ -55,12 +54,12 @@ Never put a network call or plugin setup back in front of the first frame.
 - **Notifications:** reminders are what the person asked for; what Ally starts itself is proactive by default with Normal / Quieter / Silent (ADR 0027, replaces the opt-in rule of ADR 0006). Id ranges: habits `& 0x3fffffff`,
   chat reminders `0x40000000 | …` (each upcoming time of a repeat has its own id), nightly `9000` / morning `9001` (retired, only cleared), prep `9002`, test `9003`, **agenda `9100`–`9119`** (briefing, slot nudges, wrap-up, Sunday review from `GET /now/agenda`, ADR 0027), reminder follow-ups in the reminder range. Refresh the agenda with `AgendaSync.now()` / `.soon()` after anything that changes the day.
   Reminders are exact alarms when allowed and the next 7 times come from the server (ADR 0024); You → Reminders checks permissions.
-- **First use (ADR 0026):** never ask for setup or permissions up front. New guided flows go in `starters.dart` as
-  questions with chips that compose one plain chat message; pin each phrasing in the server's `assistant.starters.integration.test.ts`.
-  Empty places show one sentence and one button (`starterRequest.value = Starter.x` opens the guided chat on Now).
+- **First use:** "Get started" makes a guest account (`POST /auth/guest`); first run saves as it goes and the account is saved
+  last (`POST /auth/claim`). Permissions are asked when first needed, with the reason. `talkPrefill.value = '…'` opens Talk with words started.
 - User-visible name is **Ally**. Never change `applicationId` / bundle ids.
-- The new screens use `features/guide/guide_style.dart` (`G` tokens). Visual design is final only in build step 8 (ADR 0011).
-  Don't use the banned fonts listed in the root `AGENTS.md`.
+- New screens use `lib/design/` only (`context.ac` colours, `AllyType`, `Sp`, components), wrapped in
+  `Theme(data: AllyAppearance.themeOf(context))`. `G` / `guide_style.dart` is the old plum look: don't use it in new code.
+  A screen is done only with loading, empty, offline and error states, widget tests, and a 320×640 at 1.5× text check.
 
 ## Android release essentials
 `android/app/proguard-rules.pro` keeps WorkManager/Room and Gson classes. Removing it crashes the app on start.

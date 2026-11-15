@@ -15,6 +15,9 @@ class WidgetSnapshot {
   // Now's pick (ADR 0027): what Done on the widget logs.
   final int? nextMinutes;
   final int? nextCount;
+
+  /// Free time left now, when Now has a pick for it; shown as "Free now · 45 min".
+  final int? freeMinutes;
   final List<WidgetHabit> habits;
 
   /// Ranked suggestions after the primary action (What Now's suggestions[1:])
@@ -43,6 +46,7 @@ class WidgetSnapshot {
     this.nextActionTitle,
     this.nextMinutes,
     this.nextCount,
+    this.freeMinutes,
     this.habits = const [],
     this.upNext = const [],
     this.bgColor = 0xFF0A0B0D,
@@ -65,6 +69,7 @@ class WidgetSnapshot {
     Object? nextActionTitle = _unset,
     Object? nextMinutes = _unset,
     Object? nextCount = _unset,
+    Object? freeMinutes = _unset,
     List<WidgetHabit>? habits,
     List<WidgetSuggestion>? upNext,
     int? bgColor,
@@ -92,6 +97,7 @@ class WidgetSnapshot {
             : nextActionTitle as String?,
         nextMinutes: identical(nextMinutes, _unset) ? this.nextMinutes : nextMinutes as int?,
         nextCount: identical(nextCount, _unset) ? this.nextCount : nextCount as int?,
+        freeMinutes: identical(freeMinutes, _unset) ? this.freeMinutes : freeMinutes as int?,
         habits: habits ?? this.habits,
         upNext: upNext ?? this.upNext,
         bgColor: bgColor ?? this.bgColor,
@@ -111,6 +117,7 @@ class WidgetSnapshot {
         'nextActionTitle': nextActionTitle,
         'nextMinutes': nextMinutes,
         'nextCount': nextCount,
+        'freeMinutes': freeMinutes,
         'habits': habits.map((h) => h.toJson()).toList(),
         'upNext': upNext.map((s) => s.toJson()).toList(),
         'bgColor': bgColor,
@@ -132,6 +139,7 @@ class WidgetSnapshot {
         nextActionTitle: j['nextActionTitle'] as String?,
         nextMinutes: (j['nextMinutes'] as num?)?.toInt(),
         nextCount: (j['nextCount'] as num?)?.toInt(),
+        freeMinutes: (j['freeMinutes'] as num?)?.toInt(),
         habits: (j['habits'] as List? ?? const [])
             .map((e) => WidgetHabit.fromJson(e as Map<String, dynamic>))
             .toList(),

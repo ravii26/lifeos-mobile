@@ -24,6 +24,7 @@ import '../you/decide_screen.dart';
 import 'day_sheets.dart';
 import 'day_shape.dart';
 import 'today_sheets.dart';
+import 'rules_today_card.dart';
 
 /// Today: the day as a dial, the free time in it, one thing to do, and the
 /// rest of today's list. Opening the app should answer "what now?" at a glance.
@@ -436,6 +437,7 @@ class _TodayScreenState extends State<TodayScreen> {
                         kind: AllyButtonKind.ghost, wide: true, icon: Icons.wb_cloudy_outlined, onPressed: () => _differentDay(themed, s)),
                   ),
                 ]),
+                RulesTodayCard(repo: _repo, clock: widget.clock),
                 _list(themed, c, open),
                 if (!s.extras.isEmpty) AnytimeToday(extras: s.extras, busy: s.busy, cubit: cubit),
                 if (s.prep.isNotEmpty) _prep(c, s),

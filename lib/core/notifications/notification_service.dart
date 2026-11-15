@@ -49,8 +49,9 @@ class NotificationService {
   static bool isAgendaId(int id) => id >= agendaBase && id < agendaBase + _agendaSlots;
   static const _prefsLevel = 'ally_proactivity';
 
-  /// Ally's peach, used for the small icon and app name in the notification.
-  static const _tint = Color(0xFFF6C9B2);
+  /// The new look's neutral, readable on light and dark notification shades.
+  /// (Marigold stays for free time inside the app.)
+  static const _tint = Color(0xFF6B7080);
 
   static const _agendaChannel = AndroidNotificationDetails(
     'ally_proactive',
@@ -482,9 +483,13 @@ class NotificationService {
           if (a is Map && a['id'] == 'DONE')
             const AndroidNotificationAction('AG_DONE', 'Done')
           else if (a is Map && a['id'] == 'SKIP')
-            const AndroidNotificationAction('AG_SKIP', 'Not now')
+            const AndroidNotificationAction('AG_SKIP', 'Later')
           else if (a is Map && a['id'] == 'MOVE_LEFT')
             const AndroidNotificationAction('AG_MOVE', 'Move to tomorrow'),
+        // Done / Later / Smaller on a nudge for something planned (ALLY.md 5.2 #23).
+        if (raw['sourceId'] != null && const {'TASK', 'HABIT', 'PROJECT'}.contains('${raw['sourceType']}') &&
+            (raw['actions'] as List? ?? const []).any((a) => a is Map && a['id'] == 'DONE'))
+          const AndroidNotificationAction('AG_SMALL', 'Smaller'),
       ];
       await _schedule(
         agendaBase + slot,
@@ -554,6 +559,11 @@ class NotificationService {
             await _plugin.show(r.id ?? agendaBase, 'Counted.', 'Nice. The next thing is on Now when you want it.',
                 const NotificationDetails(android: _agendaChannel));
           }
+        case 'AG_SMALL':
+          if (id == null) return true;
+          final r2 = await repo.nowAdvice('${p['s'] ?? 'TASK'}', id, 'SMALLER');
+          await _plugin.show(r.id ?? agendaBase, 'Made smaller', '${r2['message'] ?? 'The smaller version is ready on Today.'}',
+              const NotificationDetails(android: _agendaChannel));
         case 'CT_PLUS':
           if (id == null) return true;
           final c = await repo.addCount(id);

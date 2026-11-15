@@ -6,6 +6,7 @@ import '../intents/capture_intent_bus.dart';
 import '../widget/widget_sync_service.dart';
 import '../../data/repositories/life_repository.dart';
 import '../../features/focus/focus_screen.dart';
+import '../../features/chat/starters.dart' show talkRequest;
 
 /// Routes `lifeos://` links — fired by the home-screen widget (whole-widget
 /// tap → `lifeos://focus`, mic button → `lifeos://capture?voice=1`; iOS
@@ -45,6 +46,10 @@ class DeepLinkService {
           final id = uri.queryParameters['id'];
           if (id != null) await _toggleHabit(id);
         }
+        break;
+      case 'talk':
+        // + on the home-screen widget: Talk, ready to type or speak.
+        talkRequest.value++;
         break;
       case 'capture':
         getIt<CaptureIntentBus>().push(PendingCaptureIntent(

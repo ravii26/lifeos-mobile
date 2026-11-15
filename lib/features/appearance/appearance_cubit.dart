@@ -152,14 +152,7 @@ class AppearanceCubit extends Cubit<AppearanceState> {
     // One look for now (Plum, dark): earlier saved light mode or accents no longer apply.
     AppColors.apply(light: false, accent: AppAccent.nocturne);
     emit(s);
-    // Best-effort: keep the home-screen widget's theme in sync with the app's.
-    getIt<WidgetSyncService>().pushTheme(
-      bgColor: AppColors.bg.toARGB32(),
-      textColor: AppColors.tx.toARGB32(),
-      mutedTextColor: AppColors.tx2.toARGB32(),
-      accentColor: AppColors.accent.toARGB32(),
-      accentInkColor: AppColors.accentInk.toARGB32(),
-    );
+    // The home-screen widget follows the new look's appearance instead (main.dart).
   }
 
   Future<void> _save(Future<void> Function() op) async {

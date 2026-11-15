@@ -16,7 +16,8 @@ import 'data/repositories/auth_repository.dart';
 import 'data/repositories/life_repository.dart';
 import 'features/appearance/appearance_cubit.dart';
 import 'features/auth/bloc/auth_bloc.dart';
-import 'features/auth/login_screen.dart';
+import 'features/firstrun/first_run_gate.dart';
+import 'features/firstrun/welcome_screen.dart';
 import 'features/now/decisions_cubit.dart';
 import 'features/shell/home_shell.dart';
 import 'features/splash/splash_screen.dart';
@@ -29,7 +30,23 @@ Future<void> main() async {
   ));
   await setupLocator();
   await AllyAppearance.load();
+  // The home-screen widget wears the same colours as the app, and follows a change.
+  void widgetTheme() {
+    final c = AllyAppearance.colorsNow();
+    getIt<WidgetSyncService>()
+        .pushTheme(
+          bgColor: c.surface.toARGB32(),
+          textColor: c.ink.toARGB32(),
+          mutedTextColor: c.muted.toARGB32(),
+          accentColor: c.free.toARGB32(),
+          accentInkColor: c.onFree.toARGB32(),
+        )
+        .catchError((_) {});
+  }
   runApp(const LifeOSApp());
+  // After the first frame starts, like the rest of the plugin work below.
+  widgetTheme();
+  AllyAppearance.prefs.addListener(widgetTheme);
   // Started after runApp so neither delays the first screen. Anything that
   // schedules a notification early waits for init inside NotificationService.
   unawaited(_bestEffort(() => NotificationService.instance.init()));
@@ -136,10 +153,10 @@ class _Root extends StatelessWidget {
     return BlocBuilder<AuthBloc, AuthState>(
       builder: (context, state) {
         return switch (state.status) {
-          AuthStatus.authenticated => HomeShell(user: state.user!),
+          AuthStatus.authenticated => FirstRunGate(key: ValueKey(state.user!.id), user: state.user!, child: HomeShell(user: state.user!)),
           AuthStatus.unauthenticated ||
           AuthStatus.authenticating =>
-            const LoginScreen(),
+            const WelcomeScreen(),
           AuthStatus.unknown => const SplashScreen(),
         };
       },
