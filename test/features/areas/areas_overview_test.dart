@@ -64,7 +64,17 @@ class _Repo implements LifeRepository {
 
   @override
   Future<Area> updateArea(String id,
-      {String? name, String? type, String? color, String? icon, bool? isActive, String? tier, int? weeklyMinutes, bool clearWeeklyMinutes = false}) async {
+      {String? name,
+      String? type,
+      String? color,
+      String? icon,
+      bool? isActive,
+      String? tier,
+      int? weeklyMinutes,
+      bool clearWeeklyMinutes = false,
+      String? nextTier,
+      DateTime? nextTierOn,
+      bool clearPlanned = false}) async {
     saved.add('$id tier=$tier weekly=$weeklyMinutes clear=$clearWeeklyMinutes');
     return (await areas()).first;
   }

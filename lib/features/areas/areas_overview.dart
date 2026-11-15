@@ -37,6 +37,71 @@ class AreaStep {
   AreaStep(this.id, this.title, this.minutes, {this.energy, this.smaller, this.done = false});
 }
 
+/// One tracked number: where it started, is, and is going, and the last readings.
+class TrackedNumber {
+  final String projectId;
+  final String name;
+  final String unit;
+  final double start;
+  final double latest;
+  final double target;
+  final int percent;
+
+  /// Change per week from the recent readings; null until there are enough.
+  final double? weeklyChange;
+
+  /// TOWARD | STALLED | AWAY | TOO_EARLY.
+  final String trend;
+  final List<double> points;
+
+  const TrackedNumber({
+    required this.projectId,
+    required this.name,
+    this.unit = '',
+    required this.start,
+    required this.latest,
+    required this.target,
+    this.percent = 0,
+    this.weeklyChange,
+    this.trend = 'TOO_EARLY',
+    this.points = const [],
+  });
+
+  factory TrackedNumber.fromJson(Json j) => TrackedNumber(
+        projectId: asString(j['projectId']),
+        name: asString(j['name']),
+        unit: asString(j['unit']),
+        start: asDouble(j['start']),
+        latest: asDouble(j['latest']),
+        target: asDouble(j['target']),
+        percent: asInt(j['percent']),
+        weeklyChange: j['weeklyChange'] == null ? null : asDouble(j['weeklyChange']),
+        trend: asString(j['trend'], 'TOO_EARLY'),
+        points: ((j['points'] as List?) ?? const []).whereType<Json>().map((p) => asDouble(p['value'])).toList(),
+      );
+
+  /// 72.4 → "72.4", 72.0 → "72".
+  static String show(double v) {
+    final r = (v * 10).round() / 10;
+    return r == r.roundToDouble() ? r.toInt().toString() : r.toString();
+  }
+
+  String get _u => unit.isEmpty ? '' : ' $unit';
+
+  /// "72.4 kg now · goal 68 kg"
+  String get line => '${show(latest)}$_u now · goal ${show(target)}$_u';
+
+  /// Said plainly, never as a failure.
+  String get trendWords => switch (trend) {
+        'TOWARD' => weeklyChange == null
+            ? 'Moving the right way'
+            : 'Moving the right way, about ${show(weeklyChange!.abs())}$_u a week',
+        'STALLED' => 'Holding steady lately',
+        'AWAY' => 'Drifting the other way lately. That happens.',
+        _ => 'A few more readings and the trend shows',
+      };
+}
+
 class AreaRoutine {
   final String id;
   final String title;
@@ -60,6 +125,18 @@ class AreaStanding {
   final List<AreaStep> nextSteps;
   final List<AreaRoutine> routines;
 
+  /// Three small tastes going here, or null.
+  final ({int done, int total, bool decide})? tastes;
+
+  /// A mode change planned for a day ("YYYY-MM-DD"), or null.
+  final ({AreaMode mode, String on})? planned;
+
+  /// Steps here reworked three or more times since anything was done.
+  final bool reworking;
+
+  /// Numbers tracked here, each with its last readings.
+  final List<TrackedNumber> numbers;
+
   const AreaStanding({
     required this.id,
     required this.name,
@@ -72,6 +149,10 @@ class AreaStanding {
     this.goals = const [],
     this.nextSteps = const [],
     this.routines = const [],
+    this.tastes,
+    this.planned,
+    this.reworking = false,
+    this.numbers = const [],
   });
 
   factory AreaStanding.fromJson(Json j) => AreaStanding(
@@ -93,6 +174,18 @@ class AreaStanding {
             .whereType<Json>()
             .map((r) => AreaRoutine(asString(r['id']), asString(r['title']), asInt(r['doneThisWeek'])))
             .toList(),
+        tastes: j['tastes'] is Json
+            ? (
+                done: asInt((j['tastes'] as Json)['done']),
+                total: asInt((j['tastes'] as Json)['total'], 3),
+                decide: asBool((j['tastes'] as Json)['decide']),
+              )
+            : null,
+        planned: j['planned'] is Json
+            ? (mode: AreaMode.fromName(asString((j['planned'] as Json)['mode'])), on: asString((j['planned'] as Json)['on']))
+            : null,
+        reworking: asBool(j['reworking']),
+        numbers: ((j['numbers'] as List?) ?? const []).whereType<Json>().map(TrackedNumber.fromJson).toList(),
       );
 
   /// From the older `GET /areas` list, for a server that has no overview yet:

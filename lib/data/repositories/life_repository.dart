@@ -159,9 +159,19 @@ class LifeRepository {
     String? tier, // MAIN | SECONDARY | MAINTAIN | LATER
     int? weeklyMinutes,
     bool clearWeeklyMinutes = false,
+    // A mode change planned for a day: both, or [clearPlanned] to cancel it.
+    String? nextTier,
+    DateTime? nextTierOn,
+    bool clearPlanned = false,
   }) async {
     final data = await _api.patch('/areas/$id', body: {
       if (tier != null) 'tier': tier,
+      if (clearPlanned) ...{'nextTier': null, 'nextTierOn': null},
+      if (!clearPlanned && nextTier != null && nextTierOn != null) ...{
+        'nextTier': nextTier,
+        // The day itself, as a date: the server applies it from that day on.
+        'nextTierOn': '${nextTierOn.year.toString().padLeft(4, '0')}-${nextTierOn.month.toString().padLeft(2, '0')}-${nextTierOn.day.toString().padLeft(2, '0')}',
+      },
       if (clearWeeklyMinutes) 'weeklyMinutes': null else if (weeklyMinutes != null) 'weeklyMinutes': weeklyMinutes,
       if (name != null) 'name': name,
       if (type != null) 'type': type,
@@ -212,6 +222,41 @@ class LifeRepository {
 
   /// Archived, not destroyed; Undo brings it back.
   Future<({String message, String? activityId})> letGoStep(String id) async => _receipt(await _api.post('/steps/$id/let-go'));
+
+  // ---- Three small tastes, for an area someone is unsure about ----
+
+  /// Three tastes to start from (nothing saved). [byCode] when no AI answered.
+  Future<({List<({String title, int minutes})> tastes, bool byCode})> suggestTastes(String areaId, {String? note}) async {
+    final j = (await _api.post('/tastes/$areaId/suggest', body: {'note': ?note})) as Json;
+    return (
+      tastes: ((j['tastes'] as List?) ?? const [])
+          .whereType<Json>()
+          .map((t) => (title: asString(t['title']), minutes: asInt(t['minutes'], 30)))
+          .toList(),
+      byCode: asBool(j['byCode']),
+    );
+  }
+
+  Future<({String message, String? activityId})> startTastes(String areaId, List<({String title, int minutes})> tastes) async =>
+      _receipt(await _api.post('/tastes/$areaId', body: {
+        'tastes': [for (final t in tastes) {'title': t.title, 'minutes': t.minutes}],
+      }));
+
+  // ---- Tracked numbers (one per goal: weight, savings, applications sent) ----
+
+  Future<({String message, String? activityId})> trackNumber(String areaId,
+          {required String name, String unit = '', required double start, required double target}) async =>
+      _receipt(await _api.post('/numbers', body: {'areaId': areaId, 'name': name, 'unit': unit, 'start': start, 'target': target}));
+
+  /// A reading for a tracked number. Undo removes it.
+  Future<({String message, String? activityId})> logReading(String projectId, double value) async {
+    final j = (await _api.post('/progress/log', body: {'projectId': projectId, 'value': value})) as Json;
+    return (message: asString(j['what'], 'Saved.'), activityId: asStringOrNull(j['activityId']));
+  }
+
+  /// [decision] KEEP | CHANGE | DROP.
+  Future<({String message, String? activityId})> decideTastes(String areaId, String decision) async =>
+      _receipt(await _api.post('/tastes/$areaId/decide', body: {'decision': decision}));
 
   // ---- Tasks ----
   Future<List<Task>> tasks({String? areaId, String? status}) async {
@@ -1228,11 +1273,20 @@ class LifeRepository {
   // ---- Goal plans ----
 
   /// A goal in the person's words → weekly targets to keep (nothing saved yet).
-  Future<Json> proposeGoalPlan(String text) async => (await _api.post('/goal-plan/propose', body: {'text': text})) as Json;
+  /// With [why], [done] or [weeklyMinutes] ("make a goal concrete") a plan is always
+  /// drafted, by code when no AI answers (`draftedBy` = CODE).
+  Future<Json> proposeGoalPlan(String text, {String? why, String? done, int? weeklyMinutes}) async =>
+      (await _api.post('/goal-plan/propose', body: {
+        'text': text,
+        'why': ?why,
+        'done': ?done,
+        'weeklyMinutes': ?weeklyMinutes,
+      })) as Json;
 
-  /// Keep the plan (or park it until [parkUntil]).
-  Future<Json> acceptGoalPlan(Json plan, {bool park = false, String? parkUntil}) async =>
-      (await _api.post('/goal-plan/accept', body: {'plan': plan, 'park': park, 'parkUntil': ?parkUntil})) as Json;
+  /// Keep the plan (or park it until [parkUntil]), in [areaId] when given.
+  /// The reply has `firstStep` {id, title, minutes} when steps were made.
+  Future<Json> acceptGoalPlan(Json plan, {bool park = false, String? parkUntil, String? areaId}) async =>
+      (await _api.post('/goal-plan/accept', body: {'plan': plan, 'park': park, 'parkUntil': ?parkUntil, 'areaId': ?areaId})) as Json;
 
   /// Today by part of the day, this week, goals, habits.
   Future<Map<String, dynamic>> plan() async => (await _api.get('/now/plan')) as Map<String, dynamic>;

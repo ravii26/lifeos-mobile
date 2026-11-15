@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../core/api/api_client.dart' show QueuedOfflineException;
 import '../../core/api/api_exception.dart';
@@ -12,7 +13,15 @@ import '../chat/starters.dart' show talkRequest;
 import '../places/now_cubit.dart' show placesRefresh;
 import '../today/day_shape.dart' show duration;
 import 'areas_overview.dart';
+import '../places/done_screen.dart' show DoneChoice;
+import '../session/completion_screen.dart';
+import '../session/focus_session_screen.dart';
+import 'concrete_goal_screen.dart';
+import '../../design/trend_line.dart';
+import 'number_sheets.dart';
+import 'plan_mode_sheet.dart';
 import 'step_sheet.dart';
+import 'tastes_sheet.dart';
 
 /// One area: where it stands this week, its mode, the time it gets, and what
 /// is next in it.
@@ -147,6 +156,7 @@ class _AreaPageState extends State<AreaPage> {
                 ]),
               ),
             ]),
+            if (a.tastes != null || (_mode == AreaMode.explore && a.goals.isEmpty)) _tastesCard(themed, c, a),
             _section(c, 'Mode', [
               AllySegmented<AreaMode>(
                 options: {for (final m in AreaMode.values) m: m.label},
@@ -155,6 +165,22 @@ class _AreaPageState extends State<AreaPage> {
               ),
               const SizedBox(height: Sp.x2),
               Text(_mode.meaning, style: AllyType.small(color: c.muted)),
+              const SizedBox(height: Sp.x2),
+              if (a.planned != null)
+                Row(children: [
+                  Icon(Icons.event_outlined, size: 18, color: c.muted),
+                  const SizedBox(width: Sp.x2),
+                  Expanded(
+                    child: Text('Becomes ${a.planned!.mode.label} on ${shortDay(a.planned!.on)}', style: AllyType.body(color: c.ink)),
+                  ),
+                  AllyButton('Cancel', kind: AllyButtonKind.ghost, onPressed: _saving ? null : () => _cancelPlanned(themed)),
+                ])
+              else
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: AllyButton('Plan a change for later',
+                      kind: AllyButtonKind.ghost, icon: Icons.event_outlined, onPressed: _saving ? null : () => _planChange(themed)),
+                ),
             ]),
             if (widget.canSetTime && !resting)
               _section(c, 'Time each week', [
@@ -185,8 +211,20 @@ class _AreaPageState extends State<AreaPage> {
                     padding: const EdgeInsets.only(bottom: Sp.x1),
                     child: Text(g, style: AllyType.body(color: c.ink, w: FontWeight.w500)),
                   ),
+              if (!resting) ...[
+                const SizedBox(height: Sp.x3),
+                AllyButton(a.goals.isEmpty ? 'Make a goal concrete' : 'Add a goal, made concrete',
+                    kind: a.goals.isEmpty ? AllyButtonKind.main : AllyButtonKind.secondary,
+                    icon: Icons.flag_outlined,
+                    wide: true,
+                    onPressed: () => _concrete(themed)),
+              ],
             ]),
             _section(c, 'Next steps', [
+              if (a.reworking && a.nextSteps.isNotEmpty && !_reworkHidden) ...[
+                _reworkCard(themed, c, a),
+                const SizedBox(height: Sp.x3),
+              ],
               if (a.nextSteps.isEmpty)
                 Text(resting ? 'Resting. Nothing is asked here.' : 'Nothing lined up.', style: AllyType.body(color: c.muted))
               else
@@ -215,6 +253,19 @@ class _AreaPageState extends State<AreaPage> {
                 ),
               ],
             ]),
+            if (a.numbers.isNotEmpty || !resting)
+              _section(c, a.numbers.length > 1 ? 'Tracked numbers' : 'Tracked number', [
+                for (final n in a.numbers) ...[
+                  _numberCard(themed, c, n, color),
+                  const SizedBox(height: Sp.x2),
+                ],
+                if (!resting)
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: AllyButton(a.numbers.isEmpty ? 'Track a number' : 'Track another number',
+                        kind: AllyButtonKind.ghost, icon: Icons.show_chart_rounded, onPressed: () => _trackNumber(themed)),
+                  ),
+              ]),
             if (a.routines.isNotEmpty)
               _section(c, 'Routines', [
                 for (final r in a.routines)
@@ -236,9 +287,288 @@ class _AreaPageState extends State<AreaPage> {
     try {
       final all = (await loadAreasOverview(widget.repo)).areas;
       final fresh = all.where((x) => x.id == _area.id);
-      if (fresh.isNotEmpty && mounted) setState(() => _area = fresh.first);
+      if (fresh.isNotEmpty && mounted) {
+        setState(() {
+          _area = fresh.first;
+          _mode = fresh.first.mode;
+        });
+      }
     } on ApiException {
       // The page keeps what it had; the toast already said what happened.
+    }
+  }
+
+  // "Try step one first?" is shown at most once a week per area.
+  bool _reworkHidden = false;
+  String get _reworkKey => 'rework_hidden_${widget.area.id}';
+
+  @override
+  void initState() {
+    super.initState();
+    SharedPreferences.getInstance().then((p) {
+      final at = DateTime.tryParse(p.getString(_reworkKey) ?? '');
+      if (at != null && DateTime.now().difference(at).inDays < 7 && mounted) setState(() => _reworkHidden = true);
+    }).catchError((_) {});
+  }
+
+  Future<void> _hideRework() async {
+    setState(() => _reworkHidden = true);
+    try {
+      (await SharedPreferences.getInstance()).setString(_reworkKey, DateTime.now().toIso8601String());
+    } catch (_) {}
+  }
+
+  /// One gentle line, never a block: the steps keep changing and nothing is getting done.
+  Widget _reworkCard(BuildContext themed, AllyColors c, AreaStanding a) {
+    final first = a.nextSteps.first;
+    final minutes = (first.minutes ?? 15).clamp(5, 15);
+    return AllyCard(
+      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        Text('These steps have changed a few times. Try the first one as it is?', style: AllyType.body(color: c.ink)),
+        const SizedBox(height: Sp.x1),
+        Text('$minutes minutes is enough to learn what to change.', style: AllyType.small(color: c.faint)),
+        const SizedBox(height: Sp.x3),
+        Row(children: [
+          Expanded(child: AllyButton('Try it', wide: true, onPressed: () => _tryFirst(themed, first, minutes))),
+          const SizedBox(width: Sp.x2),
+          Expanded(child: AllyButton('Not now', kind: AllyButtonKind.ghost, wide: true, onPressed: _hideRework)),
+        ]),
+      ]),
+    );
+  }
+
+  Future<void> _tryFirst(BuildContext themed, AreaStep step, int minutes) async {
+    final color = themed.ac.area(widget.colorIndex);
+    final outcome = await Navigator.of(context).push<FocusOutcome>(MaterialPageRoute(
+      builder: (_) => FocusSessionScreen(title: step.title, minutes: minutes, areaName: _area.name, areaColor: color),
+    ));
+    if (!mounted || !themed.mounted || outcome?.end != FocusEnd.done) return;
+    await _tick(themed, step);
+  }
+
+  Future<void> _planChange(BuildContext themed) async {
+    final picked = await showAllySheet<(AreaMode, DateTime)>(themed, builder: (_) => PlanModeSheet(areaName: _area.name, current: _mode));
+    if (picked == null || !mounted) return;
+    setState(() => _saving = true);
+    try {
+      await widget.repo.updateArea(_area.id, nextTier: picked.$1.tier, nextTierOn: picked.$2);
+      placesRefresh.value++;
+      await _reload();
+      if (themed.mounted) showAllyToast(themed, 'Planned. You can cancel it here anytime.');
+    } on ApiException catch (e) {
+      if (themed.mounted) showAllyToast(themed, e.message);
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  Future<void> _cancelPlanned(BuildContext themed) async {
+    final was = _area.planned;
+    setState(() => _saving = true);
+    try {
+      await widget.repo.updateArea(_area.id, clearPlanned: true);
+      placesRefresh.value++;
+      await _reload();
+      if (!themed.mounted) return;
+      showAllyToast(
+        themed,
+        'Planned change cancelled.',
+        onUndo: was == null
+            ? null
+            : () async {
+                try {
+                  await widget.repo.updateArea(_area.id, nextTier: was.mode.tier, nextTierOn: DateTime.parse(was.on));
+                  placesRefresh.value++;
+                  await _reload();
+                } on ApiException catch (e) {
+                  if (themed.mounted) showAllyToast(themed, e.message);
+                }
+              },
+      );
+    } on ApiException catch (e) {
+      if (themed.mounted) showAllyToast(themed, e.message);
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  Widget _numberCard(BuildContext themed, AllyColors c, TrackedNumber n, Color color) => AllyCard(
+        child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          Row(children: [
+            Expanded(child: Text(n.name, style: AllyType.body(color: c.ink, w: FontWeight.w600))),
+            Text('${n.percent}%', style: AllyType.num(color: c.faint)),
+          ]),
+          const SizedBox(height: Sp.x1),
+          Text(n.line, style: AllyType.small(color: c.muted)),
+          const SizedBox(height: Sp.x3),
+          TrendLine(
+            points: n.points,
+            target: n.target,
+            color: color,
+            semanticLabel: '${n.name}: ${n.line}. ${n.trendWords}.',
+          ),
+          const SizedBox(height: Sp.x2),
+          Text(n.trendWords, style: AllyType.small(color: c.faint)),
+          const SizedBox(height: Sp.x2),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: AllyButton('Add a reading', kind: AllyButtonKind.secondary, icon: Icons.add_rounded, onPressed: () => _addReading(themed, n)),
+          ),
+        ]),
+      );
+
+  Future<void> _trackNumber(BuildContext themed) async {
+    final d = await showAllySheet<NewNumberDraft>(themed, builder: (_) => TrackNumberSheet(areaName: _area.name));
+    if (d == null || !mounted) return;
+    try {
+      final r = await widget.repo.trackNumber(_area.id, name: d.name, unit: d.unit, start: d.start, target: d.target);
+      placesRefresh.value++;
+      await _reload();
+      if (!themed.mounted) return;
+      final undoId = r.activityId;
+      showAllyToast(themed, r.message, onUndo: undoId == null ? null : () => _undo(themed, undoId));
+    } on ApiException catch (e) {
+      if (themed.mounted) showAllyToast(themed, e.isNotFound ? 'Tracking numbers needs the latest server. Deploy it, then try again.' : e.message);
+    }
+  }
+
+  Future<void> _addReading(BuildContext themed, TrackedNumber n) async {
+    final v = await showAllySheet<double>(themed, builder: (_) => ReadingSheet(number: n));
+    if (v == null || !mounted) return;
+    try {
+      final r = await widget.repo.logReading(n.projectId, v);
+      placesRefresh.value++;
+      await _reload();
+      if (!themed.mounted) return;
+      final undoId = r.activityId;
+      showAllyToast(themed, r.message, onUndo: undoId == null ? null : () => _undo(themed, undoId));
+    } on ApiException catch (e) {
+      if (themed.mounted) showAllyToast(themed, e.message);
+    }
+  }
+
+  /// An unsure area: plan three tastes, show where they stand, then decide.
+  Widget _tastesCard(BuildContext themed, AllyColors c, AreaStanding a) {
+    final t = a.tastes;
+    if (t == null) {
+      return AllyCard(
+        child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          Text('NOT SURE YET?', style: AllyType.eyebrow(color: c.faint)),
+          const SizedBox(height: Sp.x1),
+          Text('Try three small tastes of ${a.name}, then decide. Clarity comes from trying.', style: AllyType.body(color: c.ink)),
+          const SizedBox(height: Sp.x3),
+          AllyButton('Plan three tastes', kind: AllyButtonKind.secondary, wide: true, onPressed: () => _planTastes(themed)),
+        ]),
+      );
+    }
+    if (!t.decide) {
+      return AllyCard(
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text('TASTE ${(t.done + 1).clamp(1, t.total)} OF ${t.total}', style: AllyType.eyebrow(color: c.faint)),
+          const SizedBox(height: Sp.x1),
+          Text('Not sure yet is fine. Each taste comes up in your free time; then you decide.', style: AllyType.body(color: c.ink)),
+        ]),
+      );
+    }
+    return AllyCard(
+      strong: true,
+      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        Text('${t.done == 1 ? 'ONE TASTE' : '${t.done} TASTES'} DONE', style: AllyType.eyebrow(color: c.faint)),
+        const SizedBox(height: Sp.x1),
+        Text('What now for ${a.name}?', style: AllyType.h2(color: c.ink)),
+        const SizedBox(height: Sp.x4),
+        AllyButton('Keep going: make it concrete', wide: true, onPressed: _saving ? null : () => _decide(themed, 'KEEP')),
+        const SizedBox(height: Sp.x2),
+        AllyButton('Try another direction', kind: AllyButtonKind.secondary, wide: true, onPressed: _saving ? null : () => _decide(themed, 'CHANGE')),
+        AllyButton('Drop it for now', kind: AllyButtonKind.ghost, wide: true, onPressed: _saving ? null : () => _decide(themed, 'DROP')),
+      ]),
+    );
+  }
+
+  Future<void> _planTastes(BuildContext themed) async {
+    final picked = await showAllySheet<List<TasteDraft>>(
+      themed,
+      builder: (_) => TastesSheet(areaId: _area.id, areaName: _area.name, repo: widget.repo),
+    );
+    if (picked == null || !mounted || !themed.mounted) return;
+    try {
+      final r = await widget.repo.startTastes(_area.id, picked);
+      placesRefresh.value++;
+      await _reload();
+      if (!themed.mounted) return;
+      final undoId = r.activityId;
+      showAllyToast(themed, r.message, onUndo: undoId == null ? null : () => _undo(themed, undoId));
+    } on ApiException catch (e) {
+      if (themed.mounted) {
+        showAllyToast(themed, e.isNotFound ? 'Tastes need the latest server. Deploy it, then try again.' : e.message);
+      }
+    }
+  }
+
+  /// KEEP and CHANGE go straight on to the next thing; DROP rests the area, with Undo.
+  Future<void> _decide(BuildContext themed, String decision) async {
+    setState(() => _saving = true);
+    try {
+      final r = await widget.repo.decideTastes(_area.id, decision);
+      placesRefresh.value++;
+      await _reload();
+      if (!mounted || !themed.mounted) return;
+      setState(() => _saving = false);
+      final undoId = r.activityId;
+      showAllyToast(themed, r.message, onUndo: undoId == null ? null : () => _undo(themed, undoId));
+      if (decision == 'KEEP') await _concrete(themed);
+      if (decision == 'CHANGE' && themed.mounted) await _planTastes(themed);
+    } on ApiException catch (e) {
+      if (mounted) setState(() => _saving = false);
+      if (themed.mounted) showAllyToast(themed, e.message);
+    }
+  }
+
+  /// "Make a goal concrete": three answers → draft plan → start step one now, or later.
+  Future<void> _concrete(BuildContext themed) async {
+    final repo = widget.repo;
+    final kept = await Navigator.of(context).push<KeptPlan>(MaterialPageRoute(
+      builder: (_) => ConcreteGoalScreen(areaId: _area.id, areaName: _area.name, repo: repo),
+    ));
+    if (kept == null || !mounted) return;
+    placesRefresh.value++;
+    await _reload();
+    if (!mounted || !themed.mounted) return;
+    final stepId = kept.stepId;
+    if (!kept.startNow || stepId == null) {
+      final undoId = kept.activityId;
+      showAllyToast(themed, 'Saved to ${_area.name} as draft 1.', onUndo: undoId == null ? null : () => _undo(themed, undoId));
+      return;
+    }
+    final title = kept.stepTitle ?? kept.goalTitle;
+    final color = themed.ac.area(widget.colorIndex);
+    final outcome = await Navigator.of(context).push<FocusOutcome>(MaterialPageRoute(
+      builder: (_) => FocusSessionScreen(title: title, minutes: kept.stepMinutes, areaName: _area.name, areaColor: color),
+    ));
+    if (!mounted || !themed.mounted || outcome?.end != FocusEnd.done) return;
+    try {
+      final id = await repo.respondNow('TASK', stepId, 'DONE');
+      placesRefresh.value++;
+      await _reload();
+      if (!mounted) return;
+      final choice = await Navigator.of(context).push<DoneChoice>(MaterialPageRoute(
+        builder: (_) => CompletionScreen(title: title, minutes: outcome!.minutes, canUndo: id != null),
+      ));
+      if (choice == DoneChoice.undo && id != null && themed.mounted) await _undo(themed, id);
+    } on QueuedOfflineException {
+      if (themed.mounted) showAllyToast(themed, "Saved offline. It'll sync when you're back online.");
+    } on ApiException catch (e) {
+      if (themed.mounted) showAllyToast(themed, e.message);
+    }
+  }
+
+  Future<void> _undo(BuildContext themed, String id) async {
+    try {
+      await widget.repo.undo(id);
+      placesRefresh.value++;
+      await _reload();
+    } on ApiException catch (e) {
+      if (themed.mounted) showAllyToast(themed, e.message);
     }
   }
 
