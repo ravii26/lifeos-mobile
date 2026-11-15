@@ -10,13 +10,13 @@ import 'core/di/service_locator.dart';
 import 'core/notifications/notification_service.dart';
 import 'core/share/share_intent_service.dart';
 import 'core/theme/app_theme.dart';
+import 'design/appearance.dart';
 import 'core/widget/widget_sync_service.dart';
 import 'data/repositories/auth_repository.dart';
 import 'data/repositories/life_repository.dart';
 import 'features/appearance/appearance_cubit.dart';
 import 'features/auth/bloc/auth_bloc.dart';
 import 'features/auth/login_screen.dart';
-import 'features/guide/guide_style.dart';
 import 'features/now/decisions_cubit.dart';
 import 'features/shell/home_shell.dart';
 import 'features/splash/splash_screen.dart';
@@ -28,6 +28,7 @@ Future<void> main() async {
     statusBarIconBrightness: Brightness.light,
   ));
   await setupLocator();
+  await AllyAppearance.load();
   runApp(const LifeOSApp());
   // Started after runApp so neither delays the first screen. Anything that
   // schedules a notification early waits for init inside NotificationService.
@@ -92,7 +93,10 @@ class LifeOSApp extends StatelessWidget {
               getIt<LifeRepository>().clearOffline().ignore();
             }
           },
-          child: BlocBuilder<AppearanceCubit, AppearanceState>(
+          child: ValueListenableBuilder<AppearancePrefs>(
+            // Appearance (theme, larger text, reduce motion) rebuilds the whole app at once.
+            valueListenable: AllyAppearance.prefs,
+            builder: (context, _, _) => BlocBuilder<AppearanceCubit, AppearanceState>(
             builder: (context, appearance) => MaterialApp(
               navigatorKey: rootNavigatorKey,
               title: 'Ally',
@@ -102,22 +106,21 @@ class LifeOSApp extends StatelessWidget {
                   font: appearance.font,
                   light: false),
               builder: (context, child) {
-                // Plum is dark only for now, whatever the phone's own setting is.
+                // Status and navigation bars follow the theme the new screens use.
+                final light = AllyAppearance.brightnessOf(context) == Brightness.light;
+                final c = AllyAppearance.colorsOf(context);
                 SystemChrome.setSystemUIOverlayStyle(SystemUiOverlayStyle(
                   statusBarColor: Colors.transparent,
-                  statusBarIconBrightness: Brightness.light,
-                  systemNavigationBarColor: G.bg,
-                  systemNavigationBarIconBrightness: Brightness.light,
+                  statusBarIconBrightness: light ? Brightness.dark : Brightness.light,
+                  systemNavigationBarColor: c.bg,
+                  systemNavigationBarIconBrightness: light ? Brightness.dark : Brightness.light,
                 ));
-                final mq = MediaQuery.of(context);
-                return MediaQuery(
-                  data: mq.copyWith(
-                      textScaler: TextScaler.linear(appearance.textScale)),
-                  child: child!,
-                );
+                // Text follows the phone's own size (plus "larger text"), no longer a fixed scale.
+                return AllyAppearance.apply(context, child!);
               },
               home: const _Root(),
             ),
+          ),
           ),
         );
       }),

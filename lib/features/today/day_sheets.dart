@@ -6,7 +6,7 @@ import '../../design/tokens.dart';
 import '../../design/type.dart';
 
 /// What a feeling leads to. The sheet pops with one of these, or null.
-enum FeelingAction { easyDay, startTwoMinutes, freeTime, talk, rest }
+enum FeelingAction { easyDay, startTwoMinutes, freeTime, talk, decide, rest }
 
 /// One feeling: a kind line, one small thing to do, and a way forward.
 /// All written here, so it works offline and without AI.
@@ -33,7 +33,7 @@ const feelings = <Feeling>[
   Feeling('scrolling', 'Scrolling', "Your attention got pulled. That's what those apps are built to do.",
       'Put the phone face down, stand up, then pick one thing.', actionLabel: 'Show me one thing', action: FeelingAction.freeTime),
   Feeling('overthinking', 'Overthinking', "Thinking more won't make it clearer. Doing a small part will.",
-      'Write the options down, then give the easiest one ten minutes.', actionLabel: 'Talk it through with Ally', action: FeelingAction.talk),
+      'Write the options down, then give the easiest one ten minutes.', actionLabel: 'Help me decide', action: FeelingAction.decide),
   Feeling('anxious', 'Anxious', 'That feeling is real, and it will pass.', 'Breathe in for four, out for six. Five times.',
       helpline: true, breathe: true, actionLabel: 'Make today easy', action: FeelingAction.easyDay),
   Feeling('good', 'Good', 'Good. Use it on something that matters to you.', 'Pick the thing you have been putting off and give it real time.',

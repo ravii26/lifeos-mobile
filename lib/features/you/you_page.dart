@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../../design/ally_theme.dart';
+import '../../design/appearance.dart';
 import '../../design/components.dart';
 import '../../design/tokens.dart';
 import '../../design/type.dart';
@@ -28,7 +28,7 @@ class YouPage extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) => Theme(data: AllyTheme.dark(), child: Builder(builder: _page));
+  Widget build(BuildContext context) => Theme(data: AllyAppearance.themeOf(context), child: Builder(builder: _page));
 
   Widget _page(BuildContext themed) {
     final c = themed.ac;

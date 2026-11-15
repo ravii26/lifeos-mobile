@@ -8,6 +8,7 @@ import '../../data/repositories/life_repository.dart';
 import '../../design/components.dart';
 import '../../design/tokens.dart';
 import '../../design/type.dart';
+import 'ask_card.dart';
 import 'you_page.dart';
 
 /// What Ally remembers: in your own words where it has them. Mark something
@@ -166,6 +167,7 @@ class _MemoriesPageState extends State<MemoriesPage> {
               ),
             );
         return [
+          AskCard(key: const ValueKey('ask'), repo: widget.repo, onAnswered: _load),
           if (items.isEmpty) Text('Nothing yet. Talk to Ally and it will start to learn.', style: AllyType.body(color: c.muted)),
           if (current.isNotEmpty) youRows(c, [for (final m in current) row(m)]),
           if (past.isNotEmpty)

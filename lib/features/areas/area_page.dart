@@ -4,7 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../core/api/api_client.dart' show QueuedOfflineException;
 import '../../core/api/api_exception.dart';
 import '../../data/repositories/life_repository.dart';
-import '../../design/ally_theme.dart';
+import '../../design/appearance.dart';
 import '../../design/components.dart';
 import '../../design/rings.dart';
 import '../../design/tokens.dart';
@@ -125,7 +125,7 @@ class _AreaPageState extends State<AreaPage> {
 
   @override
   Widget build(BuildContext context) {
-    return Theme(data: AllyTheme.dark(), child: Builder(builder: _page));
+    return Theme(data: AllyAppearance.themeOf(context), child: Builder(builder: _page));
   }
 
   Widget _page(BuildContext themed) {

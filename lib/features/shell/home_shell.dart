@@ -9,7 +9,7 @@ import '../../core/notifications/agenda_sync.dart';
 import '../../core/notifications/notification_service.dart';
 import '../../data/models/user.dart';
 import '../../data/repositories/life_repository.dart';
-import '../../design/tokens.dart';
+import '../../design/appearance.dart';
 import '../areas/areas_home_screen.dart';
 import '../capture/capture_sheet.dart';
 import '../chat/chat_cubit.dart';
@@ -239,8 +239,8 @@ class _BottomNav extends StatelessWidget {
   // Every tab is in the new look now.
   bool get _newLook => true;
 
-  Widget _place(String label, int place) {
-    const ally = AllyColors.dark;
+  Widget _place(BuildContext context, String label, int place) {
+    final ally = AllyAppearance.colorsOf(context);
     final on = index == place;
     final color = _newLook ? (on ? ally.ink : ally.muted) : (on ? G.ink : G.muted);
     return Expanded(
@@ -265,7 +265,7 @@ class _BottomNav extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const ally = AllyColors.dark;
+    final ally = AllyAppearance.colorsOf(context);
     return ColoredBox(
       color: _newLook ? ally.bg : G.bg,
       child: SafeArea(
@@ -273,8 +273,8 @@ class _BottomNav extends StatelessWidget {
         child: SizedBox(
           height: 72,
           child: Row(children: [
-            _place('Today', _nowPlace),
-            _place('Areas', _areasPlace),
+            _place(context, 'Today', _nowPlace),
+            _place(context, 'Areas', _areasPlace),
             Expanded(
               child: Center(
                 child: Material(
@@ -296,8 +296,8 @@ class _BottomNav extends StatelessWidget {
                 ),
               ),
             ),
-            _place('Week', _weekPlace),
-            _place('You', _lifePlace),
+            _place(context, 'Week', _weekPlace),
+            _place(context, 'You', _lifePlace),
           ]),
         ),
       ),

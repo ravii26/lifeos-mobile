@@ -4,7 +4,7 @@ import '../../core/api/api_client.dart' show QueuedOfflineException;
 import '../../core/api/api_exception.dart';
 import '../../data/models/habit.dart';
 import '../../data/repositories/life_repository.dart';
-import '../../design/ally_theme.dart';
+import '../../design/appearance.dart';
 import '../../design/components.dart';
 import '../../design/tokens.dart';
 import '../../design/type.dart';
@@ -154,7 +154,7 @@ class _RoutinePageState extends State<RoutinePage> {
   }
 
   @override
-  Widget build(BuildContext context) => Theme(data: AllyTheme.dark(), child: Builder(builder: _page));
+  Widget build(BuildContext context) => Theme(data: AllyAppearance.themeOf(context), child: Builder(builder: _page));
 
   Widget _page(BuildContext themed) {
     final c = themed.ac;

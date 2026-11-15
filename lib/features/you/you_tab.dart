@@ -6,7 +6,7 @@ import '../../core/di/service_locator.dart';
 import '../../core/notifications/agenda_sync.dart';
 import '../../data/models/user.dart';
 import '../../data/repositories/life_repository.dart';
-import '../../design/ally_theme.dart';
+import '../../design/appearance.dart';
 import '../../design/components.dart';
 import '../../design/tokens.dart';
 import '../../design/type.dart';
@@ -14,7 +14,6 @@ import '../auth/bloc/auth_bloc.dart';
 import '../guide/guide_style.dart' show G;
 import '../more/log_screen.dart';
 import '../more/reminders_check_screen.dart';
-import '../more/settings_screen.dart';
 import '../more/voice_screen.dart';
 import '../more/your_day_screen.dart';
 import '../places/life_notes_screen.dart';
@@ -23,7 +22,11 @@ import '../places/you_screen.dart';
 import '../shell/life_cubit.dart';
 import '../shrink/parked_screen.dart';
 import '../tasks/task_detail_screen.dart';
+import '../design_preview/design_preview_screen.dart';
+import 'account_page.dart';
 import 'ally_works_page.dart';
+import 'appearance_page.dart';
+import 'decide_screen.dart';
 import 'history_page.dart';
 import 'memories_page.dart';
 import 'reminders_page.dart';
@@ -132,7 +135,7 @@ class _YouTabState extends State<YouTab> {
   }
 
   @override
-  Widget build(BuildContext context) => Theme(data: AllyTheme.dark(), child: Builder(builder: _page));
+  Widget build(BuildContext context) => Theme(data: AllyAppearance.themeOf(context), child: Builder(builder: _page));
 
   Widget _page(BuildContext themed) {
     final c = themed.ac;
@@ -150,13 +153,26 @@ class _YouTabState extends State<YouTab> {
     final ally = [
       _Entry(Icons.auto_awesome_outlined, 'What Ally remembers', 'In your own words; private, still true, or forget', () => _push(MemoriesPage(repo: _repo))),
       _Entry(Icons.history_rounded, 'History', 'Everything Ally did, with Undo', () => _push(HistoryPage(repo: _repo))),
+      _Entry(Icons.call_split_rounded, 'Help me decide', 'Two options, a suggestion, a check-in', () => _push(DecideScreen(repo: _repo))),
       _Entry(Icons.campaign_outlined, 'How much Ally speaks up', 'Normal, quieter or silent', () => _speakUp(themed)),
       _Entry(Icons.tune_rounded, 'How Ally works for you', 'What it helps with most, and how it talks', () => _push(AllyWorksPage(repo: _repo))),
       _Entry(Icons.schedule_rounded, 'Your normal day', 'Work hours, sleep, free time', () => _push(const YourDayScreen())),
       _Entry(Icons.record_voice_over_outlined, "Ally's voice", 'Spoken replies', () => _push(const VoiceScreen())),
     ];
     final account = [
-      _Entry(Icons.shield_outlined, 'Account and your data', 'Download, delete, and the design preview', () => _push(SettingsScreen(user: widget.user))),
+      _Entry(Icons.contrast_rounded, 'Appearance', 'Theme, larger text, reduce motion', () => _push(const AppearancePage())),
+      _Entry(Icons.shield_outlined, 'Account and privacy', 'What goes to AI, your data, delete', () {
+        final auth = context.read<AuthBloc?>();
+        _push(AccountPage(
+          user: widget.user,
+          repo: _repo,
+          onSignOut: () {
+            Navigator.of(context).popUntil((r) => r.isFirst);
+            auth?.add(const AuthLogoutRequested());
+          },
+          onDesignPreview: () => _push(const DesignPreviewScreen()),
+        ));
+      }),
     ];
     return ColoredBox(
       color: c.bg,

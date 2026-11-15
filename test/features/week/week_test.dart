@@ -67,13 +67,13 @@ class _Repo implements LifeRepository {
   dynamic noSuchMethod(Invocation i) => super.noSuchMethod(i);
 }
 
-Future<void> _open(WidgetTester t, _Repo repo, {Size size = const Size(360, 800), double textScale = 1}) async {
+Future<void> _open(WidgetTester t, _Repo repo, {Size size = const Size(360, 800), double textScale = 1, DateTime? day}) async {
   t.view.physicalSize = size;
   t.view.devicePixelRatio = 1;
   t.platformDispatcher.textScaleFactorTestValue = textScale;
   addTearDown(t.view.reset);
   addTearDown(t.platformDispatcher.clearAllTestValues);
-  await t.pumpWidget(MaterialApp(home: Scaffold(body: WeekScreen(repo: repo))));
+  await t.pumpWidget(MaterialApp(home: Scaffold(body: WeekScreen(repo: repo, clock: () => day ?? DateTime(2026, 11, 19)))));
   // One frame for the data to arrive, then time for the entrance to play.
   await t.pump();
   await t.pump(const Duration(seconds: 2));

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:lifeos_mobile/data/models/chat.dart';
+import 'package:lifeos_mobile/data/models/know.dart';
 import 'package:lifeos_mobile/data/repositories/life_repository.dart';
 import 'package:lifeos_mobile/features/you/ally_works_page.dart';
 import 'package:lifeos_mobile/features/you/history_page.dart';
@@ -19,6 +20,23 @@ class _Repo implements LifeRepository {
   bool private = false;
   String focus = 'ALL';
   String tone = 'BALANCED';
+  bool ask = false;
+
+  @override
+  Future<KnowCardData> knowNext() async => ask
+      ? const KnowCardData(
+          question: KnowQuestion(id: 'q1', text: 'When do you usually have free time?', why: 'So suggestions land when you can use them.', options: ['Mornings', 'Evenings'], allowText: true),
+          answered: 2,
+          total: 8,
+        )
+      : const KnowCardData(answered: 3, total: 8);
+
+  @override
+  Future<KnowReply> knowAnswer(String id, {String? answer, bool skip = false}) async {
+    calls.add('know:$id:${skip ? 'skip' : answer}');
+    ask = false;
+    return KnowReply(skip ? 'No problem.' : 'Got it: $answer.');
+  }
 
   @override
   Future<List<Reminder>> reminders() async => [
@@ -202,6 +220,31 @@ void main() {
     await t.pump(const Duration(seconds: 5));
   });
 
+  testWidgets('memories: one getting-to-know-you question at a time; answering or skipping', (t) async {
+    final repo = _Repo()..ask = true;
+    await _open(t, MemoriesPage(repo: repo));
+    expect(find.text('GETTING TO KNOW YOU · 2 OF 8'), findsOneWidget);
+    expect(find.text('When do you usually have free time?'), findsOneWidget);
+    await _tap(t, find.text('Evenings'));
+    expect(repo.calls.last, 'know:q1:Evenings');
+    expect(find.text('Got it: Evenings.'), findsOneWidget);
+    expect(find.text('When do you usually have free time?'), findsNothing);
+    await t.pump(const Duration(seconds: 7));
+    expect(find.text('Got it: Evenings.'), findsNothing);
+
+    repo.ask = true;
+    await t.pumpWidget(const SizedBox());
+    await _open(t, MemoriesPage(repo: repo));
+    await _tap(t, find.text('Skip for now'));
+    expect(repo.calls.last, 'know:q1:skip');
+    await t.pump(const Duration(seconds: 7));
+  });
+
+  testWidgets('memories: with nothing to ask there is no card', (t) async {
+    await _open(t, MemoriesPage(repo: _Repo()));
+    expect(find.textContaining('GETTING TO KNOW YOU'), findsNothing);
+  });
+
   testWidgets('how Ally works: a choice saves at once, with Undo', (t) async {
     final repo = _Repo();
     await _open(t, AllyWorksPage(repo: repo));
@@ -216,7 +259,7 @@ void main() {
     for (final page in [
       RemindersPage(repo: _Repo(), clock: () => _now, onCheckDelivery: () {}),
       HistoryPage(repo: _Repo(), clock: () => _now),
-      MemoriesPage(repo: _Repo()),
+      MemoriesPage(repo: _Repo()..ask = true),
       AllyWorksPage(repo: _Repo()),
     ]) {
       await _open(t, page, size: const Size(320, 640), textScale: 1.5);

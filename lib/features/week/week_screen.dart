@@ -3,13 +3,15 @@ import 'package:flutter/material.dart';
 import '../../core/api/api_exception.dart';
 import '../../core/di/service_locator.dart';
 import '../../data/repositories/life_repository.dart';
-import '../../design/ally_theme.dart';
+import '../../design/appearance.dart';
 import '../../design/components.dart';
 import '../../design/tokens.dart';
 import '../../design/type.dart';
 import '../places/now_cubit.dart' show placesRefresh;
 import '../routines/new_routine_screen.dart';
 import '../routines/routine_page.dart';
+import 'review_rules.dart';
+import 'review_screen.dart';
 import 'week_data.dart';
 
 /// Week: seven days as bars (done solid, planned faded), the chosen day's
@@ -18,7 +20,10 @@ import 'week_data.dart';
 class WeekScreen extends StatefulWidget {
   /// For tests.
   final LifeRepository? repo;
-  const WeekScreen({super.key, this.repo});
+
+  /// For tests: today's date, which decides whether the review leads.
+  final DateTime Function()? clock;
+  const WeekScreen({super.key, this.repo, this.clock});
 
   @override
   State<WeekScreen> createState() => _WeekScreenState();
@@ -65,7 +70,7 @@ class _WeekScreenState extends State<WeekScreen> {
 
   @override
   Widget build(BuildContext context) => Theme(
-    data: AllyTheme.dark(),
+    data: AllyAppearance.themeOf(context),
     child: Builder(builder: _page),
   );
 
@@ -105,6 +110,11 @@ class _WeekScreenState extends State<WeekScreen> {
     );
   }
 
+  Future<void> _review() async {
+    final set = await Navigator.of(context).push<bool>(MaterialPageRoute(builder: (_) => ReviewScreen(repo: _repo)));
+    if (set == true) await _load();
+  }
+
   Widget _problem(AllyColors c) => AllyCard(
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -121,6 +131,7 @@ class _WeekScreenState extends State<WeekScreen> {
   List<Widget> _content(AllyColors c, WeekData d) {
     final day = _day ?? d.todayIndex;
     final active = d.areas.where((a) => a.mode != 'REST').toList();
+    final due = active.isNotEmpty && reviewIsDue((widget.clock ?? DateTime.now)());
     return [
       Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -130,6 +141,20 @@ class _WeekScreenState extends State<WeekScreen> {
           Text('This week', style: AllyType.h1(color: c.ink)),
         ],
       ),
+      if (due)
+        AllyCard(
+          strong: true,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text('WEEKLY REVIEW · ABOUT 10 MIN', style: AllyType.eyebrow(color: c.faint)),
+              const SizedBox(height: Sp.x1),
+              Text('What moved, and what next week is for', style: AllyType.h2(color: c.ink)),
+              const SizedBox(height: Sp.x3),
+              AllyButton('Start the review', onPressed: _review),
+            ],
+          ),
+        ),
       AllyCard(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -144,6 +169,7 @@ class _WeekScreenState extends State<WeekScreen> {
       _routines(c, d),
       if (active.isNotEmpty) _timePerArea(c, d, active),
       if (d.lookBack != null) _lookBack(c, d.lookBack!),
+      if (!due && active.isNotEmpty) AllyButton('Review the week', kind: AllyButtonKind.ghost, onPressed: _review),
     ];
   }
 
@@ -193,7 +219,7 @@ class _WeekScreenState extends State<WeekScreen> {
     await Navigator.of(context).push(
       MaterialPageRoute<void>(
         builder: (_) =>
-            RoutinePage(habitId: r.id, repo: _repo, areaName: d.nameOf(r.areaId), color: AllyColors.dark.area(d.colorIndexOf(r.areaId))),
+            RoutinePage(habitId: r.id, repo: _repo, areaName: d.nameOf(r.areaId), color: AllyAppearance.colorsOf(context).area(d.colorIndexOf(r.areaId))),
       ),
     );
     await _load();

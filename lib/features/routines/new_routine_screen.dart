@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/api/api_exception.dart';
 import '../../data/repositories/life_repository.dart';
-import '../../design/ally_theme.dart';
+import '../../design/appearance.dart';
 import '../../design/components.dart';
 import '../../design/tokens.dart';
 import '../../design/type.dart';
@@ -74,7 +74,7 @@ class _NewRoutineScreenState extends State<NewRoutineScreen> {
   }
 
   @override
-  Widget build(BuildContext context) => Theme(data: AllyTheme.dark(), child: Builder(builder: _page));
+  Widget build(BuildContext context) => Theme(data: AllyAppearance.themeOf(context), child: Builder(builder: _page));
 
   Widget _page(BuildContext context) {
     final c = context.ac;

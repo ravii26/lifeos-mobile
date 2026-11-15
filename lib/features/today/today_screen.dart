@@ -7,7 +7,7 @@ import '../../core/api/api_client.dart' show QueuedOfflineException;
 import '../../core/api/api_exception.dart';
 import '../../core/di/service_locator.dart';
 import '../../data/repositories/life_repository.dart';
-import '../../design/ally_theme.dart';
+import '../../design/appearance.dart';
 import '../../design/components.dart';
 import '../../design/rings.dart';
 import '../../design/tokens.dart';
@@ -20,6 +20,7 @@ import '../session/completion_screen.dart';
 import '../session/focus_session_screen.dart';
 import '../dump/dump_screen.dart' show openDump;
 import 'anytime_today.dart';
+import '../you/decide_screen.dart';
 import 'day_sheets.dart';
 import 'day_shape.dart';
 import 'today_sheets.dart';
@@ -277,6 +278,8 @@ class _TodayScreenState extends State<TodayScreen> {
         await _gotTime(themed, free);
       case FeelingAction.talk:
         talkRequest.value++;
+      case FeelingAction.decide:
+        await Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => DecideScreen(repo: _repo)));
       case FeelingAction.rest:
         break;
     }
@@ -360,7 +363,7 @@ class _TodayScreenState extends State<TodayScreen> {
   @override
   Widget build(BuildContext context) {
     return Theme(
-      data: AllyTheme.dark(),
+      data: AllyAppearance.themeOf(context),
       child: Builder(
         builder: (themed) => BlocConsumer<NowCubit, NowState>(
           listenWhen: (p, c) => (c.error != null && c.error != p.error) || (c.note != null && c.note != p.note),

@@ -3,7 +3,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-import '../../design/ally_theme.dart';
+import '../../design/appearance.dart';
 import '../../design/components.dart';
 import '../../design/tokens.dart';
 import '../../design/type.dart';
@@ -69,7 +69,7 @@ class _CompletionScreenState extends State<CompletionScreen> with SingleTickerPr
   }
 
   @override
-  Widget build(BuildContext context) => Theme(data: AllyTheme.dark(), child: Builder(builder: _page));
+  Widget build(BuildContext context) => Theme(data: AllyAppearance.themeOf(context), child: Builder(builder: _page));
 
   Widget _page(BuildContext context) {
     final c = context.ac;

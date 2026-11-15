@@ -3,7 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-import '../../design/ally_theme.dart';
+import '../../design/appearance.dart';
 import '../../design/components.dart';
 import '../../design/rings.dart';
 import '../../design/tokens.dart';
@@ -133,7 +133,7 @@ class _FocusSessionScreenState extends State<FocusSessionScreen> with SingleTick
   void _end(FocusEnd end) => Navigator.of(context).pop(FocusOutcome(end, end == FocusEnd.done ? _spentMinutes : 0));
 
   @override
-  Widget build(BuildContext context) => Theme(data: AllyTheme.dark(), child: Builder(builder: _page));
+  Widget build(BuildContext context) => Theme(data: AllyAppearance.themeOf(context), child: Builder(builder: _page));
 
   Widget _page(BuildContext context) {
     final c = context.ac;

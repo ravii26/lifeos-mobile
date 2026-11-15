@@ -46,7 +46,7 @@ void main() {
     for (final s in [
       'Notes', 'Lists', 'Meals', 'People', 'Reminders', 'Log', 'Parked', 'Plans and check-ins',
       'What Ally remembers', 'How much Ally speaks up', 'How Ally works for you', 'Your normal day', "Ally's voice",
-      'Account and your data', 'Sign out',
+      'Appearance', 'Account and privacy', 'Help me decide', 'Sign out',
     ]) {
       await t.scrollUntilVisible(find.text(s), 200);
       expect(find.text(s), findsOneWidget, reason: s);

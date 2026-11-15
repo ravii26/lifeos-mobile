@@ -1356,6 +1356,15 @@ class LifeRepository {
     return asStringOrNull((data as Json)['activityId']);
   }
 
+  /// Help me decide: a suggestion (pick A | B | EITHER), why, a first step and
+  /// when to check in. Drafted by code when no AI answers (`byCode`).
+  Future<Json> decide(String a, String b, {List<String> hard = const [], String? note}) async =>
+      (await _api.post('/decide', body: {'a': a, 'b': b, 'hard': hard, 'note': ?note})) as Json;
+
+  /// Go with [choice]: a check-in reminder in [checkInDays] days. Undo removes it.
+  Future<({String message, String? activityId})> chooseDecision(String choice, int checkInDays) async =>
+      _receipt(await _api.post('/decide/choose', body: {'choice': choice, 'checkInDays': checkInDays}));
+
   /// What happened in the last [days] days, newest first. Each item may carry
   /// `undo` (what Undo would reverse) and `undoneAt`.
   Future<List<Json>> activity({int days = 30}) async =>
