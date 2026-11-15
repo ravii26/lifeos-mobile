@@ -21,6 +21,7 @@ import '../guide/tonight_cubit.dart';
 import '../places/now_cubit.dart';
 import '../places/you_screen.dart';
 import '../today/today_screen.dart';
+import '../week/week_screen.dart';
 import 'life_cubit.dart';
 
 // Where Ally lives: Now and My life, with Talk one tap from either.
@@ -28,6 +29,7 @@ const _nowPlace = 0;
 const _lifePlace = 1;
 const _talkPlace = 2;
 const _areasPlace = 3;
+const _weekPlace = 4;
 
 class HomeShell extends StatefulWidget {
   final AppUser user;
@@ -185,6 +187,7 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
                   YouScreen(user: widget.user),
                   ChatScreen(onBack: () => setState(() => _index = _nowPlace)),
                   const AreasHomeScreen(),
+                  const WeekScreen(),
                 ],
               ),
             ),
@@ -224,7 +227,7 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
   }
 }
 
-/// Today, Areas, the way to talk to Ally, and My life.
+/// Today, Areas, the way to talk to Ally, Week, and My life.
 /// Today and Areas are in the new design; My life is still Plum until it is
 /// rebuilt, so the bar takes the colours of the place it is showing.
 class _BottomNav extends StatelessWidget {
@@ -233,7 +236,7 @@ class _BottomNav extends StatelessWidget {
   final VoidCallback onTalk;
   const _BottomNav({required this.index, required this.onTap, required this.onTalk});
 
-  bool get _newLook => index == _nowPlace || index == _areasPlace;
+  bool get _newLook => index == _nowPlace || index == _areasPlace || index == _weekPlace;
 
   Widget _place(String label, int place) {
     const ally = AllyColors.dark;
@@ -292,6 +295,7 @@ class _BottomNav extends StatelessWidget {
                 ),
               ),
             ),
+            _place('Week', _weekPlace),
             _place('My life', _lifePlace),
           ]),
         ),

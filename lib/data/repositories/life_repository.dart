@@ -242,6 +242,10 @@ class LifeRepository {
         'tastes': [for (final t in tastes) {'title': t.title, 'minutes': t.minutes}],
       }));
 
+  /// The Week tab: days by area, routines as dots, time per area, a monthly look back.
+  /// A server that predates it answers 404.
+  Future<Json> week() async => (await _api.get('/week')) as Json;
+
   // ---- Tracked numbers (one per goal: weight, savings, applications sent) ----
 
   Future<({String message, String? activityId})> trackNumber(String areaId,
