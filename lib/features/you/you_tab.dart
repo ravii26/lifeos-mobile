@@ -16,13 +16,12 @@ import '../more/log_screen.dart';
 import '../more/reminders_check_screen.dart';
 import '../more/voice_screen.dart';
 import '../more/your_day_screen.dart';
-import '../places/life_notes_screen.dart';
-import '../places/notes_screen.dart';
 import '../places/you_screen.dart';
 import '../shell/life_cubit.dart';
 import '../shrink/parked_screen.dart';
 import '../tasks/task_detail_screen.dart';
 import '../design_preview/design_preview_screen.dart';
+import '../library/library_page.dart';
 import 'account_page.dart';
 import 'ally_works_page.dart';
 import 'appearance_page.dart';
@@ -77,7 +76,8 @@ class _YouTabState extends State<YouTab> {
         onOpen: (hit) => switch (hit.kind) {
           'MEMORY' => _push(MemoriesPage(repo: _repo)),
           'TASK' => _push(TaskDetailScreen(taskId: hit.id)),
-          'NOTE' || 'SAVE' => _push(const NotesScreen(), title: ''),
+          'NOTE' => _push(LibraryPage(repo: _repo)),
+          'SAVE' => _push(LibraryPage(repo: _repo, start: LibrarySection.saved)),
           _ => null,
         },
       ));
@@ -140,10 +140,7 @@ class _YouTabState extends State<YouTab> {
   Widget _page(BuildContext themed) {
     final c = themed.ac;
     final things = [
-      _Entry(Icons.sticky_note_2_outlined, 'Notes', 'Notes and saved videos', () => _push(const NotesScreen(), title: '')),
-      _Entry(Icons.checklist_rounded, 'Lists', 'Packing, shopping, anything with ticks', () => _push(const LifeNotesScreen(page: LifeNotes.lists))),
-      _Entry(Icons.restaurant_outlined, 'Meals', 'What you plan to eat', () => _push(const LifeNotesScreen(page: LifeNotes.meals))),
-      _Entry(Icons.people_outline_rounded, 'People', 'What they told you, when you last spoke', () => _push(const LifeNotesScreen(page: LifeNotes.people))),
+      _Entry(Icons.menu_book_outlined, 'Library', 'Notes, people, saved links', () => _push(LibraryPage(repo: _repo))),
       _Entry(Icons.notifications_none_rounded, 'Reminders', 'Upcoming, and a check that they arrive',
           () => _push(RemindersPage(repo: _repo, onCheckDelivery: () => _push(const RemindersCheckScreen())))),
       _Entry(Icons.show_chart_rounded, 'Log', 'Numbers and counts you logged', () => _push(const LogScreen())),

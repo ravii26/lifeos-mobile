@@ -13,10 +13,10 @@ import '../../design/appearance.dart';
 import '../areas/areas_home_screen.dart';
 import '../capture/capture_sheet.dart';
 import '../chat/chat_cubit.dart';
-import '../chat/chat_screen.dart';
 import '../chat/starters.dart';
 import '../guide/guide_style.dart';
-import '../guide/save_sheet.dart';
+import '../library/save_flow.dart';
+import '../talk/talk_screen.dart';
 import '../guide/tonight_cubit.dart';
 import '../places/now_cubit.dart';
 import '../you/you_tab.dart';
@@ -59,6 +59,7 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
 
     starterRequest.addListener(_toTalk);
     talkRequest.addListener(_openTalk);
+    talkPrefill.addListener(_toTalkWithWords);
     // What Ally says on its own follows every change (debounced), and a tapped
     // notification opens the right place (ADR 0027).
     placesRefresh.addListener(AgendaSync.soon);
@@ -88,6 +89,13 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
 
   void _openTalk() => setState(() => _index = _talkPlace);
 
+  // Words to finish in Talk (a note's "Add to this note"): Talk fills its box.
+  void _toTalkWithWords() {
+    if (talkPrefill.value == null) return;
+    Navigator.of(context).popUntil((r) => r.isFirst);
+    if (_index != _talkPlace) setState(() => _index = _talkPlace);
+  }
+
   // A starter tapped on any screen: leave pages opened from My life and go to Talk.
   void _toTalk() {
     if (starterRequest.value == null) return;
@@ -99,6 +107,7 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
   void dispose() {
     starterRequest.removeListener(_toTalk);
     talkRequest.removeListener(_openTalk);
+    talkPrefill.removeListener(_toTalkWithWords);
     placesRefresh.removeListener(AgendaSync.soon);
     _openedSub?.cancel();
     WidgetsBinding.instance.removeObserver(this);
@@ -134,7 +143,7 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
     if (isSave) {
       final tonight = context.read<TonightCubit>();
       final now = context.read<NowCubit>();
-      openSaveSheet(
+      openSaveFlow(
         context,
         SaveSource(
             text: intent.text,
@@ -185,7 +194,7 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
                 children: [
                   TodayScreen(firstName: widget.user.firstName),
                   YouTab(user: widget.user),
-                  ChatScreen(onBack: () => setState(() => _index = _nowPlace)),
+                  TalkScreen(onClose: () => setState(() => _index = _nowPlace)),
                   const AreasHomeScreen(),
                   const WeekScreen(),
                 ],
@@ -284,12 +293,12 @@ class _BottomNav extends StatelessWidget {
                     customBorder: const CircleBorder(),
                     onTap: onTalk,
                     child: Semantics(
-                      label: 'Talk to Ally',
+                      label: 'Tell Ally something',
                       button: true,
                       child: SizedBox(
                         width: 56,
                         height: 56,
-                        child: Icon(Icons.mic_none_rounded, size: 25, color: _newLook ? ally.ink : G.ink),
+                        child: Icon(Icons.add_rounded, size: 28, color: _newLook ? ally.ink : G.ink),
                       ),
                     ),
                   ),

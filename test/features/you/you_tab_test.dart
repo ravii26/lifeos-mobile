@@ -44,7 +44,7 @@ void main() {
     await _open(t);
     expect(find.text('Sam Rivera'), findsOneWidget);
     for (final s in [
-      'Notes', 'Lists', 'Meals', 'People', 'Reminders', 'Log', 'Parked', 'Plans and check-ins',
+      'Library', 'Reminders', 'Log', 'Parked', 'Plans and check-ins',
       'What Ally remembers', 'How much Ally speaks up', 'How Ally works for you', 'Your normal day', "Ally's voice",
       'Appearance', 'Account and privacy', 'Help me decide', 'Sign out',
     ]) {

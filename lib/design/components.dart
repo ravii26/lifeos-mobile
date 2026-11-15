@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import 'appearance.dart';
 import 'tokens.dart';
 import 'type.dart';
 
@@ -732,8 +733,10 @@ Future<T?> showAllySheet<T>(
   BuildContext context, {
   required WidgetBuilder builder,
 }) {
-  final theme = Theme.of(context);
-  final c = context.ac;
+  // Opened from outside the new-look screens (a shared link): use the chosen appearance.
+  final own = Theme.of(context);
+  final theme = own.extension<AllyColors>() != null ? own : AllyAppearance.themeOf(context);
+  final c = theme.extension<AllyColors>() ?? AllyColors.dark;
   return showModalBottomSheet<T>(
     context: context,
     isScrollControlled: true,

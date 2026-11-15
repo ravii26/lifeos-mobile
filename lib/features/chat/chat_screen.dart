@@ -3,7 +3,6 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:speech_to_text/speech_to_text.dart';
 
@@ -21,6 +20,7 @@ import '../places/support_screen.dart';
 import '../guide/tonight_cubit.dart';
 import '../shrink/shrink_screen.dart';
 import 'chat_cubit.dart';
+import 'chat_words.dart';
 import 'goal_plan_card.dart';
 import 'starters.dart';
 import 'talk_controller.dart';
@@ -674,8 +674,8 @@ class _BigOrb extends StatelessWidget {
 }
 
 /// Under a reply that gives the helpline: the call is one tap, not something to retype.
-class _HelpNow extends StatelessWidget {
-  const _HelpNow();
+class HelpNowCard extends StatelessWidget {
+  const HelpNowCard({super.key});
 
   @override
   Widget build(BuildContext context) => Padding(
@@ -763,7 +763,7 @@ class _Bubble extends StatelessWidget {
                 padding: const EdgeInsets.only(top: 18),
                 child: Text(m.text, style: G.text(23, w: FontWeight.w500, height: 1.25, letterSpacing: -0.3)),
               ),
-              if (isCrisisReply(m.text)) const _HelpNow(),
+              if (isCrisisReply(m.text)) const HelpNowCard(),
               if (m.aiLimit) const AiLimitCard(),
               if (m.aiDown)
                 Container(
@@ -802,7 +802,7 @@ class _Bubble extends StatelessWidget {
             for (final a in m.actions)
               if (a.type == 'GOAL_PLAN' && a.proposal != null) GoalPlanCard(proposal: a.proposal!),
             for (final a in m.actions)
-              if (a.type == 'LIST' && a.options.isNotEmpty) _ListCard(a, onCommand: onCommand),
+              if (a.type == 'LIST' && a.options.isNotEmpty) ChatListCard(a, onCommand: onCommand),
             if (ask != null)
               Padding(
                 padding: const EdgeInsets.only(top: 8),
@@ -856,99 +856,6 @@ class _Bubble extends StatelessWidget {
       ),
     );
   }
-}
-
-String _repeatLabel(String rule) {
-  const days = {'MO': 'Mon', 'TU': 'Tue', 'WE': 'Wed', 'TH': 'Thu', 'FR': 'Fri', 'SA': 'Sat', 'SU': 'Sun'};
-  final parts = {for (final p in rule.split(';')) p.split('=').first: p.contains('=') ? p.split('=').last : ''};
-  switch (parts['FREQ']) {
-    case 'DAILY':
-      return 'every day';
-    case 'MONTHLY':
-      return 'every month';
-    case 'WEEKLY':
-      final d = (parts['BYDAY'] ?? '').split(',').where((x) => x.isNotEmpty).map((x) => days[x] ?? x);
-      return d.isEmpty ? 'every week' : 'every ${d.join(', ')}';
-  }
-  return 'repeats';
-}
-
-/// (icon, one-line description) of something Ally did.
-(IconData, String) _describe(ChatAction a) {
-  String time(DateTime t) => DateFormat('h:mm a').format(t);
-  return switch (a.type) {
-    'TASK_ADDED' => (Icons.add_task_rounded, 'To-do: ${a.text}'),
-    'REMEMBERED' => (Icons.bookmark_add_outlined, 'Remembered: ${a.text}'),
-    'FORGOT' => (Icons.bookmark_remove_outlined, 'Forgot: ${a.text}'),
-    'NUDGE_SET' => (
-        Icons.notifications_active_outlined,
-        a.time == null
-            ? '${a.kind == 'MORNING' ? 'Morning heads-up' : 'Nightly nudge'} turned off'
-            : '${a.kind == 'MORNING' ? 'Morning heads-up' : 'Nightly nudge'} at ${a.time}'
-      ),
-    'TASK_COMPLETED' => (Icons.check_circle_rounded, 'Completed: ${a.text}'),
-    'HABIT_LOGGED' => (Icons.check_circle_rounded, 'Logged: ${a.text}'),
-    'HABIT_ADDED' => (
-        Icons.repeat_rounded,
-        'Habit: ${a.text}${a.detail == null ? '' : ' (${a.detail!.toLowerCase()})'}'
-      ),
-    'PROJECT_ADDED' => (
-        Icons.flag_outlined,
-        'Project: ${a.text}'
-            '${a.tasks > 0 ? ' · ${a.tasks} to-do${a.tasks == 1 ? '' : 's'}' : ''}'
-            '${a.detail == null ? '' : ' · due ${DateFormat('EEE d MMM').format(DateTime.parse(a.detail!))}'}'
-      ),
-    'NOTE_ADDED' => (
-        Icons.sticky_note_2_outlined,
-        'Note ${a.text}${a.items.isEmpty ? '' : ': ${a.items.join(', ')}'}'
-      ),
-    'REMINDER_SET' => (
-        Icons.alarm_rounded,
-        'Reminder ${a.remindAt == null ? '' : DateFormat('EEE d MMM').format(a.remindAt!)} '
-            '${a.remindAt == null ? '' : time(a.remindAt!)}'
-            '${a.windowEnd == null ? '' : ' to ${time(a.windowEnd!)}'}'
-            '${a.repeatRule == null ? '' : ', ${_repeatLabel(a.repeatRule!)}'}: ${a.text}'
-      ),
-    'MODE_SET' => (
-        Icons.bedtime_outlined,
-        switch (a.kind) {
-          'SICK' => 'Sick mode on',
-          'BUSY' => 'Busy mode on${a.detail == null ? '' : ' until ${a.detail}'}',
-          'TRAVEL' => 'Travel mode on',
-          'HOLIDAY' => 'Holiday mode on',
-          _ => 'Back to normal',
-        }
-      ),
-    'NOTE_UPDATED' => (Icons.sticky_note_2_outlined, 'Updated note: ${a.text}'),
-    'PROGRESS_LOGGED' => (Icons.trending_up_rounded, 'Logged: ${a.detail ?? a.text}'),
-    'LOG_ADDED' => (Icons.edit_note_rounded, a.text),
-    'CONTACT' => (a.kind == 'CALL' ? Icons.call_outlined : Icons.chat_outlined, a.text),
-    'LIMIT_SET' => (Icons.speed_rounded, a.text),
-    'LIMIT_USED' => (Icons.timelapse_rounded, a.detail ?? a.text),
-    'TIMER_STARTED' => (Icons.timer_outlined, a.text),
-    'TIMER_STOPPED' => (Icons.stop_circle_outlined, a.text),
-    'COUNT_ADDED' => (Icons.add_circle_outline_rounded, '${a.text}: ${a.detail ?? ''}'),
-    'BUSY_SET' => (
-        Icons.event_busy_outlined,
-        a.detail == null ? 'Free again' : 'Busy until ${time(DateTime.parse(a.detail!).toLocal())}: nothing from me till then'
-      ),
-    'PROJECT_STATUS' => (
-        Icons.flag_outlined,
-        switch (a.kind) {
-          'PAUSED' => '${a.text} paused',
-          'ABANDONED' => '${a.text} let go',
-          'COMPLETED' => '${a.text} finished',
-          _ => '${a.text} back on',
-        }
-      ),
-    'SCHEDULE_SET' => (Icons.schedule_rounded, 'Day updated for ${a.items.join(', ')}'),
-    'PREFERENCE_SET' => (Icons.tune_rounded, a.text),
-    'LOW_ENERGY' => (Icons.bedtime_outlined, a.kind == 'ON' ? 'Low energy today: on' : 'Low energy today: off'),
-    'ITEM_REMOVED' => (Icons.archive_outlined, '${a.text}: ${a.detail ?? 'removed'}'),
-    'ITEM_UPDATED' => (Icons.edit_calendar_outlined, '${a.text}: ${a.detail ?? 'updated'}'),
-    'UNDONE' => (Icons.undo_rounded, 'Undone: ${a.text}'),
-    _ => (Icons.bolt_rounded, a.text),
-  };
 }
 
 /// "5 h planned for 1.5 h": offers to move the extra to later instead of
@@ -1041,7 +948,7 @@ class _SavedCard extends StatelessWidget {
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
-                  _describe(a).$2,
+                  describeAction(a).$2,
                   style: G.text(13.5, color: a.undone ? G.faint : G.ink, w: FontWeight.w500)
                       .copyWith(decoration: a.undone ? TextDecoration.lineThrough : null),
                 ),
@@ -1079,7 +986,7 @@ class _Receipt extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final (icon, text) = _describe(a);
+    final (icon, text) = describeAction(a);
     return Container(
       margin: const EdgeInsets.only(top: 10),
       padding: const EdgeInsets.only(left: 16, right: 6),
@@ -1427,10 +1334,10 @@ class _NotifyCard extends StatelessWidget {
 
 /// "Show my habits": every row opens a small menu of what can be done to it. Each choice sends an
 /// ordinary chat command, so it goes through the same code (and Undo) as typing it.
-class _ListCard extends StatelessWidget {
+class ChatListCard extends StatelessWidget {
   final ChatAction a;
   final void Function(String text) onCommand;
-  const _ListCard(this.a, {required this.onCommand});
+  const ChatListCard(this.a, {super.key, required this.onCommand});
 
   static String _word(String kind) => switch (kind) {
         'HABIT' => 'habit',
