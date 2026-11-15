@@ -11,9 +11,7 @@ import '../../design/components.dart';
 import '../../design/tokens.dart';
 import '../../design/type.dart';
 import '../auth/bloc/auth_bloc.dart';
-import '../chat/memories_screen.dart';
 import '../guide/guide_style.dart' show G;
-import '../more/how_ally_works_screen.dart';
 import '../more/log_screen.dart';
 import '../more/reminders_check_screen.dart';
 import '../more/settings_screen.dart';
@@ -24,6 +22,12 @@ import '../places/notes_screen.dart';
 import '../places/you_screen.dart';
 import '../shell/life_cubit.dart';
 import '../shrink/parked_screen.dart';
+import '../tasks/task_detail_screen.dart';
+import 'ally_works_page.dart';
+import 'history_page.dart';
+import 'memories_page.dart';
+import 'reminders_page.dart';
+import 'search_page.dart';
 
 /// One row on the You tab.
 class _Entry {
@@ -64,6 +68,16 @@ class _YouTabState extends State<YouTab> {
     if (life != null) body = BlocProvider.value(value: life, child: body);
     Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => body));
   }
+
+  void _search() => _push(SearchPage(
+        repo: _repo,
+        onOpen: (hit) => switch (hit.kind) {
+          'MEMORY' => _push(MemoriesPage(repo: _repo)),
+          'TASK' => _push(TaskDetailScreen(taskId: hit.id)),
+          'NOTE' || 'SAVE' => _push(const NotesScreen(), title: ''),
+          _ => null,
+        },
+      ));
 
   static String _levelWords(String l) => switch (l) {
         'QUIETER' => 'Quieter: a morning briefing, an evening wrap-up and the Sunday review',
@@ -127,15 +141,17 @@ class _YouTabState extends State<YouTab> {
       _Entry(Icons.checklist_rounded, 'Lists', 'Packing, shopping, anything with ticks', () => _push(const LifeNotesScreen(page: LifeNotes.lists))),
       _Entry(Icons.restaurant_outlined, 'Meals', 'What you plan to eat', () => _push(const LifeNotesScreen(page: LifeNotes.meals))),
       _Entry(Icons.people_outline_rounded, 'People', 'What they told you, when you last spoke', () => _push(const LifeNotesScreen(page: LifeNotes.people))),
-      _Entry(Icons.notifications_none_rounded, 'Reminders', 'Upcoming, and a check that they arrive', () => _push(const RemindersCheckScreen())),
+      _Entry(Icons.notifications_none_rounded, 'Reminders', 'Upcoming, and a check that they arrive',
+          () => _push(RemindersPage(repo: _repo, onCheckDelivery: () => _push(const RemindersCheckScreen())))),
       _Entry(Icons.show_chart_rounded, 'Log', 'Numbers and counts you logged', () => _push(const LogScreen())),
       _Entry(Icons.pause_circle_outline_rounded, 'Parked', 'Things set aside on purpose', () => _push(const ParkedScreen())),
       _Entry(Icons.event_note_outlined, 'Plans and check-ins', 'Season, Sunday check-in, fitness and sleep plans', () => _push(YouScreen(user: widget.user))),
     ];
     final ally = [
-      _Entry(Icons.auto_awesome_outlined, 'What Ally remembers', 'In your own words; mark what is no longer true', () => _push(const MemoriesScreen())),
+      _Entry(Icons.auto_awesome_outlined, 'What Ally remembers', 'In your own words; private, still true, or forget', () => _push(MemoriesPage(repo: _repo))),
+      _Entry(Icons.history_rounded, 'History', 'Everything Ally did, with Undo', () => _push(HistoryPage(repo: _repo))),
       _Entry(Icons.campaign_outlined, 'How much Ally speaks up', 'Normal, quieter or silent', () => _speakUp(themed)),
-      _Entry(Icons.tune_rounded, 'How Ally works for you', 'Tone and how direct it is', () => _push(const HowAllyWorksScreen())),
+      _Entry(Icons.tune_rounded, 'How Ally works for you', 'What it helps with most, and how it talks', () => _push(AllyWorksPage(repo: _repo))),
       _Entry(Icons.schedule_rounded, 'Your normal day', 'Work hours, sleep, free time', () => _push(const YourDayScreen())),
       _Entry(Icons.record_voice_over_outlined, "Ally's voice", 'Spoken replies', () => _push(const VoiceScreen())),
     ];
@@ -155,6 +171,20 @@ class _YouTabState extends State<YouTab> {
                 const SizedBox(height: Sp.x1),
                 Text(widget.user.name.trim().isEmpty ? 'You' : widget.user.name, style: AllyType.h1(color: c.ink)),
               ]),
+              Pressable(
+                onTap: _search,
+                semanticLabel: 'Search',
+                child: Container(
+                  constraints: const BoxConstraints(minHeight: 52),
+                  padding: const EdgeInsets.symmetric(horizontal: Sp.x4),
+                  decoration: BoxDecoration(color: c.surface, borderRadius: BorderRadius.circular(Rad.button), border: Border.all(color: c.line)),
+                  child: Row(children: [
+                    Icon(Icons.search_rounded, color: c.faint),
+                    const SizedBox(width: Sp.x3),
+                    Expanded(child: Text('Search notes, to-dos, saves, goals', style: AllyType.body(color: c.faint))),
+                  ]),
+                ),
+              ),
               _group(c, 'YOUR THINGS', things),
               _group(c, 'ALLY', ally),
               _group(c, 'ACCOUNT', account),

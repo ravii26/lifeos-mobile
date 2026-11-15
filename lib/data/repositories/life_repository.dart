@@ -1356,6 +1356,14 @@ class LifeRepository {
     return asStringOrNull((data as Json)['activityId']);
   }
 
+  /// What happened in the last [days] days, newest first. Each item may carry
+  /// `undo` (what Undo would reverse) and `undoneAt`.
+  Future<List<Json>> activity({int days = 30}) async =>
+      ((await _api.get('/activity', query: {'days': '$days'})) as List).whereType<Json>().toList();
+
+  /// Notes, to-dos, saves, goals and memories that match [q].
+  Future<List<Json>> search(String q) async => ((await _api.get('/search', query: {'q': q})) as List).whereType<Json>().toList();
+
   Future<void> setMemoryPrivate(String id, bool sensitive) =>
       _api.patch('/assistant/memories/$id', body: {'sensitive': sensitive});
 
