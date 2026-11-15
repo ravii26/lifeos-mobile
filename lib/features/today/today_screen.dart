@@ -20,6 +20,7 @@ import '../session/completion_screen.dart';
 import '../session/focus_session_screen.dart';
 import '../dump/dump_screen.dart' show openDump;
 import 'anytime_today.dart';
+import 'day_sheets.dart';
 import 'day_shape.dart';
 import 'today_sheets.dart';
 
@@ -256,6 +257,67 @@ class _TodayScreenState extends State<TodayScreen> {
     if (choice == DoneChoice.finishedForToday && mounted) await context.read<NowCubit>().finishForToday();
   }
 
+  /// "I'm feeling…": a kind line and one small thing, then where it leads.
+  Future<void> _feeling(BuildContext themed, NowState s, FreeWindow? free) async {
+    final cubit = context.read<NowCubit>();
+    final a = await showAllySheet<FeelingAction>(themed, builder: (_) => const FeelingSheet());
+    if (a == null || !mounted || !themed.mounted) return;
+    switch (a) {
+      case FeelingAction.easyDay:
+        await cubit.lowEnergy();
+        if (themed.mounted) showAllyToast(themed, 'Today is easy: smaller versions until tomorrow.', onUndo: cubit.endLowEnergy);
+      case FeelingAction.startTwoMinutes:
+        final o = cubit.state.current;
+        if (o == null) {
+          showAllyToast(themed, 'Nothing is waiting. Two minutes of anything counts.');
+        } else {
+          await _start(themed, o, minutes: 2);
+        }
+      case FeelingAction.freeTime:
+        await _gotTime(themed, free);
+      case FeelingAction.talk:
+        talkRequest.value++;
+      case FeelingAction.rest:
+        break;
+    }
+  }
+
+  /// A different day: sick, travelling, busy, on holiday, for a day or more.
+  Future<void> _differentDay(BuildContext themed, NowState s) async {
+    final picked = await showAllySheet<(String, int)>(themed, builder: (_) => DifferentDaySheet(current: s.mode));
+    if (picked == null || !mounted || !themed.mounted) return;
+    await _setDay(themed, picked.$1, picked.$2, s.mode);
+  }
+
+  Future<void> _setDay(BuildContext themed, String mode, int days, String before) async {
+    final cubit = context.read<NowCubit>();
+    final end = _now.add(Duration(days: days));
+    final until = days == 0 ? null : '${end.year}-${end.month.toString().padLeft(2, '0')}-${end.day.toString().padLeft(2, '0')}';
+    try {
+      final undoId = await _repo.setDayMode(mode, until: until);
+      placesRefresh.value++;
+      await cubit.load();
+      if (!themed.mounted) return;
+      showAllyToast(
+        themed,
+        mode == 'NORMAL' ? 'Back to a normal day.' : 'Today is re-planned.',
+        onUndo: undoId == null
+            ? null
+            : () async {
+                try {
+                  await _repo.undo(undoId);
+                  placesRefresh.value++;
+                  await cubit.load();
+                } on ApiException catch (e) {
+                  if (themed.mounted) showAllyToast(themed, e.message);
+                }
+              },
+      );
+    } on ApiException catch (e) {
+      if (themed.mounted) showAllyToast(themed, e.message);
+    }
+  }
+
   Future<void> _tick(BuildContext themed, TodayItem item) async {
     if (item.done) return;
     final cubit = context.read<NowCubit>();
@@ -344,6 +406,14 @@ class _TodayScreenState extends State<TodayScreen> {
                       style: AllyType.h1(color: c.ink)),
                 ]),
                 if (s.fromSaved) const AllyBanner("You're offline. This is the copy saved on this phone."),
+                if (modeWords(s.mode).isNotEmpty)
+                  AllyCard(
+                    padding: const EdgeInsets.fromLTRB(Sp.x4, Sp.x3, Sp.x2, Sp.x3),
+                    child: Row(children: [
+                      Expanded(child: Text(modeWords(s.mode), style: AllyType.body(color: c.ink))),
+                      AllyButton('Back to normal', kind: AllyButtonKind.ghost, onPressed: () => _setDay(themed, 'NORMAL', 0, s.mode)),
+                    ]),
+                  ),
                 if (s.restart != null) _restart(c, cubit, s),
                 if (_blocks.isNotEmpty) _dial(themed, c, free),
                 _suggestion(themed, c, cubit, s, free),
@@ -353,6 +423,16 @@ class _TodayScreenState extends State<TodayScreen> {
                     icon: Icons.hourglass_empty_rounded,
                     wide: true,
                     onPressed: () => _gotTime(themed, free)),
+                Row(children: [
+                  Expanded(
+                    child: AllyButton("I'm feeling…",
+                        kind: AllyButtonKind.ghost, wide: true, icon: Icons.favorite_border_rounded, onPressed: () => _feeling(themed, s, free)),
+                  ),
+                  Expanded(
+                    child: AllyButton('A different day',
+                        kind: AllyButtonKind.ghost, wide: true, icon: Icons.wb_cloudy_outlined, onPressed: () => _differentDay(themed, s)),
+                  ),
+                ]),
                 _list(themed, c, open),
                 if (!s.extras.isEmpty) AnytimeToday(extras: s.extras, busy: s.busy, cubit: cubit),
                 if (s.prep.isNotEmpty) _prep(c, s),

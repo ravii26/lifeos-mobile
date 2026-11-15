@@ -126,6 +126,7 @@ class NowState extends Equatable {
   final bool restedToday; // "I'm finished for today": nothing more is suggested
   final bool welcomeBack; // back after a gap: no catching up asked for
   final bool sick; // sick mode: nothing is asked of them today
+  final String mode; // NORMAL | BUSY | SICK | TRAVEL | HOLIDAY ("a different day")
   final bool fromSaved; // no connection: this is the last card the phone kept
   final String? season; // "Switch & Shape · week 2 of 10"; null before the first season
   final NowRestart? restart; // set after a week or more away
@@ -148,6 +149,7 @@ class NowState extends Equatable {
     this.restedToday = false,
     this.welcomeBack = false,
     this.sick = false,
+    this.mode = 'NORMAL',
     this.fromSaved = false,
     this.season,
     this.restart,
@@ -192,13 +194,14 @@ class NowState extends Equatable {
         restedToday: restedToday,
         welcomeBack: welcomeBack,
         sick: sick,
+        mode: mode,
         fromSaved: fromSaved ?? this.fromSaved,
         season: season,
         restart: clearRestart ? null : restart,
       );
 
   @override
-  List<Object?> get props => [status, kind, message, options, index, busy, error, note, undoId, prep, advice, focus, lowEnergy, extras, restedToday, welcomeBack, sick, fromSaved, season, restart];
+  List<Object?> get props => [status, kind, message, options, index, busy, error, note, undoId, prep, advice, focus, lowEnergy, extras, restedToday, welcomeBack, sick, mode, fromSaved, season, restart];
 }
 
 /// The card on Now: the right thing for right now, with Done / Smaller / Not now.
@@ -295,6 +298,7 @@ class NowCubit extends Cubit<NowState> {
         extras: _extrasOf(data),
         welcomeBack: asBool(data['welcomeBack']),
         sick: asString(data['mode']) == 'SICK',
+        mode: asString(data['mode'], 'NORMAL'),
         fromSaved: fromSaved,
         season: asStringOrNull(data['season']),
         // Answered (or dismissed) today: not asked again on every reload.

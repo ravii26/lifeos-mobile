@@ -349,8 +349,16 @@ class LifeRepository {
     String frequency = 'DAILY',
     String? reminderTime,
     String? description,
+    String? minimumVersion,
+    List<String>? specificDays,
+    int? weeklyTarget,
+    String? timeBlock,
   }) async {
     final data = await _api.post('/habits', body: {
+      if (minimumVersion != null && minimumVersion.isNotEmpty) 'minimumVersion': minimumVersion,
+      if (specificDays != null && specificDays.isNotEmpty) 'specificDays': specificDays,
+      'weeklyTarget': ?weeklyTarget,
+      'timeBlock': ?timeBlock,
       'title': title,
       'areaId': areaId,
       'habitType': habitType,
@@ -375,8 +383,18 @@ class LifeRepository {
     String? frequency,
     String? reminderTime,
     bool? isActive,
+    // An empty string clears the text fields; [anytime] clears the time of day.
+    String? minimumVersion,
+    List<String>? specificDays,
+    int? weeklyTarget,
+    String? timeBlock,
+    bool anytime = false,
   }) async {
     final data = await _api.patch('/habits/$id', body: {
+      if (minimumVersion != null) 'minimumVersion': minimumVersion.trim().isEmpty ? null : minimumVersion.trim(),
+      'specificDays': ?specificDays,
+      'weeklyTarget': ?weeklyTarget,
+      if (anytime) 'timeBlock': null else 'timeBlock': ?timeBlock,
       if (title != null) 'title': title,
       if (areaId != null) 'areaId': areaId,
       if (habitType != null) 'habitType': habitType,
@@ -1360,6 +1378,13 @@ class LifeRepository {
   }
 
   Future<void> setMode(String mode) => _api.put('/now/mode', body: {'mode': mode});
+
+  /// A different day ([mode] BUSY | SICK | TRAVEL | HOLIDAY, or NORMAL to end it),
+  /// until [until] (YYYY-MM-DD) when given. Returns the Undo id.
+  Future<String?> setDayMode(String mode, {String? until}) async {
+    final data = await _api.put('/now/mode', body: {'mode': mode, 'until': ?until});
+    return data is Json ? asStringOrNull(data['activityId']) : null;
+  }
 
   /// Fix the title of something Ally just captured ("edit" on the confirm card).
   /// [type] is task | habit | project | note.

@@ -8,6 +8,8 @@ import '../../design/components.dart';
 import '../../design/tokens.dart';
 import '../../design/type.dart';
 import '../places/now_cubit.dart' show placesRefresh;
+import '../routines/new_routine_screen.dart';
+import '../routines/routine_page.dart';
 import 'week_data.dart';
 
 /// Week: seven days as bars (done solid, planned faded), the chosen day's
@@ -139,7 +141,7 @@ class _WeekScreenState extends State<WeekScreen> {
         ),
       ),
       if (d.days.isNotEmpty) _dayDetail(c, d, day),
-      if (d.routines.isNotEmpty) _routines(c, d),
+      _routines(c, d),
       if (active.isNotEmpty) _timePerArea(c, d, active),
       if (d.lookBack != null) _lookBack(c, d.lookBack!),
     ];
@@ -187,19 +189,60 @@ class _WeekScreenState extends State<WeekScreen> {
     ),
   );
 
-  Widget _routines(AllyColors c, WeekData d) => Column(
-    crossAxisAlignment: CrossAxisAlignment.stretch,
-    children: [
-      Text('ROUTINES · THIS WEEK', style: AllyType.eyebrow(color: c.faint)),
-      const SizedBox(height: Sp.x2),
-      AllyCard(
-        padding: const EdgeInsets.symmetric(horizontal: Sp.x4, vertical: Sp.x1),
-        child: Column(
-          children: [
-            for (var k = 0; k < d.routines.length; k++) ...[if (k > 0) Divider(color: c.line, height: 1), _routineRow(c, d, d.routines[k])],
+  Future<void> _openRoutine(WeekData d, WeekRoutine r) async {
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) =>
+            RoutinePage(habitId: r.id, repo: _repo, areaName: d.nameOf(r.areaId), color: AllyColors.dark.area(d.colorIndexOf(r.areaId))),
+      ),
+    );
+    await _load();
+  }
+
+  Future<void> _newRoutine(WeekData d) async {
+    final added = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(
+        builder: (_) => NewRoutineScreen(
+          repo: _repo,
+          areas: [
+            for (final a in d.areas)
+              if (a.mode != 'REST') (a.id, a.name),
           ],
         ),
       ),
+    );
+    if (added == true) {
+      placesRefresh.value++;
+      await _load();
+    }
+  }
+
+  Widget _routines(AllyColors c, WeekData d) => Column(
+    crossAxisAlignment: CrossAxisAlignment.stretch,
+    children: [
+      Row(
+        children: [
+          Expanded(
+            child: Text('ROUTINES · THIS WEEK', style: AllyType.eyebrow(color: c.faint)),
+          ),
+          AllyButton('Routine', kind: AllyButtonKind.ghost, icon: Icons.add_rounded, onPressed: () => _newRoutine(d)),
+        ],
+      ),
+      const SizedBox(height: Sp.x1),
+      if (d.routines.isEmpty)
+        Text('No routines yet. Something small you do on set days, like a walk or ten pages.', style: AllyType.body(color: c.muted))
+      else
+        AllyCard(
+          padding: const EdgeInsets.symmetric(horizontal: Sp.x4, vertical: Sp.x1),
+          child: Column(
+            children: [
+              for (var k = 0; k < d.routines.length; k++) ...[
+                if (k > 0) Divider(color: c.line, height: 1),
+                _routineRow(c, d, d.routines[k]),
+              ],
+            ],
+          ),
+        ),
     ],
   );
 
@@ -208,37 +251,43 @@ class _WeekScreenState extends State<WeekScreen> {
     return Semantics(
       // One spoken line per routine, instead of seven unlabelled dots.
       container: true,
+      button: true,
       label: '${r.title}, ${r.line}',
       excludeSemantics: true,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: Sp.x3),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Wrap(
-              alignment: WrapAlignment.spaceBetween,
-              spacing: Sp.x2,
-              runSpacing: 2,
-              children: [
-                Text(
-                  r.title,
-                  style: AllyType.body(color: c.ink, w: FontWeight.w500),
-                ),
-                Text(r.line, style: AllyType.small(color: c.faint)),
-              ],
-            ),
-            const SizedBox(height: Sp.x2),
-            Row(
-              children: [
-                for (final dot in r.dots)
-                  Expanded(
-                    child: Center(
-                      child: _Dot(kind: dot, color: color),
-                    ),
+      onTap: () => _openRoutine(d, r),
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: () => _openRoutine(d, r),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: Sp.x3),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Wrap(
+                alignment: WrapAlignment.spaceBetween,
+                spacing: Sp.x2,
+                runSpacing: 2,
+                children: [
+                  Text(
+                    r.title,
+                    style: AllyType.body(color: c.ink, w: FontWeight.w500),
                   ),
-              ],
-            ),
-          ],
+                  Text(r.line, style: AllyType.small(color: c.faint)),
+                ],
+              ),
+              const SizedBox(height: Sp.x2),
+              Row(
+                children: [
+                  for (final dot in r.dots)
+                    Expanded(
+                      child: Center(
+                        child: _Dot(kind: dot, color: color),
+                      ),
+                    ),
+                ],
+              ),
+            ],
+          ),
         ),
       ),
     );

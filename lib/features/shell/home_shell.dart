@@ -19,7 +19,7 @@ import '../guide/guide_style.dart';
 import '../guide/save_sheet.dart';
 import '../guide/tonight_cubit.dart';
 import '../places/now_cubit.dart';
-import '../places/you_screen.dart';
+import '../you/you_tab.dart';
 import '../today/today_screen.dart';
 import '../week/week_screen.dart';
 import 'life_cubit.dart';
@@ -184,7 +184,7 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
                 index: _index,
                 children: [
                   TodayScreen(firstName: widget.user.firstName),
-                  YouScreen(user: widget.user),
+                  YouTab(user: widget.user),
                   ChatScreen(onBack: () => setState(() => _index = _nowPlace)),
                   const AreasHomeScreen(),
                   const WeekScreen(),
@@ -227,7 +227,7 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
   }
 }
 
-/// Today, Areas, the way to talk to Ally, Week, and My life.
+/// Today, Areas, the way to talk to Ally, Week, and You.
 /// Today and Areas are in the new design; My life is still Plum until it is
 /// rebuilt, so the bar takes the colours of the place it is showing.
 class _BottomNav extends StatelessWidget {
@@ -236,7 +236,8 @@ class _BottomNav extends StatelessWidget {
   final VoidCallback onTalk;
   const _BottomNav({required this.index, required this.onTap, required this.onTalk});
 
-  bool get _newLook => index == _nowPlace || index == _areasPlace || index == _weekPlace;
+  // Every tab is in the new look now.
+  bool get _newLook => true;
 
   Widget _place(String label, int place) {
     const ally = AllyColors.dark;
@@ -296,7 +297,7 @@ class _BottomNav extends StatelessWidget {
               ),
             ),
             _place('Week', _weekPlace),
-            _place('My life', _lifePlace),
+            _place('You', _lifePlace),
           ]),
         ),
       ),

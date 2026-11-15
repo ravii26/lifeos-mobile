@@ -14,6 +14,10 @@ class Habit {
   final bool isActive;
   final String stage; // NEW | BUILDING | AUTOMATIC (automatic = no more reminders)
   final String? sourceUrl; // the video or post it was made from (a save)
+  final String? minimumVersion; // the smallest version, for hard days
+  final List<String> specificDays; // MON…SUN when frequency is CUSTOM
+  final int? weeklyTarget; // times a week when frequency is WEEKLY
+  final String? timeBlock; // MORNING | COMMUTE | OFFICE | GYM | EVENING | NIGHT; null = anytime
 
   // Stats block (from GET /habits)
   final int currentStreak;
@@ -37,6 +41,10 @@ class Habit {
     required this.isActive,
     this.stage = 'NEW',
     this.sourceUrl,
+    this.minimumVersion,
+    this.specificDays = const [],
+    this.weeklyTarget,
+    this.timeBlock,
     required this.currentStreak,
     required this.longestStreak,
     required this.todayDone,
@@ -70,6 +78,10 @@ class Habit {
       isActive: asBool(j['isActive'], true),
       stage: asString(j['stage'], 'NEW'),
       sourceUrl: asStringOrNull(j['sourceUrl']),
+      minimumVersion: asStringOrNull(j['minimumVersion']),
+      specificDays: ((j['specificDays'] as List?) ?? const []).map((e) => '$e').toList(),
+      weeklyTarget: j['weeklyTarget'] == null ? null : asInt(j['weeklyTarget']),
+      timeBlock: asStringOrNull(j['timeBlock']),
       currentStreak: asInt(j['currentStreak']),
       longestStreak: asInt(j['longestStreak']),
       todayDone: asBool(j['todayDone']),

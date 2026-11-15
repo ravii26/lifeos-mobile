@@ -21,6 +21,8 @@ import '../../design/trend_line.dart';
 import 'number_sheets.dart';
 import 'plan_mode_sheet.dart';
 import 'step_sheet.dart';
+import '../routines/new_routine_screen.dart';
+import '../routines/routine_page.dart';
 import 'tastes_sheet.dart';
 
 /// One area: where it stands this week, its mode, the time it gets, and what
@@ -266,15 +268,25 @@ class _AreaPageState extends State<AreaPage> {
                         kind: AllyButtonKind.ghost, icon: Icons.show_chart_rounded, onPressed: () => _trackNumber(themed)),
                   ),
               ]),
-            if (a.routines.isNotEmpty)
+            if (a.routines.isNotEmpty || !resting)
               _section(c, 'Routines', [
                 for (final r in a.routines)
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: Sp.x2),
-                    child: Row(children: [
-                      Expanded(child: Text(r.title, style: AllyType.body(color: c.ink))),
-                      Text('${r.doneThisWeek}× this week', style: AllyType.num(color: c.faint)),
-                    ]),
+                  Pressable(
+                    scale: 0.985,
+                    onTap: () => _openRoutine(themed, r.id, color),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: Sp.x2),
+                      child: Row(children: [
+                        Expanded(child: Text(r.title, style: AllyType.body(color: c.ink))),
+                        Text('${r.doneThisWeek}× this week', style: AllyType.num(color: c.faint)),
+                        Icon(Icons.chevron_right_rounded, color: c.faint),
+                      ]),
+                    ),
+                  ),
+                if (!resting)
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: AllyButton('Add a routine', kind: AllyButtonKind.ghost, icon: Icons.add_rounded, onPressed: () => _addRoutine(themed)),
                   ),
               ]),
           ]),
@@ -390,6 +402,23 @@ class _AreaPageState extends State<AreaPage> {
     } finally {
       if (mounted) setState(() => _saving = false);
     }
+  }
+
+  Future<void> _openRoutine(BuildContext themed, String id, Color color) async {
+    await Navigator.of(context).push(MaterialPageRoute<void>(
+      builder: (_) => RoutinePage(habitId: id, repo: widget.repo, areaName: _area.name, color: color),
+    ));
+    await _reload();
+  }
+
+  Future<void> _addRoutine(BuildContext themed) async {
+    final added = await Navigator.of(context).push<bool>(MaterialPageRoute(
+      builder: (_) => NewRoutineScreen(repo: widget.repo, areas: [(_area.id, _area.name)], areaId: _area.id),
+    ));
+    if (added != true || !mounted) return;
+    placesRefresh.value++;
+    await _reload();
+    if (themed.mounted) showAllyToast(themed, 'Routine added to ${_area.name}.');
   }
 
   Widget _numberCard(BuildContext themed, AllyColors c, TrackedNumber n, Color color) => AllyCard(
