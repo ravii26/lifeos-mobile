@@ -12,7 +12,6 @@ import '../../data/repositories/life_repository.dart';
 import '../../design/appearance.dart';
 import '../../design/components.dart' show showAllyToast;
 import '../areas/areas_home_screen.dart';
-import '../capture/capture_sheet.dart';
 import '../chat/chat_cubit.dart';
 import '../chat/starters.dart';
 import '../guide/guide_style.dart';
@@ -159,7 +158,13 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
       });
       return;
     }
-    _openCapture(context, pending: intent);
+    // Words shared from another app, or "capture by voice": Talk, with the words started.
+    final words = intent.text?.trim();
+    if (words != null && words.isNotEmpty) {
+      talkPrefill.value = words;
+    } else {
+      setState(() => _index = _talkPlace);
+    }
   }
 
   @override
@@ -213,24 +218,6 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
           ),
         );
       }),
-    );
-  }
-
-  void _openCapture(BuildContext context, {PendingCaptureIntent? pending}) {
-    final cubit = context.read<LifeCubit>();
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (_) => BlocProvider.value(
-        value: cubit,
-        child: CaptureSheet(
-          initialText: pending?.text,
-          initialImagePath: pending?.imagePath,
-          initialImageMime: pending?.imageMime,
-          autoStartVoice: pending?.startVoice ?? false,
-        ),
-      ),
     );
   }
 }

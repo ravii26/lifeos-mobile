@@ -6,8 +6,11 @@ import '../../core/notifications/notification_service.dart';
 import '../../core/system/system_settings.dart';
 import '../../data/models/chat.dart';
 import '../../data/repositories/life_repository.dart';
+import '../../design/components.dart';
+import '../../design/tokens.dart';
+import '../../design/type.dart';
 import '../chat/starters.dart';
-import '../guide/guide_style.dart';
+import '../you/you_page.dart';
 
 /// "Are my reminders going to come?" Shows the three things Android needs
 /// (notifications on, exact alarms allowed, battery unrestricted) with a fix
@@ -95,39 +98,11 @@ class _RemindersCheckScreenState extends State<RemindersCheckScreen> with Widget
           if (t.isAfter(now)) (r, t),
     ]..sort((a, b) => a.$2.compareTo(b.$2));
 
-    return Scaffold(
-      backgroundColor: G.bg,
-      appBar: AppBar(backgroundColor: G.bg, surfaceTintColor: G.bg, foregroundColor: G.ink, elevation: 0),
-      body: ListView(
-        padding: const EdgeInsets.fromLTRB(22, 0, 22, 32),
-        children: [
-          Text('Reminders', style: G.text(44, w: FontWeight.w600, height: 1.05, letterSpacing: -1.3)),
-          const SizedBox(height: 16),
-          if (_loadingReminders)
-            Padding(padding: const EdgeInsets.symmetric(vertical: 12), child: Text('Loading…', style: G.text(18, color: G.muted)))
-          else if (upcoming.isEmpty)
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 8),
-              child: Text('No reminders yet. Try saying "remind me at 6 to call Mummy".', style: G.text(19, color: G.muted, height: 1.4)),
-            )
-          else
-            for (final (r, t) in upcoming.take(8))
-              Container(
-                constraints: const BoxConstraints(minHeight: 70),
-                alignment: Alignment.centerLeft,
-                decoration: BoxDecoration(border: Border(bottom: BorderSide(color: G.lineSoft))),
-                padding: const EdgeInsets.symmetric(vertical: 10),
-                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Text(r.text, style: G.text(20, height: 1.25)),
-                  const SizedBox(height: 2),
-                  Text(r.repeats ? '${_when(t)}, repeats' : _when(t), style: G.text(15, color: G.muted, height: 1.25)),
-                ]),
-              ),
-          const SizedBox(height: 18),
-          GPill('Add a reminder', primary: true, onTap: () => starterRequest.value = Starter.reminder),
-          const SizedBox(height: 26),
-          Text('Make sure they arrive', style: G.text(16, color: G.muted, height: 1.2)),
-          const SizedBox(height: 4),
+    return YouPage(
+      title: 'Are they arriving?',
+      sub: 'Three things Android needs for reminders to reach you.',
+      children: (themed, c) => [
+        youRows(c, [
           _Check(
             ok: _notifications,
             title: 'Notifications are on',
@@ -154,21 +129,29 @@ class _RemindersCheckScreenState extends State<RemindersCheckScreen> with Widget
             fix: 'Fix',
             why: "Samsung's battery saver stops reminders. Choose \"Allow\", or Battery → Unrestricted.",
             onFix: SystemSettings.requestBatteryUnrestricted,
-            last: true,
           ),
-          const SizedBox(height: 20),
-          GPill('Send a test reminder', onTap: _test),
-          if (_testNote != null)
-            Padding(
-              padding: const EdgeInsets.only(top: 12),
-              child: Text(_testNote!, style: G.text(16, color: G.muted, height: 1.4)),
-            ),
-          Padding(
-            padding: const EdgeInsets.only(top: 14),
-            child: Text('$_pending set on this phone.', style: G.text(15, color: G.muted, height: 1.3)),
-          ),
-        ],
-      ),
+        ]),
+        AllyButton('Send a test reminder', kind: AllyButtonKind.secondary, wide: true, onPressed: _test),
+        if (_testNote != null) AllyNote(_testNote!),
+        Text('$_pending set on this phone.', style: AllyType.small(color: c.faint)),
+        Text('NEXT UP', style: AllyType.eyebrow(color: c.faint)),
+        if (_loadingReminders)
+          const AllySkeleton(height: 64, radius: Rad.card)
+        else if (upcoming.isEmpty)
+          Text('No reminders yet. Try saying "remind me at 6 to call Mummy".', style: AllyType.body(color: c.muted))
+        else
+          youRows(c, [
+            for (final (r, t) in upcoming.take(8))
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: Sp.x3),
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Text(r.text, style: AllyType.body(color: c.ink)),
+                  Text(r.repeats ? '${_when(t)}, repeats' : _when(t), style: AllyType.small(color: c.muted)),
+                ]),
+              ),
+          ]),
+        AllyButton('Add a reminder', wide: true, onPressed: () => starterRequest.value = Starter.reminder),
+      ],
     );
   }
 
@@ -189,38 +172,24 @@ class _Check extends StatelessWidget {
   final String why;
   final String fix;
   final VoidCallback onFix;
-  final bool last;
-  const _Check({required this.ok, required this.title, required this.why, required this.fix, required this.onFix, this.last = false});
+  const _Check({required this.ok, required this.title, required this.why, required this.fix, required this.onFix});
 
   @override
-  Widget build(BuildContext context) => Container(
-        padding: const EdgeInsets.symmetric(vertical: 13),
-        decoration: BoxDecoration(
-          border: Border(
-            top: BorderSide(color: G.lineSoft, width: 0.5),
-            bottom: last ? BorderSide(color: G.lineSoft, width: 0.5) : BorderSide.none,
-          ),
+  Widget build(BuildContext context) {
+    final c = context.ac;
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: Sp.x3),
+      child: Row(children: [
+        Icon(ok == null ? Icons.more_horiz : (ok! ? Icons.check_circle_rounded : Icons.radio_button_unchecked), size: 20, color: ok == true ? c.ink : c.faint),
+        const SizedBox(width: Sp.x3),
+        Expanded(
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(title, style: AllyType.body(color: c.ink)),
+            if (ok == false) Text(why, style: AllyType.small(color: c.muted)),
+          ]),
         ),
-        child: Row(children: [
-          Icon(
-            ok == null ? Icons.more_horiz : (ok! ? Icons.check_circle : Icons.radio_button_unchecked),
-            size: 20,
-            color: ok == true ? G.good : G.faint,
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text(title, style: G.text(17, height: 1.3)),
-              if (ok == false)
-                Padding(padding: const EdgeInsets.only(top: 2), child: Text(why, style: G.text(15, color: G.muted, height: 1.35))),
-            ]),
-          ),
-          if (ok == false)
-            TextButton(
-              onPressed: onFix,
-              style: TextButton.styleFrom(minimumSize: const Size(56, 44)),
-              child: Text(fix, style: G.text(16, w: FontWeight.w600, color: G.accent, height: 1.2)),
-            ),
-        ]),
-      );
+        if (ok == false) AllyButton(fix, kind: AllyButtonKind.ghost, onPressed: onFix),
+      ]),
+    );
+  }
 }

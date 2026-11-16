@@ -89,9 +89,12 @@ class _Repo implements LifeRepository {
     };
   }
 
+  List<String>? keptMilestones;
+
   @override
   Future<Map<String, dynamic>> acceptGoalPlan(Map<String, dynamic> plan, {bool park = false, String? parkUntil, String? areaId}) async {
     calls.add('accept:$areaId');
+    keptMilestones = (plan['milestones'] as List).cast<String>();
     return {
       'firstStep': {'id': 't1', 'title': 'List your three strongest projects', 'minutes': 15},
     };
@@ -222,7 +225,11 @@ void main() {
     expect(repo.calls, contains('propose:Get a new job:180'));
     expect(find.text('Career · draft 1'), findsOneWidget);
     expect(find.text('STEP ONE · 15 MIN'), findsOneWidget);
+    // The milestones are editable before anything is kept.
+    await t.enterText(find.widgetWithText(TextField, 'Apply to 20 companies'), 'Apply to 10 companies');
+    await t.pump();
     await _tap(t, find.text('Start step one now'));
+    expect(repo.keptMilestones, ['Resume and target list', 'Apply to 10 companies']);
     expect(opened, 'List your three strongest projects|15|Career');
     expect(repo.calls.skip(repo.calls.length - 2), ['accept:a0', 'done:t1']);
 

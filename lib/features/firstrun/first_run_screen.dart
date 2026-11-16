@@ -9,6 +9,7 @@ import '../../design/components.dart';
 import '../../design/tokens.dart';
 import '../../design/type.dart';
 import '../areas/areas_overview.dart' show AreaMode, loadAreasOverview;
+import '../areas/milestones.dart' show MilestoneEditor;
 import '../areas/when_picker.dart';
 import '../session/focus_session_screen.dart';
 import '../talk/voice_input.dart';
@@ -639,19 +640,14 @@ class _FirstRunScreenState extends State<FirstRunScreen> {
       Text('Good enough to start. It gets better as you go.', style: AllyType.body(color: c.muted)),
       Text(asString(plan['title']), style: AllyType.h2(color: c.ink)),
       if (milestones.isNotEmpty)
-        AllyCard(
-          padding: const EdgeInsets.symmetric(horizontal: Sp.x4, vertical: Sp.x1),
-          child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-            for (var i = 0; i < milestones.length; i++)
-              Padding(
-                padding: const EdgeInsets.symmetric(vertical: Sp.x2),
-                child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  SizedBox(width: 28, child: Text('${i + 1}', style: AllyType.num(color: c.faint))),
-                  Expanded(child: Text(milestones[i], style: AllyType.body(color: c.ink))),
-                ]),
-              ),
-          ]),
-        ),
+        Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          Text('MILESTONES', style: AllyType.eyebrow(color: c.faint)),
+          const SizedBox(height: Sp.x1),
+          Text('Small goals of one to four weeks. Change any of them; step one is for the first.', style: AllyType.small(color: c.muted)),
+          const SizedBox(height: Sp.x2),
+          // Keyed by the draft; what is saved is what is shown here.
+          MilestoneEditor(key: ObjectKey(plan), initial: milestones, onChanged: (m) => plan['milestones'] = m),
+        ]),
       if (first != null)
         AllyCard(
           strong: true,

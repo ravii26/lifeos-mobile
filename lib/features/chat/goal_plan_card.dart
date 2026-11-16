@@ -6,7 +6,9 @@ import '../../core/api/api_exception.dart';
 import '../../core/di/service_locator.dart';
 import '../../data/models/json.dart';
 import '../../data/repositories/life_repository.dart';
-import '../guide/guide_style.dart';
+import '../../design/components.dart';
+import '../../design/tokens.dart';
+import '../../design/type.dart';
 import '../places/now_cubit.dart';
 import 'chat_cubit.dart';
 
@@ -75,7 +77,7 @@ class _GoalPlanCardState extends State<GoalPlanCard> {
       });
       _remember();
     } on ApiException catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+      if (mounted) showAllyToast(context, e.message);
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -93,81 +95,73 @@ class _GoalPlanCardState extends State<GoalPlanCard> {
       });
       _remember();
     } on ApiException catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+      if (mounted) showAllyToast(context, e.message);
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final c = context.ac;
     final plan = _plan;
     final targets = ((plan?['targets'] as List?) ?? const []).whereType<Json>().toList();
     if (plan == null || targets.isEmpty) return const SizedBox.shrink();
     final milestones = ((plan['milestones'] as List?) ?? const []).map((e) => e.toString()).toList();
+    final steps = ((plan['steps'] as List?) ?? const []).whereType<Json>().toList();
     final deadline = asStringOrNull(plan['deadline']);
-    return Container(
-      margin: const EdgeInsets.only(top: 12),
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(color: G.card, borderRadius: BorderRadius.circular(24)),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Text('A week you can keep', style: G.text(16, color: G.accent, height: 1.2)),
-        const SizedBox(height: 6),
-        Text(asString(plan['title']), style: G.text(25, w: FontWeight.w600, height: 1.12, letterSpacing: -0.4)),
-        if (deadline != null) Padding(padding: const EdgeInsets.only(top: 3), child: Text('By ${_date(deadline)}', style: G.text(16, color: G.muted, height: 1.3))),
-        const SizedBox(height: 10),
+    return AllyCard(
+      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        Text('DRAFT PLAN', style: AllyType.eyebrow(color: c.faint)),
+        const SizedBox(height: Sp.x1),
+        Text(asString(plan['title']), style: AllyType.h2(color: c.ink)),
+        if (deadline != null) Text('By ${_date(deadline)}', style: AllyType.small(color: c.muted)),
+        const SizedBox(height: Sp.x3),
         for (final t in targets)
-          Container(
-            constraints: const BoxConstraints(minHeight: 54),
-            padding: const EdgeInsets.symmetric(vertical: 8),
-            decoration: BoxDecoration(border: Border(bottom: BorderSide(color: G.surfaceHigh))),
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: Sp.x1),
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Row(children: [
-                Expanded(child: Text(asString(t['title']), style: G.text(19, height: 1.25))),
-                const SizedBox(width: 10),
-                Text(_amount(t), style: G.text(15, color: G.accent, height: 1.25)),
+              Wrap(spacing: Sp.x2, children: [
+                Text(asString(t['title']), style: AllyType.body(color: c.ink)),
+                Text(_amount(t), style: AllyType.body(color: c.muted)),
               ]),
-              if (asStringOrNull(t['note']) != null) Text(asString(t['note']), style: G.text(15, color: G.muted, height: 1.3)),
+              if (asStringOrNull(t['note']) != null) Text(asString(t['note']), style: AllyType.small(color: c.muted)),
             ]),
           ),
         if (milestones.isNotEmpty) ...[
-          const SizedBox(height: 10),
-          Text('Stages: ${milestones.join(', then ')}', style: G.text(16, color: G.muted, height: 1.35)),
+          const SizedBox(height: Sp.x3),
+          Text('MILESTONES', style: AllyType.eyebrow(color: c.faint)),
+          const SizedBox(height: Sp.x1),
+          for (var i = 0; i < milestones.length; i++) Text('${i + 1}. ${milestones[i]}', style: AllyType.body(color: c.muted)),
+        ],
+        if (steps.isNotEmpty) ...[
+          const SizedBox(height: Sp.x3),
+          Text('FIRST STEPS', style: AllyType.eyebrow(color: c.faint)),
+          const SizedBox(height: Sp.x1),
+          for (final st in steps.take(3))
+            Text('${asString(st['title'])}${asInt(st['minutes']) > 0 ? ' · ${asInt(st['minutes'])} min' : ''}', style: AllyType.body(color: c.muted)),
         ],
         if (asStringOrNull(_fit?['message']) != null) ...[
-          const SizedBox(height: 10),
-          Text(asString(_fit!['message']), style: G.text(17, height: 1.35)),
+          const SizedBox(height: Sp.x3),
+          Text(asString(_fit!['message']), style: AllyType.body(color: c.ink)),
         ],
         if (_caution != null) ...[
-          const SizedBox(height: 12),
-          Container(
-            padding: const EdgeInsets.all(14),
-            decoration: BoxDecoration(color: G.surfaceHigh, borderRadius: BorderRadius.circular(18)),
-            child: Text(asString(_caution!['message']), style: G.text(17, height: 1.35)),
-          ),
+          const SizedBox(height: Sp.x3),
+          AllyNote(asString(_caution!['message'])),
         ],
-        const SizedBox(height: 14),
+        const SizedBox(height: Sp.x3),
         if (_done != null)
           Row(children: [
-            Expanded(child: Text(_done!, style: G.text(16, color: G.muted, height: 1.35))),
-            if (_undoId != null)
-              TextButton(
-                onPressed: _undo,
-                style: TextButton.styleFrom(minimumSize: const Size(48, 44)),
-                child: Text('Undo', style: G.text(16, w: FontWeight.w600, color: G.accent, height: 1.2)),
-              ),
+            Expanded(child: Text(_done!, style: AllyType.small(color: c.muted))),
+            if (_undoId != null) AllyButton('Undo', kind: AllyButtonKind.ghost, onPressed: _undo),
           ])
         else
-          Row(children: [
-            Expanded(child: GPill(_busy ? 'Saving…' : (_caution != null ? 'Start anyway' : 'Keep this plan'), primary: true, onTap: _busy ? null : () => _keep(park: false))),
-            if (_caution != null) ...[
-              const SizedBox(width: 8),
-              Expanded(child: GPill('Park it', onTap: _busy ? null : () => _keep(park: true))),
-            ],
+          Wrap(spacing: Sp.x2, runSpacing: Sp.x2, children: [
+            AllyButton(_busy ? 'Saving…' : (_caution != null ? 'Start anyway' : 'Keep this plan'), onPressed: _busy ? null : () => _keep(park: false)),
+            if (_caution != null) AllyButton('Park it', kind: AllyButtonKind.secondary, onPressed: _busy ? null : () => _keep(park: true)),
           ]),
-        if (_done == null)
-          Padding(
-            padding: const EdgeInsets.only(top: 10),
-            child: Text('Want it different? Just say so, like "make it lighter".', style: G.text(15, color: G.muted, height: 1.3)),
-          ),
+        if (_done == null) ...[
+          const SizedBox(height: Sp.x2),
+          Text('Want it different? Just say so, like "make it lighter".', style: AllyType.small(color: c.faint)),
+        ],
       ]),
     );
   }

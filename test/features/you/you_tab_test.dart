@@ -40,12 +40,15 @@ Future<_Repo> _open(WidgetTester t, {Size size = const Size(360, 800), double te
 void main() {
   GoogleFonts.config.allowRuntimeFetching = false;
 
-  testWidgets('You lists every place My life reached, grouped', (t) async {
+  testWidgets('You lists every place My life reached, grouped; the old Log, Parked, Plans and voice rows are gone', (t) async {
     await _open(t);
+    for (final gone in ['Log', 'Parked', 'Plans and check-ins', "Ally's voice"]) {
+      expect(find.text(gone), findsNothing, reason: gone);
+    }
     expect(find.text('Sam Rivera'), findsOneWidget);
     for (final s in [
-      'Library', 'Reminders', 'Log', 'Parked', 'Plans and check-ins',
-      'What Ally remembers', 'How much Ally speaks up', 'How Ally works for you', 'Your normal day', "Ally's voice",
+      'Library', 'Reminders',
+      'What Ally remembers', 'How much Ally speaks up', 'How Ally works for you', 'Your normal day',
       'Appearance', 'Account and privacy', 'Help me decide', 'Sign out',
     ]) {
       await t.scrollUntilVisible(find.text(s), 200);
