@@ -21,6 +21,7 @@ import '../guide/tonight_cubit.dart';
 import '../library/save_flow.dart';
 import '../places/now_cubit.dart';
 import '../places/support_screen.dart';
+import 'receipt_edit.dart';
 import 'voice_input.dart';
 
 /// Words for Talk to start with, set from anywhere (a note's "Add to this
@@ -282,6 +283,7 @@ class _TalkScreenState extends State<TalkScreen> {
               : _AllyLine(
                   s.messages[i],
                   onUndo: (ai) => cubit.undoAction(i, ai),
+                  onEdit: (ai) => editReceipt(context, cubit, i, ai, s.messages[i].actions[ai]),
                   onUndoAll: () => cubit.undoAll(i),
                   onSay: _send,
                   onSuggest: (t) => cubit.acceptSuggestion(i, t),
@@ -438,13 +440,14 @@ const _notReceipts = {'ASK', 'LIST', 'NOW_PICK', 'STAND', 'WEEK_CARD', 'NOTES_US
 class _AllyLine extends StatelessWidget {
   final ChatMessage m;
   final void Function(int actionIndex) onUndo;
+  final void Function(int actionIndex) onEdit;
   final VoidCallback onUndoAll;
   final void Function(String text) onSay;
   final void Function(String title) onSuggest;
   final VoidCallback onMove;
   final VoidCallback onUndoMove;
   const _AllyLine(this.m,
-      {required this.onUndo, required this.onUndoAll, required this.onSay, required this.onSuggest, required this.onMove, required this.onUndoMove});
+      {required this.onUndo, required this.onEdit, required this.onUndoAll, required this.onSay, required this.onSuggest, required this.onMove, required this.onUndoMove});
 
   @override
   Widget build(BuildContext context) {
@@ -484,7 +487,7 @@ class _AllyLine extends StatelessWidget {
                   Expanded(child: Text('Saved $created things', style: AllyType.eyebrow(color: c.faint))),
                   AllyButton('Undo all', kind: AllyButtonKind.ghost, onPressed: onUndoAll),
                 ]),
-              for (final i in receipts) _Receipt(m.actions[i], onUndo: () => onUndo(i)),
+              for (final i in receipts) _Receipt(m.actions[i], onUndo: () => onUndo(i), onEdit: () => onEdit(i)),
             ]),
           ),
         ],
@@ -532,12 +535,15 @@ class _AllyLine extends StatelessWidget {
 class _Receipt extends StatelessWidget {
   final ChatAction a;
   final VoidCallback onUndo;
-  const _Receipt(this.a, {required this.onUndo});
+  final VoidCallback onEdit;
+  const _Receipt(this.a, {required this.onUndo, required this.onEdit});
 
   @override
   Widget build(BuildContext context) {
     final c = context.ac;
     final (icon, text) = describeAction(a);
+    final source = sourceLine(a);
+    final editable = a.isCreation && !a.undone && a.id != null;
     return ConstrainedBox(
       constraints: const BoxConstraints(minHeight: 48),
       child: Row(children: [
@@ -546,12 +552,23 @@ class _Receipt extends StatelessWidget {
         Expanded(
           child: Padding(
             padding: const EdgeInsets.symmetric(vertical: Sp.x2),
-            child: Text(
-              text,
-              style: AllyType.body(color: a.undone ? c.faint : c.ink).copyWith(decoration: a.undone ? TextDecoration.lineThrough : null),
-            ),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(
+                text,
+                style: AllyType.body(color: a.undone ? c.faint : c.ink).copyWith(decoration: a.undone ? TextDecoration.lineThrough : null),
+              ),
+              if (source != null) Text(source, style: AllyType.small(color: c.faint)),
+            ]),
           ),
         ),
+        if (editable)
+          IconButton(
+            tooltip: 'Edit: $text',
+            icon: Icon(Icons.edit_outlined, size: 20, color: c.muted),
+            constraints: const BoxConstraints(minWidth: 44, minHeight: 44),
+            padding: EdgeInsets.zero,
+            onPressed: onEdit,
+          ),
         if (a.type == 'CONTACT' && a.url != null)
           AllyButton(a.kind == 'CALL' ? 'Call' : 'WhatsApp', kind: AllyButtonKind.ghost, onPressed: () => openLink(context, a.url!)),
         if (a.undone)

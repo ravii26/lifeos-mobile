@@ -269,6 +269,18 @@ class ChatCubit extends Cubit<ChatState> {
     }
   }
 
+  /// Shows a new title on a saved thing after it was changed somewhere else
+  /// (the edit sheet saved it already).
+  Future<void> retitle(int messageIndex, int actionIndex, String title) async {
+    final m = state.messages[messageIndex];
+    final a = m.actions[actionIndex];
+    if (title.trim().isEmpty || title == a.text) return;
+    final actions = [...m.actions]..[actionIndex] = a.copyWith(text: title.trim());
+    final msgs = [...state.messages]..[messageIndex] = m.copyWith(actions: actions);
+    emit(state.copyWith(messages: msgs));
+    await _persist(msgs);
+  }
+
   /// "Move to later" on the too-much-today card.
   Future<void> moveToLater(int messageIndex) async {
     final m = state.messages[messageIndex];

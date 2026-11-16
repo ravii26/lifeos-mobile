@@ -66,6 +66,12 @@ class ChatAction {
   final String? goalText; // GOAL_PLAN: what was asked, so "make DSA 4 h" can re-plan it
   final String? url; // CONTACT: tel: or WhatsApp link the phone opens
 
+  /// Where a saved thing came from: SAID (their words) or IDEA (Ally's own). Null on older servers.
+  final String? origin;
+  final String? said; // SAID: the part of their message it came from
+  final String? ideaFor; // IDEA: the words of theirs it helps with
+  final String? reason; // IDEA: one line on why
+
   const ChatAction(
       {required this.type,
       this.id,
@@ -83,7 +89,11 @@ class ChatAction {
       this.options = const [],
       this.proposal,
       this.goalText,
-      this.url});
+      this.url,
+      this.origin,
+      this.said,
+      this.ideaFor,
+      this.reason});
 
   ChatAction copyWith({String? text, bool? undone}) => ChatAction(
       type: type,
@@ -102,7 +112,11 @@ class ChatAction {
       options: options,
       proposal: proposal,
       goalText: goalText,
-      url: url);
+      url: url,
+      origin: origin,
+      said: said,
+      ideaFor: ideaFor,
+      reason: reason);
 
   ChatAction markUndone() => copyWith(undone: true);
 
@@ -140,6 +154,10 @@ class ChatAction {
         proposal: j['proposal'] is Json ? j['proposal'] as Json : null,
         goalText: asStringOrNull(j['goalText']),
         url: asStringOrNull(j['url']),
+        origin: asStringOrNull(j['origin']),
+        said: asStringOrNull(j['said']),
+        ideaFor: asStringOrNull(j['ideaFor']),
+        reason: asStringOrNull(j['reason']),
       );
 
   /// What "it" can mean in the next message: the thing this action made or
@@ -179,6 +197,10 @@ class ChatAction {
         if (proposal != null) 'proposal': proposal,
         if (goalText != null) 'goalText': goalText,
         if (url != null) 'url': url,
+        if (origin != null) 'origin': origin,
+        if (said != null) 'said': said,
+        if (ideaFor != null) 'ideaFor': ideaFor,
+        if (reason != null) 'reason': reason,
         if (items.isNotEmpty) 'items': items,
         if (tasks > 0) 'tasks': tasks,
         if (detail != null) 'deadline': detail,
