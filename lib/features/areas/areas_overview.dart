@@ -33,8 +33,22 @@ class AreaStep {
 
   /// The smaller version, for a hard day.
   final String? smaller;
+
+  /// ON (that day; hidden until then) | BY (any day until then); null = no day.
+  final String? dueKind;
+
+  /// YYYY-MM-DD.
+  final String? dueKey;
+
+  /// Hours of the day it belongs to, "HH:MM"; null = anytime.
+  final String? windowFrom;
+  final String? windowTo;
+
+  /// When, in plain words from the server: "Tomorrow", "By Fri 21 Nov", "Mornings 6 to 8".
+  final String? when;
   bool done;
-  AreaStep(this.id, this.title, this.minutes, {this.energy, this.smaller, this.done = false});
+  AreaStep(this.id, this.title, this.minutes,
+      {this.energy, this.smaller, this.dueKind, this.dueKey, this.windowFrom, this.windowTo, this.when, this.done = false});
 }
 
 /// One tracked number: where it started, is, and is going, and the last readings.
@@ -109,6 +123,63 @@ class AreaRoutine {
   const AreaRoutine(this.id, this.title, this.doneThisWeek);
 }
 
+/// A milestone: a small goal under a big one, reachable in 1 to 4 weeks.
+enum MilestoneState {
+  reached,
+  current,
+  next;
+
+  static MilestoneState fromName(String s) => switch (s) {
+        'REACHED' => reached,
+        'CURRENT' => current,
+        _ => next,
+      };
+}
+
+class Milestone {
+  final String id;
+  final String title;
+  final MilestoneState state;
+  final int stepsDone;
+  final int stepsTotal;
+  const Milestone(this.id, this.title, this.state, {this.stepsDone = 0, this.stepsTotal = 0});
+}
+
+/// A goal on an area, with its milestones when it has them.
+class AreaGoal {
+  final String id;
+  final String title;
+
+  /// Empty for a goal without milestones.
+  final List<Milestone> milestones;
+
+  /// "Milestone 2 of 5: run 5 km without stopping · 3 of 6 steps done", or null.
+  final String? line;
+
+  /// Every step of the current milestone is done: ask whether it is reached.
+  final bool ready;
+
+  const AreaGoal(this.id, this.title, {this.milestones = const [], this.line, this.ready = false});
+
+  Milestone? get current => milestones.where((m) => m.state == MilestoneState.current).firstOrNull;
+  int get reached => milestones.where((m) => m.state == MilestoneState.reached).length;
+
+  factory AreaGoal.fromJson(Json g) {
+    final p = g['progress'] is Json ? g['progress'] as Json : null;
+    return AreaGoal(
+      asString(g['id']),
+      asString(g['title']),
+      milestones: ((g['milestones'] as List?) ?? const [])
+          .whereType<Json>()
+          .map((m) => Milestone(asString(m['id']), asString(m['title']), MilestoneState.fromName(asString(m['state'])),
+              stepsDone: asInt(m['stepsDone']), stepsTotal: asInt(m['stepsTotal'])))
+          .toList(),
+      line: p == null ? null : asStringOrNull(p['line']),
+      ready: p != null && asBool(p['ready']),
+    );
+  }
+}
+
 /// One area and where it stands this week.
 class AreaStanding {
   final String id;
@@ -122,6 +193,15 @@ class AreaStanding {
   final double value;
   final String status;
   final List<String> goals;
+
+  /// The id of each goal in [goals], in the same order.
+  final List<String> goalIds;
+
+  /// The goals with their milestones (same order as [goals]).
+  final List<AreaGoal> goalDetails;
+
+  /// The first goal's milestone line, or null (no milestones, or an older server).
+  final String? progressLine;
   final List<AreaStep> nextSteps;
   final List<AreaRoutine> routines;
 
@@ -147,6 +227,9 @@ class AreaStanding {
     required this.value,
     required this.status,
     this.goals = const [],
+    this.goalIds = const [],
+    this.goalDetails = const [],
+    this.progressLine,
     this.nextSteps = const [],
     this.routines = const [],
     this.tastes,
@@ -165,10 +248,20 @@ class AreaStanding {
         value: asDouble(j['value']).clamp(0.0, 1.0).toDouble(),
         status: asString(j['status']),
         goals: ((j['goals'] as List?) ?? const []).whereType<Json>().map((g) => asString(g['title'])).toList(),
+        goalIds: ((j['goals'] as List?) ?? const []).whereType<Json>().map((g) => asString(g['id'])).toList(),
+        goalDetails: ((j['goals'] as List?) ?? const []).whereType<Json>().map(AreaGoal.fromJson).toList(),
+        progressLine: asStringOrNull(j['progressLine']),
         nextSteps: ((j['nextSteps'] as List?) ?? const [])
             .whereType<Json>()
             .map((s) => AreaStep(asString(s['id']), asString(s['title']), s['minutes'] == null ? null : asInt(s['minutes']),
-                energy: asStringOrNull(s['energy']), smaller: asStringOrNull(s['smaller'])))
+                energy: asStringOrNull(s['energy']),
+                smaller: asStringOrNull(s['smaller']),
+                // A server from before "when" sends a date with no kind: it reads as "by".
+                dueKind: asStringOrNull(s['dueKey']) == null ? null : (asStringOrNull(s['dueKind']) ?? 'BY'),
+                dueKey: asStringOrNull(s['dueKey']),
+                windowFrom: asStringOrNull(s['windowFrom']),
+                windowTo: asStringOrNull(s['windowTo']),
+                when: asStringOrNull(s['when'])))
             .toList(),
         routines: ((j['routines'] as List?) ?? const [])
             .whereType<Json>()

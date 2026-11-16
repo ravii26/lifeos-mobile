@@ -195,26 +195,42 @@ class LifeRepository {
     return (message: asString(j['message'], 'Saved.'), activityId: asStringOrNull(j['activityId']));
   }
 
-  /// [energy] LOW | NORMAL | HIGH.
+  /// [energy] LOW | NORMAL | HIGH. [when] is {dueKind, dueKey, windowFrom, windowTo};
+  /// left out, the server reads it from the words ("call the bank tomorrow").
+  /// [goalId] puts the step under a goal or milestone of this area.
   Future<({String message, String? activityId})> addStep(String areaId, String title,
-          {int? minutes, String? energy, String? smaller}) async =>
+          {int? minutes, String? energy, String? smaller, Map<String, dynamic>? when, String? goalId}) async =>
       _receipt(await _api.post('/steps', body: {
         'areaId': areaId,
+        'goalId': ?goalId,
         'title': title,
+        if (when != null) 'when': when,
         if (minutes != null) 'sizeMinutes': minutes,
         if (energy != null) 'energy': energy,
         if (smaller != null && smaller.trim().isNotEmpty) 'minimumVersion': smaller.trim(),
       }));
 
   /// Sends only what is given; an empty [smaller] clears it, [clearMinutes] clears the length.
+  /// [when] replaces when it happens (all nulls = anytime); leave it out to keep it.
   Future<({String message, String? activityId})> editStep(String id,
-          {String? title, int? minutes, bool clearMinutes = false, String? energy, String? smaller}) async =>
+          {String? title, int? minutes, bool clearMinutes = false, String? energy, String? smaller, Map<String, dynamic>? when}) async =>
       _receipt(await _api.patch('/steps/$id', body: {
         if (title != null) 'title': title,
+        if (when != null) 'when': when,
         if (clearMinutes) 'sizeMinutes': null else if (minutes != null) 'sizeMinutes': minutes,
         if (energy != null) 'energy': energy,
         if (smaller != null) 'minimumVersion': smaller.trim().isEmpty ? null : smaller.trim(),
       }));
+
+  /// For the "doing it" screen: {title, minutes, smaller, begin, done, byCode,
+  /// from: {goal, why, area}}. Works without AI.
+  Future<Json> stepBrief(String id) async => (await _api.get('/steps/$id/brief')) as Json;
+
+  /// A clearer wording for a step that isn't clear; null when there is none. Nothing is saved.
+  Future<String?> clearerStep(String id) async {
+    final data = await _api.get('/steps/$id/clearer');
+    return data is Json ? asStringOrNull(data['title']) : null;
+  }
 
   /// [when] TOMORROW | WEEKEND | NEXT_WEEK. Not suggested before then.
   Future<({String message, String? activityId})> moveStep(String id, String when) async =>
@@ -1298,6 +1314,38 @@ class LifeRepository {
 
   /// A reminder's follow-up "Tomorrow": the same time, one day later.
   Future<void> moveReminder(String id, DateTime remindAt) => _api.patch('/tasks/$id', body: {'remindAt': remindAt.toUtc().toIso8601String()});
+
+  // ---- Milestones (small goals under a big one) ----
+
+  /// A draft for a goal: {milestones: [String], draftedBy: AI | CODE}. Nothing saved.
+  Future<({List<String> milestones, bool byCode})> proposeMilestones(String goalId) async {
+    final j = (await _api.post('/milestones/propose', body: {'goalId': goalId})) as Json;
+    return (
+      milestones: ((j['milestones'] as List?) ?? const []).map((e) => '$e').where((e) => e.isNotEmpty).toList(),
+      byCode: j['draftedBy'] == 'CODE',
+    );
+  }
+
+  /// Keep milestones under a goal; its open steps move to the first. One Undo.
+  Future<String?> setMilestones(String goalId, List<String> milestones) async =>
+      asStringOrNull(((await _api.post('/milestones', body: {'goalId': goalId, 'milestones': milestones})) as Json)['activityId']);
+
+  Future<String?> addMilestone(String goalId, String title) async =>
+      asStringOrNull(((await _api.post('/milestones/add', body: {'goalId': goalId, 'title': title})) as Json)['activityId']);
+
+  /// The current milestone is reached; the next opens (with a first step if it had none).
+  Future<({String message, String? next, String? firstStep, String? activityId})> reachMilestone(String id) async {
+    final j = (await _api.post('/milestones/$id/reached')) as Json;
+    return (
+      message: asString(j['message'], 'Reached.'),
+      next: j['next'] is Json ? asStringOrNull((j['next'] as Json)['title']) : null,
+      firstStep: j['firstStep'] is Json ? asStringOrNull((j['firstStep'] as Json)['title']) : null,
+      activityId: asStringOrNull(j['activityId']),
+    );
+  }
+
+  /// Kept, not deleted, with its open steps; the next opens if it was current.
+  Future<({String message, String? activityId})> letGoMilestone(String id) async => _receipt(await _api.post('/milestones/$id/let-go'));
 
   // ---- Goal plans ----
 

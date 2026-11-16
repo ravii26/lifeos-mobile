@@ -284,6 +284,97 @@ void main() {
     expect(done, isNull);
   });
 
+  // "Here's what I heard", with one thing said and one idea of Ally's.
+  Future<_Repo> heard(WidgetTester t, {Size size = const Size(360, 800), double textScale = 1}) async {
+    await _size(t, size: size, textScale: textScale);
+    SharedPreferences.setMockInitialValues({});
+    final d = FirstRunDraft(step: 1, text: 'reduce my scrolling at night, call the bank tomorrow', freeMinutes: 780)
+      ..takeSort({
+        'byCode': false,
+        'items': [
+          {'title': 'Reduce scrolling', 'kind': 'GOAL', 'areaName': 'Health', 'origin': 'SAID', 'said': 'reduce my scrolling at night'},
+          {
+            'title': 'Draft a weekly schedule',
+            'kind': 'TASK',
+            'areaName': 'Health',
+            'origin': 'IDEA',
+            'ideaFor': 'reduce my scrolling at night',
+            'reason': 'A plan for the evening leaves less room to scroll.',
+          },
+          {'title': 'Call the bank', 'kind': 'TASK', 'areaName': 'Money', 'origin': 'SAID', 'said': 'call the bank tomorrow', 'due': '2099-01-05', 'dueKind': 'ON'},
+        ],
+        'areas': [
+          {'name': 'Health', 'mode': 'PUSH', 'reason': 'A clear goal you want to move on now.'},
+          {'name': 'Money', 'mode': 'MAINTAIN', 'reason': 'Kept steady with a small, regular dose.'},
+        ],
+      });
+    await d.save();
+    final repo = _Repo();
+    await t.pumpWidget(const SizedBox());
+    await t.pumpWidget(MaterialApp(home: FirstRunScreen(repo: repo, claim: ({required name, required email, required password}) async => _saved, onDone: (_) {})));
+    await t.pump();
+    await t.pump(const Duration(seconds: 1));
+    return repo;
+  }
+
+  Future<void> toModes(WidgetTester t) async {
+    // The week is already set in this draft, so both steps are a Continue.
+    await _tap(t, find.text('Continue'));
+    await _tap(t, find.text('Continue'));
+    await _tap(t, find.text('Set up my areas'));
+  }
+
+  testWidgets('each item says where it came from; an idea of Ally\'s says what for and why', (t) async {
+    await heard(t);
+    expect(find.text('From what you said: “reduce my scrolling at night”'), findsOneWidget);
+    expect(find.text('Ally\'s idea for “reduce my scrolling at night”'), findsOneWidget);
+    expect(find.text('A plan for the evening leaves less room to scroll.'), findsOneWidget);
+    expect(find.text('Mon 5 Jan'), findsOneWidget);
+    expect(find.textContaining("untick any of Ally's ideas"), findsOneWidget);
+  });
+
+  testWidgets('an idea comes ticked; unticking leaves it out of what is set up', (t) async {
+    final repo = await heard(t);
+    final tick = find.bySemanticsLabel("Keep Ally's idea: Draft a weekly schedule");
+    expect(t.widget<AllyCheck>(find.byType(AllyCheck)).done, isTrue);
+    await _tap(t, tick);
+    expect(t.widget<AllyCheck>(find.byType(AllyCheck)).done, isFalse);
+    await toModes(t);
+    expect(repo.appliedItems!.map((i) => i['title']), ['Reduce scrolling', 'Call the bank']);
+    await t.pump(const Duration(seconds: 2));
+  });
+
+  testWidgets('an item can be renamed, given a when, and moved before anything is saved', (t) async {
+    final repo = await heard(t);
+    await _tap(t, find.text('Draft a weekly schedule'));
+    expect(find.text('Edit'), findsOneWidget);
+    await t.enterText(find.widgetWithText(TextFormField, 'Draft a weekly schedule'), 'Phone out of the bedroom');
+    await t.pump();
+    await _tap(t, find.widgetWithText(AllyChip, 'Evening'));
+    await _tap(t, find.widgetWithText(AllyChip, 'Money'));
+    await _tap(t, find.text('Done'));
+    expect(find.text('Phone out of the bedroom'), findsOneWidget);
+    expect(find.text('Evenings 6 to 9'), findsOneWidget);
+    await toModes(t);
+    final sent = repo.appliedItems!.firstWhere((i) => i['title'] == 'Phone out of the bedroom');
+    expect(sent, {'title': 'Phone out of the bedroom', 'kind': 'TASK', 'areaName': 'Money', 'due': null, 'windowFrom': '18:00', 'windowTo': '21:00'});
+    final bank = repo.appliedItems!.firstWhere((i) => i['title'] == 'Call the bank');
+    expect(bank['dueKind'], 'ON');
+    // Where it came from stays on the phone; it is not sent.
+    expect(sent.containsKey('origin'), isFalse);
+    await t.pump(const Duration(seconds: 2));
+  });
+
+  testWidgets('the item sheet fits a small phone at large text', (t) async {
+    await heard(t, size: const Size(320, 640), textScale: 1.5);
+    expect(t.takeException(), isNull);
+    await _tap(t, find.text('Call the bank'));
+    await t.drag(find.byType(SingleChildScrollView).last, const Offset(0, -1200));
+    await t.pump(const Duration(milliseconds: 400));
+    expect(find.text('Remove'), findsOneWidget);
+    expect(t.takeException(), isNull);
+  });
+
   testWidgets('every step fits a small phone at large text', (t) async {
     await _size(t, size: const Size(320, 640), textScale: 1.5);
     for (final step in [0, 1, 2, 3, 5]) {

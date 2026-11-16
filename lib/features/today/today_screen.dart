@@ -104,6 +104,9 @@ class _TodayScreenState extends State<TodayScreen> {
           minutes: minutes ?? (o.minutes > 0 ? o.minutes : 25),
           firstStep: !o.smaller && o.minimum.isNotEmpty ? o.minimum.replaceAll(RegExp(r'\.$'), '') : null,
           areaName: o.areaName,
+          // A to-do gets the "doing it" screen: how to begin and what done looks like.
+          stepId: o.sourceType == 'TASK' && !o.smaller ? o.sourceId : null,
+          repo: _repo,
         ),
       ));
 
@@ -157,14 +160,55 @@ class _TodayScreenState extends State<TodayScreen> {
     if (!mounted) return;
     switch (outcome?.end) {
       case FocusEnd.done:
+        if (outcome!.smaller) {
+          await _didSmall(themed, o, outcome.minutes);
+          return;
+        }
         final was = await before;
         if (!mounted || !themed.mounted) return;
-        await _done(themed, o, minutes: outcome!.minutes, before: was);
+        await _done(themed, o, minutes: outcome.minutes, before: was);
       case FocusEnd.stuck:
         await cubit.smaller();
+      case FocusEnd.later:
+        await cubit.moveCurrent('TOMORROW');
+      case FocusEnd.letGo:
+        _letGoToast(themed, o, outcome!.undoId);
+        await cubit.load();
       case FocusEnd.stopped || null:
         break;
     }
+  }
+
+  /// Only the small first move was done: it counts, and the step stays.
+  Future<void> _didSmall(BuildContext themed, NowOption o, int minutes) async {
+    final cubit = context.read<NowCubit>();
+    try {
+      await _repo.respondNow(o.sourceType, o.sourceId, 'MINIMUM', minutes: minutes);
+      placesRefresh.value++;
+      if (themed.mounted) showAllyToast(themed, 'That counts. The rest of it is still here for later.');
+    } on QueuedOfflineException {
+      if (themed.mounted) showAllyToast(themed, "Saved offline. It'll sync when you're back online.");
+    } on ApiException catch (e) {
+      if (themed.mounted) showAllyToast(themed, e.message);
+    }
+    unawaited(cubit.load());
+  }
+
+  void _letGoToast(BuildContext themed, NowOption o, String? undoId) {
+    final cubit = context.read<NowCubit>();
+    placesRefresh.value++;
+    showAllyToast(themed, 'Let go of ${o.title}.',
+        onUndo: undoId == null
+            ? null
+            : () async {
+                try {
+                  await _repo.undo(undoId);
+                  placesRefresh.value++;
+                  await cubit.load();
+                } on ApiException catch (e) {
+                  if (themed.mounted) showAllyToast(themed, e.message);
+                }
+              });
   }
 
   /// Done, from the card (no timer) or at the end of a session.
@@ -233,11 +277,23 @@ class _TodayScreenState extends State<TodayScreen> {
       if (go == true && mounted && themed.mounted) await _runFree(themed, o, minutes: 5);
       return;
     }
+    if (outcome?.end == FocusEnd.letGo) return _letGoToast(themed, o, outcome!.undoId);
+    if (outcome?.end == FocusEnd.later) {
+      try {
+        final r = await _repo.nowAdvice(o.sourceType, o.sourceId, 'TOMORROW');
+        placesRefresh.value++;
+        if (themed.mounted) showAllyToast(themed, (r['message'] as String?) ?? 'Moved to tomorrow.');
+      } on ApiException catch (e) {
+        if (themed.mounted) showAllyToast(themed, e.message);
+      }
+      return;
+    }
     if (outcome?.end != FocusEnd.done) return;
+    if (outcome!.smaller) return _didSmall(themed, o, outcome.minutes);
     final was = await before;
     String? undoId;
     try {
-      undoId = await _repo.respondNow(o.sourceType, o.sourceId, 'DONE', minutes: outcome!.minutes, count: o.count);
+      undoId = await _repo.respondNow(o.sourceType, o.sourceId, 'DONE', minutes: outcome.minutes, count: o.count);
       placesRefresh.value++;
     } on QueuedOfflineException {
       if (themed.mounted) _toast(themed, "Saved offline. It'll sync when you're back online.");

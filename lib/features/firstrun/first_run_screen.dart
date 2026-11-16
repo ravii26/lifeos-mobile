@@ -9,6 +9,7 @@ import '../../design/components.dart';
 import '../../design/tokens.dart';
 import '../../design/type.dart';
 import '../areas/areas_overview.dart' show AreaMode, loadAreasOverview;
+import '../areas/when_picker.dart';
 import '../session/focus_session_screen.dart';
 import '../talk/voice_input.dart';
 import '../week/review_rules.dart' show minutesLabel;
@@ -159,7 +160,7 @@ class _FirstRunScreenState extends State<FirstRunScreen> {
   Future<void> _apply() => _run(() async {
         final r = await widget.repo.firstRunApply(
           areas: [for (final a in d.areas) {'name': a.name, 'mode': a.mode}],
-          items: [for (final i in d.items) i.toJson()],
+          items: [for (final i in d.kept) i.toApply()],
         );
         d.applied = r;
         await _go(4);
@@ -314,7 +315,7 @@ class _FirstRunScreenState extends State<FirstRunScreen> {
 
   Widget? _bottom(AllyColors c) => switch (d.step) {
         0 => _busy ? null : AllyButton('Sort it for me', wide: true, onPressed: _text.text.trim().length < 3 ? null : _sort),
-        1 => AllyButton('Continue', wide: true, onPressed: d.items.isEmpty ? null : () => _go(2)),
+        1 => AllyButton('Continue', wide: true, onPressed: d.kept.isEmpty ? null : () => _go(2)),
         2 => _weekSet
             ? AllyButton('Continue', wide: true, onPressed: () => _go(3))
             : AllyButton(_busy ? 'Working it out…' : 'This is my week', wide: true, onPressed: _busy ? null : _setWeek),
@@ -326,7 +327,12 @@ class _FirstRunScreenState extends State<FirstRunScreen> {
 
   List<Widget> _heard(BuildContext themed, AllyColors c, Widget? err) => [
         Text("Here's what I heard", style: AllyType.h1(color: c.ink)),
-        Text(d.byCode ? 'Sorted without AI this time, by plain words. Tap anything to move or rename it.' : 'Tap anything to move or rename it.',
+        Text(
+            d.byCode
+                ? 'Sorted without AI this time, by plain words. Tap anything to change it.'
+                : d.items.any((i) => i.isIdea)
+                    ? "Each one says where it came from. Tap anything to change it, and untick any of Ally's ideas you don't want."
+                    : 'Each one says where it came from. Tap anything to change it.',
             style: AllyType.body(color: c.muted)),
         for (var k = 0; k < d.areas.length; k++)
           AllyCard(
@@ -351,10 +357,29 @@ class _FirstRunScreenState extends State<FirstRunScreen> {
                     constraints: const BoxConstraints(minHeight: 48),
                     child: Padding(
                       padding: const EdgeInsets.symmetric(vertical: Sp.x2),
-                      child: Row(children: [
-                        Expanded(child: Text(i.title, style: AllyType.body(color: c.ink))),
+                      child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                        Expanded(
+                          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                            Text(i.title, style: AllyType.body(color: i.on ? c.ink : c.faint)),
+                            if (_source(i) case final from?) Text(from, style: AllyType.small(color: c.faint)),
+                            if (i.isIdea && i.reason != null) Text(i.reason!, style: AllyType.small(color: c.muted)),
+                          ]),
+                        ),
                         const SizedBox(width: Sp.x2),
-                        Text(kindLabel(i.kind), style: AllyType.small(color: c.faint)),
+                        Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
+                          Text(kindLabel(i.kind), style: AllyType.small(color: c.faint)),
+                          if (_whenOf(i).words(DateTime.now()) case final w? when i.kind == 'TASK') Text(w, style: AllyType.small(color: c.muted)),
+                        ]),
+                        // Ally's ideas come ticked: one tap leaves an idea out.
+                        if (i.isIdea)
+                          AllyCheck(
+                            done: i.on,
+                            semanticLabel: "Keep Ally's idea: ${i.title}",
+                            onTap: () {
+                              setState(() => i.on = !i.on);
+                              d.save();
+                            },
+                          ),
                       ]),
                     ),
                   ),
@@ -389,24 +414,55 @@ class _FirstRunScreenState extends State<FirstRunScreen> {
     await d.save();
   }
 
+  /// Where an item came from, said plainly; null when nothing is known (an older draft).
+  static String? _source(FrItem i) {
+    if (i.isIdea) return i.ideaFor == null ? "Ally's idea" : "Ally's idea for \u201c${i.ideaFor}\u201d";
+    return i.said == null ? null : 'From what you said: \u201c${i.said}\u201d';
+  }
+
+  static StepWhen _whenOf(FrItem i) => StepWhen(kind: i.due == null ? null : (i.dueKind ?? 'ON'), day: i.due, from: i.windowFrom, to: i.windowTo);
+
+  /// Change anything about an item before it is saved: its name, what kind of
+  /// thing it is, when it happens (a to-do), and its area; or remove it.
   Future<void> _editItem(BuildContext themed, FrItem item) async {
-    var newArea = '';
+    var title = item.title, kind = item.kind, area = item.areaName, newArea = '';
+    var when = _whenOf(item), whenOk = true;
     final result = await showAllySheet<String>(
       themed,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, set) => Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-          Text(item.title, style: AllyType.h2(color: ctx.ac.ink)),
+          Text('Edit', style: AllyType.h2(color: ctx.ac.ink)),
+          if (_source(item) case final from?) Text(from, style: AllyType.small(color: ctx.ac.faint)),
+          const SizedBox(height: Sp.x3),
+          TextFormField(
+            initialValue: item.title,
+            maxLength: 200,
+            textCapitalization: TextCapitalization.sentences,
+            style: AllyType.body(color: ctx.ac.ink),
+            decoration: const InputDecoration(hintText: 'What it is', counterText: ''),
+            onChanged: (v) => set(() => title = v),
+          ),
           const SizedBox(height: Sp.x3),
           AllySegmented<String>(
             options: const {'GOAL': 'Goal', 'TASK': 'To-do', 'HABIT': 'Routine'},
-            value: item.kind,
-            onChanged: (k) => set(() => item.kind = k),
+            value: kind,
+            onChanged: (k) => set(() => kind = k),
           ),
+          if (kind == 'TASK') ...[
+            const SizedBox(height: Sp.x4),
+            WhenPicker(
+              initial: when,
+              onChanged: (w, ok) => set(() {
+                when = w;
+                whenOk = ok;
+              }),
+            ),
+          ],
           const SizedBox(height: Sp.x4),
-          Text('MOVE TO', style: AllyType.eyebrow(color: ctx.ac.faint)),
+          Text('AREA', style: AllyType.eyebrow(color: ctx.ac.faint)),
           const SizedBox(height: Sp.x2),
           Wrap(spacing: Sp.x2, runSpacing: Sp.x2, children: [
-            for (final a in d.areas) AllyChip(a.name, selected: a.name == item.areaName, onTap: () => Navigator.of(ctx).pop('move:${a.name}')),
+            for (final a in d.areas) AllyChip(a.name, selected: a.name == area, onTap: () => set(() => area = a.name)),
           ]),
           const SizedBox(height: Sp.x3),
           Row(children: [
@@ -418,17 +474,36 @@ class _FirstRunScreenState extends State<FirstRunScreen> {
                 onChanged: (v) => newArea = v,
               ),
             ),
-            IconButton(tooltip: 'Move to the new area', icon: const Icon(Icons.arrow_forward_rounded), onPressed: () => Navigator.of(ctx).pop('move:$newArea')),
+            IconButton(
+                tooltip: 'Move to the new area',
+                icon: const Icon(Icons.arrow_forward_rounded),
+                onPressed: () {
+                  if (newArea.trim().isNotEmpty) area = newArea.trim();
+                  Navigator.of(ctx).pop('done');
+                }),
           ]),
           const SizedBox(height: Sp.x3),
-          AllyButton('Done', wide: true, onPressed: () => Navigator.of(ctx).pop('done')),
+          AllyButton('Done', wide: true, onPressed: title.trim().isEmpty || !whenOk ? null : () => Navigator.of(ctx).pop('done')),
           AllyButton('Remove', kind: AllyButtonKind.ghost, wide: true, onPressed: () => Navigator.of(ctx).pop('remove')),
         ]),
       ),
     );
+    if (result == null) return;
     setState(() {
-      if (result == 'remove') d.removeItem(item);
-      if (result != null && result.startsWith('move:') && result.substring(5).trim().isNotEmpty) d.moveItem(item, result.substring(5));
+      if (result == 'remove') {
+        d.removeItem(item);
+        return;
+      }
+      if (title.trim().isNotEmpty) item.title = title.trim();
+      item.kind = kind;
+      if (kind == 'TASK') {
+        item
+          ..due = when.day
+          ..dueKind = when.day == null ? null : when.kind
+          ..windowFrom = when.from
+          ..windowTo = when.to;
+      }
+      if (area != item.areaName) d.moveItem(item, area);
     });
     await d.save();
   }

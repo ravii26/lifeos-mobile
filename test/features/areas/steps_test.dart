@@ -12,6 +12,10 @@ class _Repo implements LifeRepository {
   final List<String> calls = [];
   bool oldServer = false;
 
+  /// The "when" sent with the last add or edit; null = not sent.
+  Map<String, dynamic>? lastWhen;
+  Map<String, dynamic> step = {'id': 's1', 'title': 'Draft the intro', 'minutes': 25, 'energy': 'HIGH', 'smaller': 'Write one line'};
+
   @override
   Future<Map<String, dynamic>> areasOverview() async => {
         'areas': [
@@ -23,7 +27,7 @@ class _Repo implements LifeRepository {
             'status': '1h of 3h this week',
             'goals': [],
             'nextSteps': [
-              {'id': 's1', 'title': 'Draft the intro', 'minutes': 25, 'energy': 'HIGH', 'smaller': 'Write one line'},
+              step,
             ],
             'routines': [],
           },
@@ -38,15 +42,18 @@ class _Repo implements LifeRepository {
 
   @override
   Future<({String message, String? activityId})> addStep(String areaId, String title,
-      {int? minutes, String? energy, String? smaller}) async {
+      {int? minutes, String? energy, String? smaller, Map<String, dynamic>? when, String? goalId}) async {
     if (oldServer) throw const ApiException('Not found', statusCode: 404);
+    lastWhen = when;
     return _ok('add:$areaId:$title:$minutes:$energy:$smaller', '$title added.');
   }
 
   @override
   Future<({String message, String? activityId})> editStep(String id,
-          {String? title, int? minutes, bool clearMinutes = false, String? energy, String? smaller}) async =>
-      _ok('edit:$id:$title:$minutes:$clearMinutes:$energy:$smaller', 'Saved.');
+      {String? title, int? minutes, bool clearMinutes = false, String? energy, String? smaller, Map<String, dynamic>? when}) async {
+    lastWhen = when;
+    return _ok('edit:$id:$title:$minutes:$clearMinutes:$energy:$smaller', 'Saved.');
+  }
 
   @override
   Future<({String message, String? activityId})> moveStep(String id, String when) async =>
@@ -117,14 +124,71 @@ void main() {
     await t.pump(const Duration(seconds: 5));
   });
 
-  testWidgets('move and let go each take one tap', (t) async {
+  String key(DateTime d) => '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
+
+  testWidgets('when: anytime by default and not sent unless changed', (t) async {
     final repo = await _open(t);
     await _tap(t, find.text('Draft the intro'));
-    await _tap(t, find.text('Tomorrow'));
-    expect(repo.calls.last, 'move:s1:TOMORROW');
-    expect(find.text('Draft the intro moved to tomorrow.'), findsOneWidget);
+    expect(find.text('Offered whenever you have time for it.'), findsOneWidget);
+    await _tap(t, find.text('Save'));
+    expect(repo.lastWhen, isNull);
+    await t.pump(const Duration(seconds: 5));
+  });
+
+  testWidgets('when: on a day hides it until then; by a day is a deadline', (t) async {
+    final repo = await _open(t);
+    final tomorrow = key(DateTime.now().add(const Duration(days: 1)));
+    await _tap(t, find.text('Draft the intro'));
+    await _tap(t, find.text('On a day'));
+    expect(find.text('Choose a day.'), findsOneWidget);
+    expect(t.widget<AllyButton>(find.widgetWithText(AllyButton, 'Save')).onPressed, isNull);
+    await _tap(t, find.widgetWithText(AllyChip, 'Tomorrow'));
+    expect(find.text('Kept out of the way until tomorrow.'), findsOneWidget);
+    await _tap(t, find.text('Save'));
+    expect(repo.lastWhen, {'dueKind': 'ON', 'dueKey': tomorrow, 'windowFrom': null, 'windowTo': null});
     await t.pump(const Duration(seconds: 5));
 
+    await _tap(t, find.text('Draft the intro'));
+    await _tap(t, find.text('By a day'));
+    await _tap(t, find.widgetWithText(AllyChip, 'Tomorrow'));
+    expect(find.text('Offered any day until tomorrow, sooner as it gets close.'), findsOneWidget);
+    await _tap(t, find.text('Save'));
+    expect(repo.lastWhen?['dueKind'], 'BY');
+    await t.pump(const Duration(seconds: 5));
+  });
+
+  testWidgets('when: hours of the day, shown on the step and opened as set', (t) async {
+    final repo = _Repo()..step = {'id': 's1', 'title': 'Go running', 'minutes': 30, 'windowFrom': '06:00', 'windowTo': '08:00', 'when': 'Mornings 6 to 8'};
+    await _open(t, repo: repo);
+    expect(find.text('Mornings 6 to 8'), findsOneWidget);
+    await _tap(t, find.text('Go running'));
+    expect(t.widget<AllyChip>(find.widgetWithText(AllyChip, '6 to 8')).selected, isTrue);
+    expect(find.text('Offered only between 6 and 8, on any day.'), findsOneWidget);
+    await _tap(t, find.widgetWithText(AllyChip, 'Evening'));
+    expect(find.text('Offered only between 6 and 9, on any day.'), findsOneWidget);
+    await _tap(t, find.text('Save'));
+    expect(repo.lastWhen, {'dueKind': null, 'dueKey': null, 'windowFrom': '18:00', 'windowTo': '21:00'});
+    await t.pump(const Duration(seconds: 5));
+
+    await _tap(t, find.text('Go running'));
+    await _tap(t, find.widgetWithText(AllyChip, 'Any hour'));
+    await _tap(t, find.text('Save'));
+    expect(repo.lastWhen, {'dueKind': null, 'dueKey': null, 'windowFrom': null, 'windowTo': null});
+    await t.pump(const Duration(seconds: 5));
+  });
+
+  testWidgets('a date from an older server reads as "by"', (t) async {
+    final repo = _Repo()..step = {'id': 's1', 'title': 'Send the form', 'minutes': 10, 'dueKey': '2099-01-05'};
+    await _open(t, repo: repo);
+    await _tap(t, find.text('Send the form'));
+    expect(find.textContaining('Offered any day until'), findsOneWidget);
+    await _tap(t, find.text('Save'));
+    expect(repo.lastWhen, isNull);
+    await t.pump(const Duration(seconds: 5));
+  });
+
+  testWidgets('let go takes one tap', (t) async {
+    final repo = await _open(t);
     await _tap(t, find.text('Draft the intro'));
     await _tap(t, find.text('Let this go'));
     expect(repo.calls.last, 'letgo:s1');
@@ -142,6 +206,7 @@ void main() {
     await _tap(t, find.text('Light'));
     await _tap(t, find.text('Add step'));
     expect(repo.calls.single, 'add:a1:Outline chapter two:30:LOW:');
+    expect(repo.lastWhen, isNull);
     expect(find.text('Outline chapter two added.'), findsOneWidget);
     await t.pump(const Duration(seconds: 5));
   });

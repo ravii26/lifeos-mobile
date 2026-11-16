@@ -5,6 +5,9 @@ import '../../design/tokens.dart';
 import '../../design/type.dart';
 import '../today/day_shape.dart' show duration;
 import 'areas_overview.dart';
+import 'when_picker.dart';
+
+export 'when_picker.dart' show StepWhen;
 
 /// What the step sheet asks for. Exactly one kind per answer.
 sealed class StepAnswer {
@@ -22,13 +25,8 @@ class StepSave extends StepAnswer {
 
   /// Empty = no smaller version.
   final String smaller;
-  const StepSave(this.title, this.minutes, this.energy, this.smaller);
-}
-
-class StepMove extends StepAnswer {
-  /// TOMORROW | WEEKEND | NEXT_WEEK.
-  final String when;
-  const StepMove(this.when);
+  final StepWhen when;
+  const StepSave(this.title, this.minutes, this.energy, this.smaller, [this.when = StepWhen.anytime]);
 }
 
 class StepLetGo extends StepAnswer {
@@ -36,14 +34,18 @@ class StepLetGo extends StepAnswer {
 }
 
 /// Add a step, or change one: name, length, the energy it takes, a smaller
-/// version for hard days; and for an existing step, move it or let it go.
+/// version for hard days, and when it happens (on a day, by a day, hours of the
+/// day, or anytime); an existing step can also be let go.
 /// Pops with a [StepAnswer], or null when closed.
 class StepSheet extends StatefulWidget {
   /// Null to add a new step.
   final AreaStep? step;
   final String areaName;
 
-  const StepSheet({super.key, this.step, required this.areaName});
+  /// For tests.
+  final DateTime Function()? clock;
+
+  const StepSheet({super.key, this.step, required this.areaName, this.clock});
 
   @override
   State<StepSheet> createState() => _StepSheetState();
@@ -56,6 +58,10 @@ class _StepSheetState extends State<StepSheet> {
   late final _smaller = TextEditingController(text: widget.step?.smaller ?? '');
   late int? _minutes = widget.step?.minutes;
   late String _energy = widget.step?.energy ?? 'NORMAL';
+
+  // When it happens, and whether that choice is complete (a day picked when one is needed).
+  late StepWhen _when = StepWhen.of(widget.step);
+  bool _whenOk = true;
 
   bool get _adding => widget.step == null;
   bool get _named => _title.text.trim().isNotEmpty;
@@ -73,7 +79,7 @@ class _StepSheetState extends State<StepSheet> {
     super.dispose();
   }
 
-  void _save() => Navigator.of(context).pop<StepAnswer>(StepSave(_title.text.trim(), _minutes, _energy, _smaller.text.trim()));
+  void _save() => Navigator.of(context).pop<StepAnswer>(StepSave(_title.text.trim(), _minutes, _energy, _smaller.text.trim(), _when));
 
   @override
   Widget build(BuildContext context) {
@@ -102,6 +108,15 @@ class _StepSheetState extends State<StepSheet> {
             AllyChip(duration(m), selected: _minutes == m, onTap: () => setState(() => _minutes = _minutes == m ? null : m)),
         ]),
         const SizedBox(height: Sp.x4),
+        WhenPicker(
+          initial: _when,
+          clock: widget.clock,
+          onChanged: (w, ok) => setState(() {
+            _when = w;
+            _whenOk = ok;
+          }),
+        ),
+        const SizedBox(height: Sp.x4),
         Text('ENERGY IT TAKES', style: AllyType.eyebrow(color: c.faint)),
         const SizedBox(height: Sp.x2),
         AllySegmented<String>(
@@ -129,15 +144,8 @@ class _StepSheetState extends State<StepSheet> {
           decoration: const InputDecoration(hintText: 'For a hard day, e.g. "just open the file"', counterText: ''),
         ),
         const SizedBox(height: Sp.x4),
-        AllyButton(_adding ? 'Add step' : 'Save', wide: true, onPressed: _named ? _save : null),
+        AllyButton(_adding ? 'Add step' : 'Save', wide: true, onPressed: _named && _whenOk ? _save : null),
         if (!_adding) ...[
-          const SizedBox(height: Sp.x5),
-          Text('MOVE IT', style: AllyType.eyebrow(color: c.faint)),
-          const SizedBox(height: Sp.x2),
-          Wrap(spacing: Sp.x2, runSpacing: Sp.x2, children: [
-            for (final (label, to) in const [('Tomorrow', 'TOMORROW'), ('This weekend', 'WEEKEND'), ('Next week', 'NEXT_WEEK')])
-              AllyChip(label, onTap: () => Navigator.of(context).pop<StepAnswer>(StepMove(to))),
-          ]),
           const SizedBox(height: Sp.x3),
           AllyButton('Let this go',
               kind: AllyButtonKind.ghost,

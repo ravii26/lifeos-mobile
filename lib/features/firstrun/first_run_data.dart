@@ -15,11 +15,59 @@ class FrItem {
   String title;
   String kind;
   String areaName;
-  final String? due;
-  FrItem(this.title, this.kind, this.areaName, {this.due});
 
-  factory FrItem.fromJson(Json j) => FrItem(asString(j['title']), asString(j['kind'], 'TASK'), asString(j['areaName'], 'Other'), due: asStringOrNull(j['due']));
-  Json toJson() => {'title': title, 'kind': kind, 'areaName': areaName, 'due': due};
+  /// A day (YYYY-MM-DD): a goal's deadline; for a to-do, on or by that day.
+  String? due;
+
+  /// For a to-do: ON | BY, and the hours of the day ("HH:MM").
+  String? dueKind;
+  String? windowFrom;
+  String? windowTo;
+
+  /// SAID = the person's own words ([said] is the part of the text it came
+  /// from); IDEA = Ally's suggestion ([ideaFor] is what of theirs it is for,
+  /// [reason] why it helps).
+  final String origin;
+  final String? said;
+  final String? ideaFor;
+  final String? reason;
+
+  /// Kept? An idea can be unticked; it is then not set up.
+  bool on;
+
+  FrItem(this.title, this.kind, this.areaName,
+      {this.due, this.dueKind, this.windowFrom, this.windowTo, this.origin = 'SAID', this.said, this.ideaFor, this.reason, this.on = true});
+
+  bool get isIdea => origin == 'IDEA';
+
+  factory FrItem.fromJson(Json j) => FrItem(
+        asString(j['title']),
+        asString(j['kind'], 'TASK'),
+        asString(j['areaName'], 'Other'),
+        due: asStringOrNull(j['due']),
+        dueKind: asStringOrNull(j['dueKind']),
+        windowFrom: asStringOrNull(j['windowFrom']),
+        windowTo: asStringOrNull(j['windowTo']),
+        origin: asString(j['origin'], 'SAID'),
+        said: asStringOrNull(j['said']),
+        ideaFor: asStringOrNull(j['ideaFor']),
+        reason: asStringOrNull(j['reason']),
+        on: j['on'] == null ? true : asBool(j['on']),
+      );
+
+  /// For the phone's copy of the draft.
+  Json toJson() => {...toApply(), 'origin': origin, 'said': said, 'ideaFor': ideaFor, 'reason': reason, 'on': on};
+
+  /// What is set up. "When" belongs to to-dos; it is sent only when there is one,
+  /// so a server from before it existed is never asked about it.
+  Json toApply() => {
+        'title': title,
+        'kind': kind,
+        'areaName': areaName,
+        'due': due,
+        if (kind == 'TASK' && due != null && dueKind != null) 'dueKind': dueKind,
+        if (kind == 'TASK' && windowFrom != null && windowTo != null) ...{'windowFrom': windowFrom, 'windowTo': windowTo},
+      };
 }
 
 class FrArea {
@@ -106,6 +154,9 @@ class FirstRunDraft {
     }
     areas.removeWhere((a) => !items.any((i) => i.areaName == a.name));
   }
+
+  /// What will be set up: everything except ideas that were unticked.
+  List<FrItem> get kept => [for (final i in items) if (i.on) i];
 
   void renameArea(String from, String to) {
     final name = to.trim();

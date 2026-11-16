@@ -63,10 +63,22 @@ class _AreasHomeScreenState extends State<AreasHomeScreen> {
   Future<void> _open(BuildContext themed, int index) async {
     final data = _data;
     if (data == null) return;
-    await Navigator.of(themed).push(MaterialPageRoute<void>(
-      builder: (_) => AreaPage(area: data.areas[index], colorIndex: index, canSetTime: data.full, repo: _repo),
+    final area = data.areas[index];
+    final gone = await Navigator.of(themed).push(MaterialPageRoute<AreaLetGo>(
+      builder: (_) => AreaPage(area: area, colorIndex: index, canSetTime: data.full, repo: _repo),
     ));
-    _load();
+    await _load();
+    // The area page closes when its area is let go; the way back is offered here.
+    if (gone == null || !themed.mounted) return;
+    showAllyToast(themed, 'Let go of ${gone.name}. Nothing in it was deleted.', onUndo: () async {
+      try {
+        await _repo.updateArea(gone.id, isActive: true);
+        placesRefresh.value++;
+        await _load();
+      } on ApiException catch (e) {
+        if (themed.mounted) showAllyToast(themed, e.message);
+      }
+    });
   }
 
   Future<void> _add(BuildContext themed) async {
@@ -205,7 +217,7 @@ class _AreasHomeScreenState extends State<AreasHomeScreen> {
 
   Widget _row(BuildContext themed, AllyColors c, AreaStanding a, int i) => Pressable(
         scale: 0.985,
-        semanticLabel: '${a.name}, ${a.mode.label}, ${a.status}',
+        semanticLabel: '${a.name}, ${a.mode.label}, ${a.progressLine == null ? '' : '${a.progressLine}, '}${a.status}',
         onTap: () => _open(themed, i),
         child: Padding(
           padding: const EdgeInsets.symmetric(vertical: Sp.x3),
@@ -218,6 +230,7 @@ class _AreasHomeScreenState extends State<AreasHomeScreen> {
                   Text(a.name, style: AllyType.body(color: c.ink, w: FontWeight.w500)),
                   ModeTag(a.mode.label),
                 ]),
+                if (a.progressLine != null) Text(a.progressLine!, style: AllyType.small(color: c.muted)),
                 Text(a.status, style: AllyType.small(color: c.faint)),
               ]),
             ),

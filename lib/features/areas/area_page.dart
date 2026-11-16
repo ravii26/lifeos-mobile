@@ -17,13 +17,22 @@ import '../places/done_screen.dart' show DoneChoice;
 import '../session/completion_screen.dart';
 import '../session/focus_session_screen.dart';
 import 'concrete_goal_screen.dart';
+import 'milestones.dart';
 import '../../design/trend_line.dart';
 import 'number_sheets.dart';
 import 'plan_mode_sheet.dart';
+import 'rename_sheet.dart';
 import 'step_sheet.dart';
 import '../routines/new_routine_screen.dart';
 import '../routines/routine_page.dart';
 import 'tastes_sheet.dart';
+
+/// What the area page pops with when its area was let go, so the list can offer Undo.
+class AreaLetGo {
+  final String id;
+  final String name;
+  const AreaLetGo(this.id, this.name);
+}
 
 /// One area: where it stands this week, its mode, the time it gets, and what
 /// is next in it.
@@ -74,6 +83,103 @@ class _AreaPageState extends State<AreaPage> {
       if (mounted) setState(() => _saving = false);
     }
   }
+
+  /// Rename the area, or let it go (kept, not deleted; Undo on the Areas list).
+  Future<void> _editArea(BuildContext themed) async {
+    if (_saving) return;
+    final was = _area.name;
+    final answer = await showAllySheet<EditAnswer>(
+      themed,
+      builder: (_) => RenameSheet(
+        heading: 'Edit area',
+        name: was,
+        letGoLabel: 'Let this area go',
+        letGoNote: 'Letting go takes it off your areas. Nothing in it is deleted, and you can undo it.',
+      ),
+    );
+    if (answer == null || !mounted) return;
+    setState(() => _saving = true);
+    try {
+      switch (answer) {
+        case EditRename(:final name):
+          await _rename(themed, name, was);
+        case EditLetGo():
+          await widget.repo.updateArea(_area.id, isActive: false);
+          placesRefresh.value++;
+          if (themed.mounted) Navigator.of(themed).pop(AreaLetGo(_area.id, was));
+      }
+    } on ApiException catch (e) {
+      if (themed.mounted) showAllyToast(themed, e.message);
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  Future<void> _rename(BuildContext themed, String name, String was) async {
+    await widget.repo.updateArea(_area.id, name: name);
+    placesRefresh.value++;
+    await _reload();
+    if (!themed.mounted) return;
+    showAllyToast(themed, 'Renamed to $name.', onUndo: () async {
+      try {
+        await widget.repo.updateArea(_area.id, name: was);
+        placesRefresh.value++;
+        await _reload();
+      } on ApiException catch (e) {
+        if (themed.mounted) showAllyToast(themed, e.message);
+      }
+    });
+  }
+
+  /// Rename a goal, or let it go (its steps stay; Undo brings the goal back).
+  Future<void> _editGoal(BuildContext themed, String id, String title) async {
+    final answer = await showAllySheet<EditAnswer>(
+      themed,
+      builder: (_) => RenameSheet(
+        heading: 'Edit goal',
+        name: title,
+        letGoLabel: 'Let this goal go',
+        letGoNote: 'Letting go takes the goal off this area. You can undo it.',
+      ),
+    );
+    if (answer == null || !mounted) return;
+    final repo = widget.repo;
+    Future<void> apply({String? name, String? status}) async {
+      await repo.updateGoal(id, title: name, status: status);
+      placesRefresh.value++;
+      await _reload();
+    }
+
+    try {
+      final (message, undo) = switch (answer) {
+        EditRename(:final name) => ('Renamed to $name.', () => apply(name: title)),
+        EditLetGo() => ('Let go of $title.', () => apply(status: 'ACTIVE')),
+      };
+      await (answer is EditRename ? apply(name: answer.name) : apply(status: 'ABANDONED'));
+      if (!themed.mounted) return;
+      showAllyToast(themed, message, onUndo: () async {
+        try {
+          await undo();
+        } on ApiException catch (e) {
+          if (themed.mounted) showAllyToast(themed, e.message);
+        }
+      });
+    } on ApiException catch (e) {
+      if (themed.mounted) showAllyToast(themed, e.message);
+    }
+  }
+
+  // Narrow, still 48 tall: a step row holds two of these beside its tick.
+  static const _iconBox = BoxConstraints(minWidth: 36, minHeight: 48);
+
+  Widget _editIcon(AllyColors c, String label, VoidCallback? onTap) => IconButton(
+        onPressed: onTap,
+        tooltip: label,
+        padding: EdgeInsets.zero,
+        constraints: _iconBox,
+        style: IconButton.styleFrom(tapTargetSize: MaterialTapTargetSize.shrinkWrap),
+        icon: Icon(Icons.edit_outlined, size: 20, color: c.muted),
+      );
 
   Future<void> _setWeekly(BuildContext themed, int? next) async {
     if (_saving) return;
@@ -135,7 +241,10 @@ class _AreaPageState extends State<AreaPage> {
     final resting = _mode == AreaMode.rest;
     return Scaffold(
       backgroundColor: c.bg,
-      appBar: AppBar(),
+      appBar: AppBar(actions: [
+        _editIcon(c, 'Edit area', _saving ? null : () => _editArea(themed)),
+        const SizedBox(width: Sp.x2),
+      ]),
       body: ListView(
         padding: const EdgeInsets.fromLTRB(Sp.side, 0, Sp.side, Sp.x6),
         children: [
@@ -154,6 +263,8 @@ class _AreaPageState extends State<AreaPage> {
                 child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                   Text(a.name, style: AllyType.h1(color: c.ink)),
                   const SizedBox(height: Sp.x1),
+                  // Where the goal stands first, then time this week against plan.
+                  if (a.progressLine != null) Text(a.progressLine!, style: AllyType.body(color: c.ink)),
                   Text(a.status, style: AllyType.body(color: c.muted)),
                 ]),
               ),
@@ -208,11 +319,14 @@ class _AreaPageState extends State<AreaPage> {
               if (a.goals.isEmpty)
                 Text('No goal here yet.', style: AllyType.body(color: c.muted))
               else
-                for (final g in a.goals)
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: Sp.x1),
-                    child: Text(g, style: AllyType.body(color: c.ink, w: FontWeight.w500)),
-                  ),
+                for (final (i, g) in a.goals.indexed) ...[
+                  if (i > 0) const SizedBox(height: Sp.x3),
+                  Row(children: [
+                    Expanded(child: Text(g, style: AllyType.body(color: c.ink, w: FontWeight.w500))),
+                    if (i < a.goalIds.length && a.goalIds[i].isNotEmpty) _editIcon(c, 'Edit goal: $g', () => _editGoal(themed, a.goalIds[i], g)),
+                  ]),
+                  if (i < a.goalDetails.length) ..._milestones(themed, c, a.goalDetails[i], color, resting),
+                ],
               if (!resting) ...[
                 const SizedBox(height: Sp.x3),
                 AllyButton(a.goals.isEmpty ? 'Make a goal concrete' : 'Add a goal, made concrete',
@@ -295,6 +409,175 @@ class _AreaPageState extends State<AreaPage> {
     );
   }
 
+  /// A goal's milestones: the line, each milestone (reached, current, still to
+  /// come) with its edit button, and "Reached it?" once every step of the
+  /// current one is done. A goal without them can be split.
+  List<Widget> _milestones(BuildContext themed, AllyColors c, AreaGoal g, Color color, bool resting) {
+    if (g.milestones.isEmpty) {
+      if (resting || g.id.isEmpty) return const [];
+      return [
+        Align(
+          alignment: Alignment.centerLeft,
+          child: AllyButton('Split into milestones',
+              kind: AllyButtonKind.ghost, icon: Icons.linear_scale_rounded, onPressed: () => _split(themed, g)),
+        ),
+      ];
+    }
+    final current = g.current;
+    return [
+      if (g.line != null) ...[
+        const SizedBox(height: Sp.x1),
+        Text(g.line!, style: AllyType.small(color: c.muted)),
+      ],
+      const SizedBox(height: Sp.x2),
+      AllyCard(
+        padding: const EdgeInsets.fromLTRB(Sp.x3, Sp.x1, Sp.x1, Sp.x1),
+        child: Column(children: [
+          for (var i = 0; i < g.milestones.length; i++) ...[
+            if (i > 0) Divider(color: c.line, height: 1),
+            _milestoneRow(themed, c, g, g.milestones[i], color),
+          ],
+        ]),
+      ),
+      if (g.ready && current != null) ...[
+        const SizedBox(height: Sp.x2),
+        AllyCard(
+          child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+            Text('Every step of "${current.title}" is done. Reached it?', style: AllyType.body(color: c.ink)),
+            const SizedBox(height: Sp.x3),
+            Wrap(spacing: Sp.x2, runSpacing: Sp.x2, children: [
+              AllyButton('Yes, reached', icon: Icons.flag_rounded, onPressed: () => _reach(themed, g, current)),
+              AllyButton('Add a step', kind: AllyButtonKind.ghost, onPressed: () => _openStep(themed, null, under: current)),
+            ]),
+          ]),
+        ),
+      ],
+    ];
+  }
+
+  Widget _milestoneRow(BuildContext themed, AllyColors c, AreaGoal g, Milestone m, Color color) {
+    final (icon, tint, said) = switch (m.state) {
+      MilestoneState.reached => (Icons.check_circle_rounded, c.done, 'reached'),
+      MilestoneState.current => (Icons.radio_button_checked_rounded, color, 'current'),
+      MilestoneState.next => (Icons.radio_button_unchecked_rounded, c.faint, 'still to come'),
+    };
+    final steps = m.state == MilestoneState.current && m.stepsTotal > 0 ? '${m.stepsDone} of ${m.stepsTotal}' : null;
+    // One spoken line for the milestone; its edit button stays a separate control.
+    return Row(children: [
+      Expanded(
+        child: Semantics(
+          container: true,
+          label: '${m.title}, $said${steps == null ? '' : ', $steps steps done'}',
+          child: ExcludeSemantics(
+            child: Row(children: [
+              Icon(icon, size: 20, color: tint),
+              const SizedBox(width: Sp.x3),
+              Expanded(
+                child: Text(m.title,
+                    style: AllyType.body(
+                        color: m.state == MilestoneState.next ? c.muted : c.ink, w: m.state == MilestoneState.current ? FontWeight.w600 : FontWeight.w400)),
+              ),
+              if (steps != null) ...[
+                const SizedBox(width: Sp.x2),
+                Text(steps, style: AllyType.num(color: c.faint)),
+              ],
+            ]),
+          ),
+        ),
+      ),
+      _editIcon(c, 'Edit milestone: ${m.title}', () => _editMilestone(themed, g, m)),
+    ]);
+  }
+
+  Future<void> _undoToast(BuildContext themed, String message, String? undoId) async {
+    if (!themed.mounted) return;
+    showAllyToast(themed, message,
+        onUndo: undoId == null || undoId.isEmpty
+            ? null
+            : () async {
+                try {
+                  await widget.repo.undo(undoId);
+                  placesRefresh.value++;
+                  await _reload();
+                } on ApiException catch (e) {
+                  if (themed.mounted) showAllyToast(themed, e.message);
+                }
+              });
+  }
+
+  Future<void> _split(BuildContext themed, AreaGoal g) async {
+    final id = await showAllySheet<String>(themed, builder: (_) => SplitGoalSheet(goalId: g.id, goalTitle: g.title, repo: widget.repo));
+    if (id == null || !mounted) return;
+    placesRefresh.value++;
+    await _reload();
+    if (!themed.mounted) return;
+    await _undoToast(themed, 'Split into milestones. Steps show for the first one.', id);
+  }
+
+  Future<void> _editMilestone(BuildContext themed, AreaGoal g, Milestone m) async {
+    final answer = await showAllySheet<MilestoneAnswer>(themed,
+        builder: (_) => MilestoneSheet(title: m.title, current: m.state == MilestoneState.current, reached: m.state == MilestoneState.reached));
+    if (answer == null || !mounted) return;
+    final repo = widget.repo;
+    try {
+      switch (answer) {
+        case MilestoneRename(:final title):
+          await repo.updateGoal(m.id, title: title);
+          placesRefresh.value++;
+          await _reload();
+          if (!themed.mounted) return;
+          showAllyToast(themed, 'Renamed to $title.', onUndo: () async {
+            try {
+              await repo.updateGoal(m.id, title: m.title);
+              await _reload();
+            } on ApiException catch (e) {
+              if (themed.mounted) showAllyToast(themed, e.message);
+            }
+          });
+        case MilestoneReached():
+          if (themed.mounted) await _reach(themed, g, m);
+        case MilestoneLetGo():
+          final r = await repo.letGoMilestone(m.id);
+          placesRefresh.value++;
+          await _reload();
+          if (!themed.mounted) return;
+          await _undoToast(themed, r.message, r.activityId);
+      }
+    } on ApiException catch (e) {
+      if (themed.mounted) showAllyToast(themed, e.message);
+    }
+  }
+
+  /// Reached: the calm moment, then the next milestone opens. Undo puts it back.
+  Future<void> _reach(BuildContext themed, AreaGoal g, Milestone m) async {
+    try {
+      final r = await widget.repo.reachMilestone(m.id);
+      placesRefresh.value++;
+      await _reload();
+      if (!themed.mounted) return;
+      final undo = await showAllySheet<bool>(
+        themed,
+        builder: (_) => MilestoneReachedSheet(
+          title: m.title,
+          next: r.next,
+          firstStep: r.firstStep,
+          reached: g.reached + 1,
+          total: g.milestones.length,
+          color: themed.ac.area(widget.colorIndex),
+          canUndo: r.activityId != null,
+        ),
+      );
+      if (undo == true && r.activityId != null) {
+        await widget.repo.undo(r.activityId!);
+        placesRefresh.value++;
+        await _reload();
+        if (themed.mounted) showAllyToast(themed, '${m.title} is the current milestone again.');
+      }
+    } on ApiException catch (e) {
+      if (themed.mounted) showAllyToast(themed, e.message);
+    }
+  }
+
   Future<void> _reload() async {
     try {
       final all = (await loadAreasOverview(widget.repo)).areas;
@@ -352,10 +635,67 @@ class _AreaPageState extends State<AreaPage> {
   Future<void> _tryFirst(BuildContext themed, AreaStep step, int minutes) async {
     final color = themed.ac.area(widget.colorIndex);
     final outcome = await Navigator.of(context).push<FocusOutcome>(MaterialPageRoute(
-      builder: (_) => FocusSessionScreen(title: step.title, minutes: minutes, areaName: _area.name, areaColor: color),
+      builder: (_) => FocusSessionScreen(title: step.title, minutes: minutes, areaName: _area.name, areaColor: color, stepId: step.id, repo: widget.repo),
     ));
-    if (!mounted || !themed.mounted || outcome?.end != FocusEnd.done) return;
-    await _tick(themed, step);
+    if (!mounted || !themed.mounted) return;
+    await _afterSession(themed, step, outcome);
+  }
+
+  /// Start a step from its row: the "doing it" screen, then what its ending means.
+  Future<void> _startStep(BuildContext themed, AreaStep step) async {
+    final color = themed.ac.area(widget.colorIndex);
+    final outcome = await Navigator.of(context).push<FocusOutcome>(MaterialPageRoute(
+      builder: (_) => FocusSessionScreen(
+          title: step.title, minutes: step.minutes ?? 25, areaName: _area.name, areaColor: color, stepId: step.id, repo: widget.repo),
+    ));
+    if (!mounted || !themed.mounted) return;
+    await _afterSession(themed, step, outcome);
+  }
+
+  /// Done ticks the step; the small version counts and leaves it; Later moves it
+  /// to tomorrow; let go was saved on the screen. Each with Undo.
+  Future<void> _afterSession(BuildContext themed, AreaStep step, FocusOutcome? outcome) async {
+    final repo = widget.repo;
+    Future<void> toast(String message, String? undoId) async {
+      placesRefresh.value++;
+      await _reload();
+      if (!themed.mounted) return;
+      showAllyToast(themed, message,
+          onUndo: undoId == null
+              ? null
+              : () async {
+                  try {
+                    await repo.undo(undoId);
+                    placesRefresh.value++;
+                    await _reload();
+                  } on ApiException catch (e) {
+                    if (themed.mounted) showAllyToast(themed, e.message);
+                  }
+                });
+    }
+
+    try {
+      switch (outcome?.end) {
+        case FocusEnd.done when outcome!.smaller:
+          final id = await repo.respondNow('TASK', step.id, 'MINIMUM', minutes: outcome.minutes);
+          await toast('That counts. The rest of it is still here for later.', id);
+        case FocusEnd.done:
+          await _tick(themed, step);
+          await _reload();
+        case FocusEnd.later:
+          final r = await repo.moveStep(step.id, 'TOMORROW');
+          await toast(r.message, r.activityId);
+        case FocusEnd.letGo:
+          await toast('Let go of ${step.title}.', outcome!.undoId);
+        case FocusEnd.stuck || FocusEnd.stopped || null:
+          // A step reworded on the screen shows its new name.
+          await _reload();
+      }
+    } on QueuedOfflineException {
+      if (themed.mounted) showAllyToast(themed, "Saved offline. It'll sync when you're back online.");
+    } on ApiException catch (e) {
+      if (themed.mounted) showAllyToast(themed, e.message);
+    }
   }
 
   Future<void> _planChange(BuildContext themed) async {
@@ -601,22 +941,29 @@ class _AreaPageState extends State<AreaPage> {
     }
   }
 
+  /// The milestone new steps go under: the current one of the first goal that has milestones.
+  Milestone? get _currentMilestone => _area.goalDetails.map((g) => g.current).whereType<Milestone>().firstOrNull;
+
   /// Add (step null) or change a step: one sheet, then one call, with Undo.
-  Future<void> _openStep(BuildContext themed, AreaStep? step) async {
-    final answer = await showAllySheet<StepAnswer>(themed, builder: (_) => StepSheet(step: step, areaName: _area.name));
+  /// A new step goes under the current milestone when there is one.
+  Future<void> _openStep(BuildContext themed, AreaStep? step, {Milestone? under}) async {
+    final milestone = step == null ? (under ?? _currentMilestone) : null;
+    final answer = await showAllySheet<StepAnswer>(themed, builder: (_) => StepSheet(step: step, areaName: milestone?.title ?? _area.name));
     if (answer == null || !mounted) return;
     final repo = widget.repo;
     try {
       final r = switch (answer) {
-        StepSave(:final title, :final minutes, :final energy, :final smaller) => step == null
-            ? await repo.addStep(_area.id, title, minutes: minutes, energy: energy, smaller: smaller)
+        // "When" is sent only if it was set or changed, so an older server is never asked about it.
+        StepSave(:final title, :final minutes, :final energy, :final smaller, when: final at) => step == null
+            ? await repo.addStep(_area.id, title,
+                minutes: minutes, energy: energy, smaller: smaller, when: at.isAnytime ? null : at.toJson(), goalId: milestone?.id)
             : await repo.editStep(step.id,
                 title: title,
                 minutes: minutes,
                 clearMinutes: minutes == null && step.minutes != null,
                 energy: energy,
-                smaller: smaller),
-        StepMove(when: final to) => await repo.moveStep(step!.id, to),
+                smaller: smaller,
+                when: at == StepWhen.of(step) ? null : at.toJson()),
         StepLetGo() => await repo.letGoStep(step!.id),
       };
       placesRefresh.value++;
@@ -682,9 +1029,10 @@ class _AreaPageState extends State<AreaPage> {
                   style: AllyType.body(color: s.done ? c.faint : c.ink, w: FontWeight.w500)
                       .copyWith(decoration: s.done ? TextDecoration.lineThrough : null),
                 ),
-                if (s.energy == 'HIGH' || s.energy == 'LOW' || (s.smaller != null && s.smaller!.isNotEmpty))
+                if (s.when != null || s.energy == 'HIGH' || s.energy == 'LOW' || (s.smaller != null && s.smaller!.isNotEmpty))
                   Text(
                     [
+                      if (s.when != null) s.when!,
                       if (s.energy == 'HIGH') 'Demanding',
                       if (s.energy == 'LOW') 'Light',
                       if (s.smaller != null && s.smaller!.isNotEmpty) 'Smaller: ${s.smaller}',
@@ -698,6 +1046,17 @@ class _AreaPageState extends State<AreaPage> {
           ),
         ),
         if (s.minutes != null && s.minutes! > 0) Text(duration(s.minutes!), style: AllyType.num(color: c.faint)),
+        if (!s.done) ...[
+          IconButton(
+            onPressed: () => _startStep(themed, s),
+            tooltip: 'Start: ${s.title}',
+            padding: EdgeInsets.zero,
+            constraints: _iconBox,
+        style: IconButton.styleFrom(tapTargetSize: MaterialTapTargetSize.shrinkWrap),
+            icon: Icon(Icons.play_arrow_rounded, size: 22, color: c.ink),
+          ),
+          _editIcon(c, 'Edit step: ${s.title}', () => _openStep(themed, s)),
+        ],
         AllyCheck(done: s.done, semanticLabel: s.title, onTap: s.done ? null : () => _tick(themed, s)),
       ]);
 }

@@ -62,3 +62,5 @@ ios/.symlinks/
 .vscode/ (optional, only if shared settings)
 
 *.log
+# Widget Preview related
+.widget_preview/

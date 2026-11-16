@@ -8,6 +8,7 @@ import '../../design/components.dart';
 import '../../design/tokens.dart';
 import '../../design/type.dart';
 import '../today/day_shape.dart' show duration;
+import 'milestones.dart';
 
 /// What keeping the plan gave back: the first step, to start right away.
 class KeptPlan {
@@ -304,7 +305,20 @@ class _ConcreteGoalScreenState extends State<ConcreteGoalScreen> {
           for (final t in targets)
             (asString(t['title']), asString(t['unit']) == 'count' ? '${asInt(t['perWeek'])} ${asString(t['countUnit'], 'times')}' : duration(asInt(t['perWeek']))),
         ]),
-      if (milestones.isNotEmpty) _list(c, 'MILESTONES', [for (final m in milestones) (m, '')]),
+      if (milestones.isNotEmpty)
+        Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          Text('MILESTONES', style: AllyType.eyebrow(color: c.faint)),
+          const SizedBox(height: Sp.x1),
+          Text('Small goals of one to four weeks. Change any of them; the first steps are for the first one.',
+              style: AllyType.small(color: c.muted)),
+          const SizedBox(height: Sp.x2),
+          // Keyed by the draft, so a new draft starts a fresh list.
+          MilestoneEditor(
+            key: ObjectKey(_proposal),
+            initial: milestones,
+            onChanged: (m) => plan['milestones'] = m,
+          ),
+        ]),
       if (steps.isNotEmpty) _list(c, 'FIRST STEPS', [for (final s in steps) (asString(s['title']), duration(asInt(s['minutes'], 15)))]),
       error,
       Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
