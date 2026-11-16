@@ -10,6 +10,7 @@ import '../../core/notifications/notification_service.dart';
 import '../../data/models/user.dart';
 import '../../data/repositories/life_repository.dart';
 import '../../design/appearance.dart';
+import '../../design/components.dart' show showAllyToast;
 import '../areas/areas_home_screen.dart';
 import '../capture/capture_sheet.dart';
 import '../chat/chat_cubit.dart';
@@ -184,9 +185,7 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
             body: BlocListener<LifeCubit, LifeState>(
               listenWhen: (prev, curr) => curr.error != null && curr.error != prev.error,
               listener: (context, state) {
-                ScaffoldMessenger.of(context)
-                  ..hideCurrentSnackBar()
-                  ..showSnackBar(SnackBar(content: Text(state.error!)));
+                showAllyToast(context, state.error!);
                 context.read<LifeCubit>().clearError();
               },
               child: IndexedStack(

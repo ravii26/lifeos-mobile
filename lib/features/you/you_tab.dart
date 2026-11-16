@@ -24,6 +24,8 @@ import '../tasks/task_detail_screen.dart';
 import '../design_preview/design_preview_screen.dart';
 import '../firstrun/save_account.dart';
 import '../library/library_page.dart';
+import '../areas/area_page.dart';
+import '../areas/areas_overview.dart';
 import 'account_page.dart';
 import 'ally_works_page.dart';
 import 'appearance_page.dart';
@@ -77,6 +79,27 @@ class _YouTabState extends State<YouTab> {
     Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => body));
   }
 
+  /// A to-do found in Search opens its step sheet inside its area. A to-do
+  /// with no area (or one past the area's next steps) opens the earlier page.
+  Future<void> _openTask(String id) async {
+    try {
+      final data = await loadAreasOverview(_repo);
+      for (var i = 0; i < data.areas.length; i++) {
+        final area = data.areas[i];
+        if (area.nextSteps.any((s) => s.id == id)) {
+          if (!mounted) return;
+          await Navigator.of(context).push(MaterialPageRoute<void>(
+            builder: (_) => AreaPage(area: area, colorIndex: i, canSetTime: data.full, repo: _repo, openStepId: id),
+          ));
+          return;
+        }
+      }
+    } on ApiException {
+      // Falls through to the earlier page.
+    }
+    if (mounted) _push(TaskDetailScreen(taskId: id));
+  }
+
   Claim get _claim => widget.claim ?? getIt<AuthRepository>().claim;
 
   void _saveAccount() {
@@ -123,7 +146,7 @@ class _YouTabState extends State<YouTab> {
         repo: _repo,
         onOpen: (hit) => switch (hit.kind) {
           'MEMORY' => _push(MemoriesPage(repo: _repo)),
-          'TASK' => _push(TaskDetailScreen(taskId: hit.id)),
+          'TASK' => _openTask(hit.id),
           'NOTE' => _push(LibraryPage(repo: _repo)),
           'SAVE' => _push(LibraryPage(repo: _repo, start: LibrarySection.saved)),
           _ => null,

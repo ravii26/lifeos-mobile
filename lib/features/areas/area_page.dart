@@ -46,7 +46,10 @@ class AreaPage extends StatefulWidget {
   final bool canSetTime;
   final LifeRepository repo;
 
-  const AreaPage({super.key, required this.area, required this.colorIndex, required this.canSetTime, required this.repo});
+  /// Opens this step's edit sheet as soon as the page shows (from Search).
+  final String? openStepId;
+
+  const AreaPage({super.key, required this.area, required this.colorIndex, required this.canSetTime, required this.repo, this.openStepId});
 
   @override
   State<AreaPage> createState() => _AreaPageState();
@@ -234,7 +237,22 @@ class _AreaPageState extends State<AreaPage> {
     return Theme(data: AllyAppearance.themeOf(context), child: Builder(builder: _page));
   }
 
+  bool _autoOpened = false;
+
   Widget _page(BuildContext themed) {
+    final want = widget.openStepId;
+    if (want != null && !_autoOpened) {
+      _autoOpened = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted || !themed.mounted) return;
+        for (final s in _area.nextSteps) {
+          if (s.id == want && !s.done) {
+            _openStep(themed, s);
+            return;
+          }
+        }
+      });
+    }
     final c = themed.ac;
     final a = _area;
     final color = c.area(widget.colorIndex);

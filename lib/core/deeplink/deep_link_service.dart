@@ -5,11 +5,10 @@ import '../di/service_locator.dart';
 import '../intents/capture_intent_bus.dart';
 import '../widget/widget_sync_service.dart';
 import '../../data/repositories/life_repository.dart';
-import '../../features/focus/focus_screen.dart';
 import '../../features/chat/starters.dart' show talkRequest;
 
 /// Routes `lifeos://` links — fired by the home-screen widget (whole-widget
-/// tap → `lifeos://focus`, mic button → `lifeos://capture?voice=1`; iOS
+/// tap → `lifeos://focus` (opens Today), mic button → `lifeos://capture?voice=1`; iOS
 /// habit-checkbox tap → `lifeos://habit?id=...&action=toggle`, since iOS has
 /// no silent background-action path the way Android's Glance widget does),
 /// and by the Android App Actions / iOS Siri shortcut for voice capture.
@@ -38,8 +37,9 @@ class DeepLinkService {
     if (uri.scheme != 'lifeos') return;
     switch (uri.host) {
       case 'focus':
-        navigatorKey.currentState
-            ?.push(MaterialPageRoute(builder: (_) => const FocusScreen()));
+        // The widget tap lands on Today, which shows the one thing with Start
+        // (the doing-it screen) and any running timer. No bare timer screen.
+        navigatorKey.currentState?.popUntil((r) => r.isFirst);
         break;
       case 'habit':
         if (uri.queryParameters['action'] == 'toggle') {

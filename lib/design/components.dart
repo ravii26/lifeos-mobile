@@ -643,7 +643,10 @@ VoidCallback showAllyToast(
   Duration duration = const Duration(seconds: 4),
 }) {
   final overlay = Overlay.of(context, rootOverlay: true);
-  final theme = Theme.of(context);
+  // Called from the older shell (outside a new-look page), the theme has no
+  // Ally colours yet: take the person's appearance.
+  final base = Theme.of(context);
+  final theme = base.extension<AllyColors>() != null ? base : AllyAppearance.themeOf(context);
   late OverlayEntry entry;
   Timer? timer;
   var removed = false;
